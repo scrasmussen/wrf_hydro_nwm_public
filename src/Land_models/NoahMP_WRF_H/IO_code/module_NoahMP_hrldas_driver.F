@@ -1326,10 +1326,14 @@ end subroutine land_driver_ini
      if(noah_lsm%forc_typ .eq. 0) then
         call READFORC_HRLDAS(noah_lsm%INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, &
              noah_lsm%OLDDATE, noah_lsm%xstart, noah_lsm%XEND, noah_lsm%YSTART, &
-             noah_lsm%YEND, noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), &
+             noah_lsm%YEND, &
+             noah_lsm%forcing_name_T, noah_lsm%forcing_name_Q, noah_lsm%forcing_name_U, &
+             noah_lsm%forcing_name_V, noah_lsm%forcing_name_P, noah_lsm%forcing_name_LW, &
+             noah_lsm%forcing_name_SW, noah_lsm%forcing_name_PR, noah_lsm%forcing_name_SN, &
+             noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), &
              noah_lsm%V_PHY(:,1,:), noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, &
-             noah_lsm%RAINBL_tmp, noah_lsm%VEGFRA, noah_lsm%update_veg, noah_lsm%LAI, &
-             noah_lsm%update_lai)
+             noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, noah_lsm%VEGFRA, noah_lsm%update_veg, &
+             noah_lsm%LAI, noah_lsm%update_lai)
         ! =REFACTOR=, they have this! what to do with this?
         ! noah_lsm%VEGFRA = noah_lsm%VEGFRA * 100.
      else
@@ -1360,7 +1364,7 @@ end subroutine land_driver_ini
 	  noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
 	  noah_lsm%forcing_name_LF, &
           noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), noah_lsm%V_PHY(:,1,:), &
-	  noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, &
+	  noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, &
           noah_lsm%VEGFRA, noah_lsm%update_veg, noah_lsm%LAI, noah_lsm%update_lai)
 
      ! =REFACTOR= THIS WAS IN NOAHMPR
@@ -1392,7 +1396,7 @@ end subroutine land_driver_ini
      noah_lsm%RAINCV     = 0.0
      noah_lsm%RAINNCV    = noah_lsm%RAINBL
      noah_lsm%RAINSHV    = 0.0
-     noah_lsm%SNOWNCV    = state%SNOWBL ! =REFACTOR= in noahmpr it is NoahmpIO%SNOWBL
+     noah_lsm%SNOWNCV    = noah_lsm%SNOWBL ! =REFACTOR= in noahmpr it is NoahmpIO%SNOWBL
      noah_lsm%GRAUPELNCV = 0.0
      noah_lsm%HAILNCV    = 0.0
      noah_lsm%DZ8W = 2 * noah_lsm%ZLVL ! 2* to be consistent with WRF model level

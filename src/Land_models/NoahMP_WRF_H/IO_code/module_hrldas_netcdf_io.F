@@ -1900,9 +1900,9 @@ contains
     integer :: rank
 
     type(inputstruct) :: lastread = inputstruct("0000-00-00_00:00:00", &
-         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null())
+         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null() )
     type(inputstruct) :: nextread= inputstruct("0000-00-00_00:00:00", &
-         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null())
+         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null() )
 
 !KWM    print*, 'target_date        = ', target_date
 !KWM    print*, 'lastread%read_date = ', lastread%read_date
