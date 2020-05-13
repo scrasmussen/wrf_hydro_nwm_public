@@ -10,6 +10,11 @@ CPPHRLDAS = -D_HRLDAS_OFFLINE_
 
 all: $(OBJS)
 
+module_sf_noahmplsm.o: ../noahmp/src/module_sf_noahmplsm.F
+	@echo ""
+	$(COMPILERF90) $(CPPINVOKE) $(CPPFLAGS) $(CPPHRLDAS) -o $(@) -c $(F90FLAGS) $(LDFLAGS) $(FREESOURCE) ../noahmp/src/module_sf_noahmplsm.F
+	@echo ""
+
 %.o:%.F
 	@echo ""
 	$(COMPILERF90) $(CPPINVOKE) $(CPPFLAGS) $(CPPHRLDAS) -o $(@) -c -I../Utility_routines -Isurfex $(F90FLAGS) $(LDFLAGS) $(FREESOURCE) $(*).F
