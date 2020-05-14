@@ -1330,6 +1330,7 @@ end subroutine land_driver_ini
              noah_lsm%forcing_name_T, noah_lsm%forcing_name_Q, noah_lsm%forcing_name_U, &
              noah_lsm%forcing_name_V, noah_lsm%forcing_name_P, noah_lsm%forcing_name_LW, &
              noah_lsm%forcing_name_SW, noah_lsm%forcing_name_PR, noah_lsm%forcing_name_SN, &
+             noah_lsm%forcing_name_LF, &
              noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), &
              noah_lsm%V_PHY(:,1,:), noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, &
              noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, noah_lsm%VEGFRA, noah_lsm%update_veg, &
