@@ -443,7 +443,7 @@ Contains
 
 
 
-  subroutine READFORC_HRLDAS(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_HRLDAS(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp,lai,lqf,fpar)
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -460,6 +460,7 @@ Contains
     real,             dimension(ix,jx), intent(out) :: pcp
     real,             dimension(ix,jx), intent(inout) :: lai
     real,             dimension(ix,jx), intent(inout) :: fpar
+    real,             dimension(ix,jx), intent(inout) :: lqf
 
     character(len=256) :: units
     integer :: ierr
@@ -485,6 +486,7 @@ Contains
       if(maxval(fpar) .gt. 10 .and. maxval(fpar) .lt. 10000)  fpar = fpar * 1.E-2
     endif
     call get_2d_netcdf("LAI",     ncid, lai,   units, ix, jx, .FALSE., ierr)
+    call get_2d_netcdf("LQFRAC",  ncid, lqf,   units, ix, jx, .FALSE., ierr)
 
     ierr = nf_close(ncid)
 
@@ -898,7 +900,7 @@ Contains
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  &
        T2,q2x,u,v,pres,xlong,short,prcp1,&
-       lai,fpar,snodep,dt,k,prcp_old)
+       lai,lqf,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
    implicit none
    ! in variable
@@ -911,14 +913,13 @@ Contains
    ! tmp variable
    character(len=256) :: inflnm, inflnm2, product
    integer  :: i,j,mmflag,ierr_flg
-   real,dimension(ix,jx):: lai,fpar
+   real,dimension(ix,jx):: lai,lqf,fpar
    character(len=4) nwxst_t
    logical :: fexist
 
         inflnm = trim(indir)//"/"//&
              olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
              ".LDASIN_DOMAIN"//hgrid
-
 !!!DJG... Call READFORC_(variable) Subroutine for forcing data...
 !!!DJG HRLDAS Format Forcing with hour format filename (NOTE: precip must be in mm/s!!!)
    if(FORC_TYP.eq.1) then
@@ -935,7 +936,7 @@ Contains
         endif
 
       CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+          PRES,XLONG,SHORT,PRCP1,LAI,LQF,FPAR)
    end if
 
 
@@ -954,7 +955,7 @@ Contains
            call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
         endif
       CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+          PRES,XLONG,SHORT,PRCP1,LAI,LQF,FPAR)
    end if
 
 
@@ -1140,7 +1141,7 @@ Contains
 #endif
 
            CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-                PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+                PRES,XLONG,SHORT,PRCP1,LAI,LQF,FPAR)
            PRCP_old = PRCP1  ! This assigns new precip to last precip as a fallback for missing data...
         endif
 
@@ -1717,7 +1718,7 @@ Contains
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  &
        T2,q2x,u,v,pres,xlong,short,prcp1,&
-       lai,fpar,snodep,dt,k,prcp_old)
+       lai,lqf,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 
 
@@ -1727,13 +1728,13 @@ Contains
    character(len=256) :: filename
    integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
    real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
-          prcpnew,lai,fpar,snodep,prcp_old
+          prcpnew,lai,lqf,fpar,snodep,prcp_old
    real ::  dt
    ! tmp variable
    character(len=256) :: inflnm, product
    integer  :: i,j,mmflag
    real,dimension(global_nx,global_ny):: g_T2,g_Q2X,g_U,g_V,g_XLONG, &
-             g_SHORT,g_PRCP1,g_PRES,g_lai,g_snodep,g_prcp_old, g_fpar
+             g_SHORT,g_PRCP1,g_PRES,g_lai,g_lqf,g_snodep,g_prcp_old, g_fpar
    integer flag
 
 
@@ -1749,6 +1750,7 @@ Contains
      call write_io_real(prcp_old,g_PRCP_old)
 
      call write_io_real(lai,g_lai)
+     call write_io_real(lqf,g_lqf)
      call write_io_real(fpar,g_fpar)
      call write_io_real(snodep,g_snodep)
 
@@ -1759,7 +1761,7 @@ Contains
         indir,olddate,hgrid,&
         global_nx,global_ny,forc_typ,snow_assim,  &
         g_T2,g_q2x,g_u,g_v,g_pres,g_xlong,g_short,g_prcp1,&
-        g_lai,g_fpar,g_snodep,dt,k,g_prcp_old)
+        g_lai,g_lqf,g_fpar,g_snodep,dt,k,g_prcp_old)
 #ifdef HYDRO_D
      write(6,*) "finish read forcing,olddate ",olddate
 #endif
@@ -2250,7 +2252,7 @@ subroutine read_hydro_forcing_mpp1( &
      indir,olddate,hgrid, &
      ix,jx,forc_typ,snow_assim,  &
      T2,q2x,u,v,pres,xlong,short,prcp1,&
-     lai,fpar,snodep,dt,k,prcp_old)
+     lai,lqf,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 implicit none
 ! in variable
@@ -2263,7 +2265,7 @@ real ::  dt, wrf_dt
 ! tmp variable
 character(len=256) :: inflnm, inflnm2, product
 integer  :: i,j,mmflag,ierr_flg
-real,dimension(ix,jx):: lai,fpar
+real,dimension(ix,jx):: lai,lqf,fpar
 character(len=4) nwxst_t
 logical :: fexist
 
@@ -2271,9 +2273,9 @@ inflnm = trim(indir)//"/"//&
          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
          ".LDASIN_DOMAIN"//hgrid
 
+
 !!!DJG... Call READFORC_(variable) Subroutine for forcing data...
 !!!DJG HRLDAS Format Forcing with hour format filename (NOTE: precip must be in mm/s!!!)
-
 
 !!! FORC_TYPE 1 ============================================================================
 if(FORC_TYP.eq.1) then
@@ -2297,7 +2299,7 @@ if(FORC_TYP.eq.1) then
    print*, "read forcing data at ", OLDDATE,  trim(inflnm)
 #endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+        PRES,XLONG,SHORT,PRCP1,LAI,LQF,FPAR)
 
    where(PRCP1 .lt. 0) PRCP1= 0  ! set minimum to be 0
    where(PRCP1 .gt. 0.138889) PRCP1= 0.138889 ! set maximum to be 500 mm/h
@@ -2323,7 +2325,7 @@ if(FORC_TYP.eq.2) then
       call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
    endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+        PRES,XLONG,SHORT,PRCP1,LAI,LQF,FPAR)
 
    where(PRCP1 .lt. 0) PRCP1= 0  ! set minimum to be 0
    where(PRCP1 .gt. 0.138889) PRCP1= 0.138889 ! set maximum to be 500 mm/h
@@ -2537,7 +2539,7 @@ if(FORC_TYP.eq.6) then
 #endif
 
       call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-           PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+           PRES,XLONG,SHORT,PRCP1,LAI,LQF,FPAR)
       PRCP_old = PRCP1  ! This assigns new precip to last precip as a fallback for missing data...
    endif
 
@@ -2726,7 +2728,7 @@ end subroutine read_hydro_forcing_mpp1
 
 
 
-  subroutine READFORC_HRLDAS_mpp(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_HRLDAS_mpp(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,lqf,fpar)
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -2742,6 +2744,7 @@ end subroutine read_hydro_forcing_mpp1
     real,             dimension(ix,jx), intent(out) :: sw
     real,             dimension(ix,jx), intent(out) :: pcp
     real,             dimension(ix,jx), intent(inout) :: lai
+    real,             dimension(ix,jx), intent(inout) :: lqf
     real,             dimension(ix,jx), intent(inout) :: fpar
 
     character(len=256) :: units
@@ -2751,6 +2754,7 @@ end subroutine read_hydro_forcing_mpp1
     ! Open the NetCDF file.
 #ifdef MPP_LAND
     real, allocatable, dimension(:,:):: buf2
+
     if(my_id .eq. io_id) then
         allocate(buf2(global_nx,global_ny))
     else
@@ -2793,6 +2797,9 @@ end subroutine read_hydro_forcing_mpp1
     if(my_id .eq. io_id ) call get_2d_netcdf("LAI",     ncid, buf2,   units, ix, jx, .FALSE., ierr)
     call mpp_land_bcast_int1(ierr)
     if(ierr == 0) call decompose_data_real (buf2,lai)
+    if(my_id .eq. io_id ) call get_2d_netcdf("LQFRAC", ncid,buf2, units, global_nx, global_ny, .FALSE., ierr)
+    call mpp_land_bcast_int1(ierr)
+    if(ierr == 0) call decompose_data_real (buf2,lqf)
 
     deallocate(buf2)
 #else
@@ -2815,6 +2822,7 @@ end subroutine read_hydro_forcing_mpp1
       if(maxval(fpar) .gt. 10 .and. maxval(fpar) .lt. 10000)  fpar = fpar * 1.E-2
     endif
     call get_2d_netcdf("LAI",     ncid, lai,   units, ix, jx, .FALSE., ierr)
+    call get_2d_netcdf("LQFRAC",  ncid, lqf,   units, ix, jx, .FALSE., ierr)
 #endif
 
     ierr = nf_close(ncid)
@@ -3305,4 +3313,3 @@ end module module_lsm_forcing
       real, dimension(ix,jx):: infxsrt,soldrain
       call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
     end subroutine read_forc_ldasout_seq
-

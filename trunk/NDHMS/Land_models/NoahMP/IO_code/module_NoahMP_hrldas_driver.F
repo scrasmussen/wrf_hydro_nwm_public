@@ -221,6 +221,7 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  STBLCPXY  ! stable carbon in deep soil [g/m2]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  FASTCPXY  ! short-lived carbon, shallow soil [g/m2]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAI       ! leaf area index
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LQF       ! liquid fraction
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  XSAIXY    ! stem area index
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  TAUSSXY   ! snow age factor
 
@@ -648,17 +649,17 @@ module module_NoahMP_hrldas_driver
        noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, noah_lsm%start_hour, noah_lsm%start_min, 0
 
   startdate = olddate
-  
+
 #ifdef MPP_LAND
   ix = ix_tmp
   jx = jx_tmp
 #endif
-  
+
 #ifdef WRF_HYDRO
   forcdate = olddate
 #endif
-  
-  ! Convenience variables    
+
+  ! Convenience variables
   xstart = noah_lsm%xstart
   ystart = noah_lsm%ystart
   xend = noah_lsm%xend
@@ -810,6 +811,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( STBLCPXY  (XSTART:XEND,YSTART:YEND) )  ! stable carbon in deep soil [g/m2]
   ALLOCATE ( FASTCPXY  (XSTART:XEND,YSTART:YEND) )  ! short-lived carbon, shallow soil [g/m2]
   ALLOCATE ( LAI       (XSTART:XEND,YSTART:YEND) )  ! leaf area index
+  ALLOCATE ( LQF       (XSTART:XEND,YSTART:YEND) )  ! liquid fraction
   ALLOCATE ( XSAIXY    (XSTART:XEND,YSTART:YEND) )  ! stem area index
   ALLOCATE ( TAUSSXY   (XSTART:XEND,YSTART:YEND) )  ! snow age factor
 
@@ -986,6 +988,7 @@ module module_NoahMP_hrldas_driver
   STBLCPXY   = undefined_real
   FASTCPXY   = undefined_real
   LAI        = undefined_real
+  LQF        = undefined_real
   XSAIXY     = undefined_real
   TAUSSXY    = undefined_real
   XLONIN     = undefined_real
@@ -1553,8 +1556,7 @@ end subroutine land_driver_ini
            CALL HYDRO_frocing_drv(trim(noah_lsm%indir), forc_typ, wrf_hydro%snow_assim,olddate,                      &
                xstart, xend, ystart, yend,    &
                T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),P8W(:,1,:),    &
-               GLW,SWDOWN,RAINBL_tmp,LAI,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0)
-
+               GLW,SWDOWN,RAINBL_tmp,LAI,LQF,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0)
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
            call geth_newdate(newdate, forcDate, noah_lsm%FORCING_TIMESTEP)
@@ -1593,7 +1595,7 @@ end subroutine land_driver_ini
      V_PHY(:,2,:)   = V_PHY(:,1,:)    !
      QV_CURR(:,2,:) = QV_CURR(:,1,:)  !
      RAINBL = RAINBL_tmp * DTBL       ! RAINBL in WRF is [mm]
-     SNOWBL = SNOWBL * DTBL           ! 
+     SNOWBL = SNOWBL * DTBL           !
      SR         = 0.0                 ! Will only use component if opt_snf=4
      RAINCV     = 0.0
      RAINNCV    = RAINBL
