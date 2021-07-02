@@ -5,6 +5,8 @@
    type (subsurface_input_interface) :: subsurface_input
    type (subsurface_output_interface) :: subsurface_output
 
+   type (river_temperature), allocatable :: river_temp
+
    class (reservoir_container), allocatable, dimension(:) :: reservoirs
    integer, allocatable, dimension(:) :: reservoir_type ! specifying type of reservoir
    integer, allocatable, dimension(:) :: final_reservoir_type   ! resolved reservoir type (since it can change)
