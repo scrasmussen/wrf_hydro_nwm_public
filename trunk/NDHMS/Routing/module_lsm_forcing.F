@@ -2810,8 +2810,8 @@ end subroutine read_hydro_forcing_mpp1
     if(ierr == 0) call decompose_data_real (buf2,lai)
     if(my_id .eq. io_id ) call get_2d_netcdf("SNOW", ncid, buf2, units, global_nx, global_ny, .FALSE., ierr)
     call mpp_land_bcast_int1(ierr)
+    if(my_id .eq. io_id ) call debug_SNOW(buf2, global_nx, global_ny, 1, ierr, flnm)
     if (ierr == 0) then
-       if(my_id .eq. io_id ) call debug_SNOW(buf2, global_nx, global_ny, 1, ierr, flnm)
        call decompose_data_real (buf2,snowbl)
     else
        if(my_id .eq. io_id ) call get_2d_netcdf("LQFRAC", ncid, buf2, units, global_nx, global_ny, .FALSE., ierr)
@@ -3368,10 +3368,12 @@ subroutine debug_SNOW(buf2, nx, ny, var, ierr, flnm)
      write(1,*) "SNOW WAS READ from ", trim(flnm)
   else if (var .eq. 2 .and. ierr .eq. 0) then
      write(1,*) "LIQFRAC WAS READ from ", trim(flnm)
+     return
   else if (var .eq. 1 .and. ierr .ne. 0) then
      write(1,*) "SNOW WAS NOT READ from", trim(flnm)
   else if (var .eq. 2 .and. ierr .ne. 0) then
      write(1,*) "LIQFRAC WAS NOT READ from", trim(flnm)
+     return
   end if
 
   write(1,*) "size", nx, ny
