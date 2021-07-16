@@ -3368,11 +3368,13 @@ subroutine debug_SNOW(buf2, nx, ny, var, ierr, flnm)
      write(1,*) "SNOW WAS READ from ", trim(flnm)
   else if (var .eq. 2 .and. ierr .eq. 0) then
      write(1,*) "LIQFRAC WAS READ from ", trim(flnm)
-     return
   else if (var .eq. 1 .and. ierr .ne. 0) then
      write(1,*) "SNOW WAS NOT READ from", trim(flnm)
+     close(1)
+     return
   else if (var .eq. 2 .and. ierr .ne. 0) then
      write(1,*) "LIQFRAC WAS NOT READ from", trim(flnm)
+     close(1)
      return
   end if
 
