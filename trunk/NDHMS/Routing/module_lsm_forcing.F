@@ -2811,9 +2811,11 @@ end subroutine read_hydro_forcing_mpp1
     if(my_id .eq. io_id ) call get_2d_netcdf("SNOW", ncid, buf2, units, global_nx, global_ny, .FALSE., ierr)
     call mpp_land_bcast_int1(ierr)
     if (ierr == 0) then
+       if(my_id .eq. io_id ) call debug_SNOW(buf2, global_nx, global_ny, 1, ierr, flnm)
        call decompose_data_real (buf2,snowbl)
     else
        if(my_id .eq. io_id ) call get_2d_netcdf("LQFRAC", ncid, buf2, units, global_nx, global_ny, .FALSE., ierr)
+       if(my_id .eq. io_id ) call debug_SNOW(buf2, global_nx, global_ny, 2, ierr, flnm)
        call mpp_land_bcast_int1(ierr)
        if(ierr == 0) then
           allocate(liqfrac(ix,jx))
@@ -3348,3 +3350,42 @@ end module module_lsm_forcing
       real, dimension(ix,jx):: infxsrt,soldrain
       call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
     end subroutine read_forc_ldasout_seq
+
+subroutine debug_SNOW(buf2, nx, ny, var, ierr, flnm)
+  implicit none
+  character(len=*), intent(in)  :: flnm
+  integer, intent(in) :: nx, ny, var, ierr
+  real, dimension(nx, ny), intent(in) :: buf2
+  integer :: i,j
+  logical :: exists
+  inquire(file="lqf_debug.txt", exist=exists)
+  if (exists) then
+     open(unit=1, file="lqf_debug.txt", access="APPEND")
+  else
+     open(unit=1, file="lqf_debug.txt")
+  end if
+  if (var .eq. 1 .and. ierr .eq. 0) then
+     write(1,*) "SNOW WAS READ from ", trim(flnm)
+  else if (var .eq. 2 .and. ierr .eq. 0) then
+     write(1,*) "LIQFRAC WAS READ from ", trim(flnm)
+  else if (var .eq. 1 .and. ierr .ne. 0) then
+     write(1,*) "SNOW WAS NOT READ from", trim(flnm)
+  else if (var .eq. 2 .and. ierr .ne. 0) then
+     write(1,*) "LIQFRAC WAS NOT READ from", trim(flnm)
+  end if
+
+  write(1,*) "size", nx, ny
+  if (var .eq. 1) then
+     write(1,*) "SNOW(1:5,1:5) ="
+  else
+     write(1,*) "LIQFRAC(1:5,1:5) ="
+  end if
+
+  do i=1,5
+     do j=1,5
+        write(1,'(F10.3)', advance="no") buf2(i,j)
+     end do
+     write(1,*)
+  end do
+  close(1)
+end subroutine debug_SNOW
