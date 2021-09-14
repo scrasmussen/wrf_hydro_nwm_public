@@ -11,7 +11,8 @@ module config_base
   type NOAHLSM_OFFLINE_
      character(len=256) :: indir
      integer            :: nsoil ! number of soil layers
- !++ T.EI crocus
+!++ T.EI crocus
+     integer            :: crocus_opt = -1
      integer            :: act_lev
 ! -- T.EI
      integer            :: forcing_timestep
@@ -177,6 +178,7 @@ module config_base
   end type Configuration_
 
   type crocus_options
+     integer :: crocus_opt = 0
      integer :: act_lev = -999
   end type crocus_options
 
@@ -977,8 +979,8 @@ contains
        rewind(30)
        read(30, NOAHLSM_OFFLINE)
 #else
-            rewind(11)
-            read(11, NOAHLSM_OFFLINE)
+       rewind(11)
+       read(11, NOAHLSM_OFFLINE)
 #endif
        stop "FATAL ERROR: Problem reading namelist NOAHLSM_OFFLINE"
     endif
@@ -994,12 +996,17 @@ contains
     endif
 
 #ifndef NCEP_WCOSS
+    call read_crocus_namelist(crocus_opt, 30)
+#else
+    ! scr :: fill in with appropriate func call
+#endif
+
+#ifndef NCEP_WCOSS
     close(30)
 #else
     close(11)
 #endif
 
-    call read_crocus_namelist(crocus_opt)
 
     wrf_hydro%finemesh = 0!finemesh
     wrf_hydro%finemesh_factor = 0!finemesh_factor
@@ -1009,6 +1016,7 @@ contains
     noah_lsm%indir = indir
     noah_lsm%nsoil = nsoil ! number of soil layers
     !++ T.EI crocus
+    noah_lsm%crocus_opt = crocus_opt%crocus_opt
     noah_lsm%act_lev = crocus_opt%act_lev
     !-- T.EI
     noah_lsm%forcing_timestep = forcing_timestep
@@ -1071,25 +1079,39 @@ contains
 
   end subroutine init_noah_lsm_and_wrf_hydro
 
-  subroutine read_crocus_namelist(opt)
+  subroutine read_crocus_namelist(opt, f_in)
     type(crocus_options), intent(OUT) :: opt
-    character(len=10) :: filename = "crocus.nml"
-    logical :: f_exists
-    integer :: act_lev
-    integer :: f, ierr
+    integer, intent(IN), optional :: f_in
+    character(len=15) :: filename = "namelist.hrldas"
+    logical :: f_exists, f_opened
+    integer :: crocus_opt, act_lev
+    integer :: ierr, f_local
     namelist /CROCUS_nlist/ &
-         act_lev
+         crocus_opt, act_lev
 
-    inquire(file=filename, exist=f_exists)
-    if (f_exists .eqv. .false.) return
-
-    f = 27
-    open(f, file=filename, form="FORMATTED", err=ierr)
-    read(f, NML=BAR_LIST, iostat=ierr)
-    if (ierr .eq. 0) then
-       opt%act_lev = act_lev
+    ! check if file is opened
+    if (present(f_in)) then
+       rewind(30)
+       read(f_in, NML=CROCUS_nlist, iostat=ierr)
+    else
+       ! check that file exists
+       inquire(file=filename, exist=f_exists)
+       if (f_exists .eqv. .false.) &
+           call hydro_stop (" FATAL ERROR: namelist.hrldas does not exist")
+       open(f_local, file=filename, form="FORMATTED", iostat=ierr)
+       read(f_local, NML=CROCUS_nlist, iostat=ierr)
+       close(f_local)
     end if
-    close(f)
+
+    if ((ierr .ne. 0) .or. (crocus_opt .eq. 0)) &
+         return
+    if ((act_lev .gt. 50) .or. (act_lev .lt. 0)) then
+       call hydro_stop (" FATAL ERROR: Crocus act_lev out of range of 0-50 ")
+    end if
+
+    opt%crocus_opt = crocus_opt
+    opt%act_lev = act_lev
+
   end subroutine read_crocus_namelist
 
 end module config_base
