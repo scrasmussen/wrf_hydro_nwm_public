@@ -9,6 +9,8 @@ use module_version, only: get_code_version, get_nwm_version
 use orchestrator_base
 use module_hydro_stop, only: HYDRO_stop
 
+use iso_fortran_env, only: int64
+
 implicit none
 
 ! Module-wide variables
@@ -110,14 +112,16 @@ subroutine output_chrt_NWM(domainId)
    ! sorting has taken place by ascending feature_id value.
    real, allocatable, dimension(:) :: strFlowLocal,velocityLocal,qlossLocal
    real, allocatable, dimension(:,:) :: g_qlink
-   integer, allocatable, dimension(:) :: g_linkid,g_order
+   integer, allocatable, dimension(:) :: g_order
+   integer(kind=int64), allocatable, dimension(:) :: g_linkid
    real, allocatable, dimension(:) :: g_chlat,g_chlon,g_hlink,g_zelev
    real, allocatable, dimension(:) :: g_QLateral,g_velocity,g_qloss
    real, allocatable, dimension(:) :: g_nudge,g_qSfcLatRunoff
    real, allocatable, dimension(:) :: g_qBucket,g_qBtmVertRunoff,g_accBucket
    real*8, allocatable, dimension(:) :: g_accSfcLatRunoff
    real, allocatable, dimension(:,:) :: g_qlinkOut
-   integer, allocatable, dimension(:) :: g_orderOut,g_linkidOut
+   integer, allocatable, dimension(:) :: g_orderOut
+   integer(kind=int64), allocatable, dimension(:) :: g_linkidOut
    real, allocatable, dimension(:) :: g_chlatOut,g_chlonOut,g_hlinkOut,g_zelevOut
    real, allocatable, dimension(:) :: g_QLateralOut,g_velocityOut,g_qlossOut
    real, allocatable, dimension(:) :: g_nudgeOut,g_qSfcLatRunoffOut
@@ -134,6 +138,7 @@ subroutine output_chrt_NWM(domainId)
    integer :: numPtsOut
    real, allocatable, dimension(:,:) :: varMetaReal
    integer, allocatable, dimension(:,:) :: varMetaInt
+   integer(kind=int64), allocatable, dimension(:,:) :: varMetaInt8
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
@@ -407,7 +412,7 @@ subroutine output_chrt_NWM(domainId)
          call write_chanel_real(RT_DOMAIN(domainId)%CHLON,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlon)
          call write_chanel_real(RT_DOMAIN(domainId)%HLINK,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_hlink)
          call write_chanel_int(RT_DOMAIN(domainId)%ORDER,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_order)
-         call write_chanel_int(RT_DOMAIN(domainId)%linkid,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_linkid)
+         call write_chanel_int8(RT_DOMAIN(domainId)%linkid,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_linkid)
          call write_chanel_real(RT_DOMAIN(domainId)%ZELEV,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_zelev)
          call write_chanel_real(RT_DOMAIN(domainId)%QLateral,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_QLateral)
          call write_chanel_real(velocityLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_velocity)
@@ -654,7 +659,8 @@ subroutine output_chrt_NWM(domainId)
       allocate(varOutReal(fileMeta%numVars,numPtsOut))
       allocate(varOutInt(numPtsOut))
       allocate(varMetaReal(3,numPtsOut))
-      allocate(varMetaInt(2,numPtsOut))
+      allocate(varMetaInt(1,numPtsOut))
+      allocate(varMetaInt8(1,numPtsOut))
 
       varOutReal(1,:) = PACK(g_qlinkOut(:,1),g_outInd == 1)
       varOutReal(2,:) = PACK(g_nudgeOut,g_outInd == 1)
@@ -674,7 +680,7 @@ subroutine output_chrt_NWM(domainId)
       varMetaReal(2,:) = PACK(g_chlonOut,g_outInd == 1)
       varMetaReal(3,:) = PACK(g_zelevOut,g_outInd == 1)
       varMetaInt(1,:) = PACK(g_orderOut,g_outInd == 1)
-      varMetaInt(2,:) = PACK(g_linkidOut,g_outInd == 1)
+      varMetaInt8(1,:) = PACK(g_linkidOut,g_outInd == 1)
 
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
@@ -794,7 +800,7 @@ subroutine output_chrt_NWM(domainId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place inverse_flattening into crs variable.')
 
       ! Create feature_id variable
-      iret = nf90_def_var(ftn,"feature_id",nf90_int,dimId(1),featureVarId)
+      iret = nf90_def_var(ftn,"feature_id",nf90_int64,dimId(1),featureVarId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create feature_id variable.')
       iret = nf90_put_att(ftn,featureVarId,'long_name',trim(fileMeta%featureIdLName))
       call nwmCheck(diagFlag,iret,'ERROR: Uanble to place long_name attribute into feature_id variable')
@@ -959,7 +965,7 @@ subroutine output_chrt_NWM(domainId)
       ! Place link ID values into the NetCDF file
       iret = nf90_inq_varid(ftn,'feature_id',varId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to locate feature_id in NetCDF file.')
-      iret = nf90_put_var(ftn,varId,varMetaInt(2,:))
+      iret = nf90_put_var(ftn,varId,varMetaInt8(1,:))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into feature_id output variable.')
 
 #ifndef NWM_META
@@ -1013,6 +1019,7 @@ subroutine output_chrt_NWM(domainId)
       deallocate(varOutInt)
       deallocate(varMetaReal)
       deallocate(varMetaInt)
+      deallocate(varMetaInt8)
    endif
    deallocate(g_chlonOut)
    deallocate(g_chlatOut)
@@ -1113,7 +1120,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 !   integer :: dimId(7) ! NetCDF dimension ID values
 ! ++ T.EI crocus
    integer :: dimId(8) ! NetCDF dimension ID values
-! -- T.EI 
+! -- T.EI
    integer :: varId ! NetCDF variable ID value
    integer :: timeId ! NetCDF time variable ID
    integer :: refTimeId ! NetCDF reference_time variable ID
@@ -1236,15 +1243,16 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              1,1,1,1,1,1,1,1,1,1,& !61-70
                              1,1,1,1,1,1,1,1,1,1,& !71-80
                              1,1,1,1,1,1,1,1,1,1,& !81-90
-                             1,1,1,1,1,1,1,1,&      !91-98
-! ++ T.EI crocus
-                             1,1,1,& ! 99-101
+                             1,1,1,1,1,1,1,1,&     !91-98
+      ! ++ T.EI crocus
+                             1,1,1,& !99-101
                              1,1,1,& !102-104
                              1,1,1,& !105-107
                              1,1,1,& !108-110
                              1,1,1,& !111-113
-                             1,1,1] !114
-! -- T.EI   
+                             1,1,1]  !114
+      ! -- T.EI
+
   else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
       fileMeta%outFlag(:) = [0,0,0,0,0,0,0,0,0,0,& !1-10
@@ -1256,15 +1264,15 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,1,1,1,1,1,1,0,1,& !61-70
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
-                             0,1,1,0,1,0,0,1,&      !91-98
-! ++ T.EI crocus
-                             1,1,1,& ! 99-101
-                             1,1,1,& !102-104
-                             1,1,1,& !105-107
-                             1,1,1,& !108-110
-                             1,1,1,& !111-113
-                             1,1,1] !114
-! -- T.EI   
+                             0,1,1,0,1,0,0,1,&     !91-98
+      ! ++ T.EI crocus
+                             0,0,0,& !99-101
+                             0,0,0,& !102-104
+                             0,0,0,& !105-107
+                             0,0,0,& !108-110
+                             0,0,0,& !111-113
+                             0,0,0]  !114
+      ! -- T.EI
 
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
@@ -1277,15 +1285,15 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,1,1,0,0,1,0,0,& !61-70
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
-                             0,0,1,0,1,0,0,0,&      !91-98
-! ++ T.EI crocus
-                             0,0,0,& ! 99-101
+                             0,0,1,0,1,0,0,0,&     !91-98
+      ! ++ T.EI crocus
+                             0,0,0,& !99-101
                              0,0,0,& !102-104
                              0,0,0,& !105-107
                              0,0,0,& !108-110
                              0,0,0,& !111-113
-                             0,0,0] !114
-! -- T.EI   
+                             0,0,0]  !114
+      ! -- T.EI
 
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
@@ -1298,15 +1306,16 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,1,1,1,0,1,1,0,1,& !61-70
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
-                             1,1,1,0,1,0,0,0,&      !91-98
-! ++ T.EI crocus
-                             0,0,0,& ! 99-101
+                             1,1,1,0,1,0,0,0,&     !91-98
+      ! ++ T.EI crocus
+                             0,0,0,& !99-101
                              0,0,0,& !102-104
                              0,0,0,& !105-107
                              0,0,0,& !108-110
                              0,0,0,& !111-113
-                             0,0,0] !114
-! -- T.EI   
+                             0,0,0]  !114
+      ! -- T.EI
+
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
       fileMeta%outFlag(:) = [0,0,0,0,0,0,0,0,0,0,& !1-10
@@ -1318,15 +1327,15 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,1,0,0,0,0,1,& !61-70
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
-                             1,0,1,1,0,0,0,0,&      !91-98
-! ++ T.EI crocus
-                             0,0,0,& ! 99-101
+                             1,0,1,1,0,0,0,0,&     !91-98
+      ! ++ T.EI crocus
+                             0,0,0,& !99-101
                              0,0,0,& !102-104
                              0,0,0,& !105-107
                              0,0,0,& !108-110
                              0,0,0,& !111-113
-                             0,0,0] !114
-! -- T.EI   
+                             0,0,0]  !114
+      ! -- T.EI
 
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
@@ -1344,10 +1353,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,& ! 99-101
                              0,0,0,& !102-104
                              0,0,0,& !105-107
-                             0,0,0,& !108-110
-                             0,0,0,& !111-113
-                             0,0,0] !114
-! -- T.EI   
+                             1,1,0,& !108-110
+                             1,0,0,& !111-113
+                             1,1,1]  !114
+      ! -- T.EI
 
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
@@ -1367,9 +1376,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,& !105-107
                              0,0,0,& !108-110
                              0,0,0,& !111-113
-                             0,0,0] !114
-
-! -- T.EI   
+                             0,0,0]  !114
+! -- T.EI
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -1443,11 +1451,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define snow_layers dimension')
          iret = nf90_def_dim(ftnNoahMP,'reference_time',1,dimId(6))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define reference_time dimension')
-!++ T.EI crocus
          iret = nf90_def_dim(ftnNoahMP,'glacier_levels',fileMeta%act_lev,dimId(8))
-         write(*,*) 'glacier levels ', fileMeta%act_lev, dimid(8)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define act_layers dimension')
-! -- T.EI
          ! Only create vis_nir if we are outputting the two snow albedo variables.
          ! Otherwise these are unecessary dimensions.
          if ((fileMeta%outFlag(96) .eq. 1) .or. (fileMeta%outFlag(96) .eq. 1)) then
@@ -1782,9 +1787,6 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       ! Write array out to NetCDF file.
       if(myId .eq. 0) then
          iret = nf90_inq_varid(ftnNoahMP,trim(fileMeta%varNames(varInd)),varId)
-         write(*,*) trim(fileMeta%varNames(varInd))
-         write(*,*) varInd
-         write(*,*) iret
          call nwmCheck(diagFlag,iret,'ERROR: Unable to find variable ID for var: '//trim(fileMeta%varNames(varInd)))
          if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
             if(fileMeta%numLev(varInd) .eq. 1) then
@@ -2473,10 +2475,10 @@ subroutine output_lakes_NWM(domainId,iGrid)
    real, allocatable, dimension(:) :: g_lakeType
    real, allocatable, dimension(:) :: g_lake_assimilated_value
    character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_file
-   integer, allocatable, dimension(:) :: g_lakeid
+   integer(kind=int64), allocatable, dimension(:) :: g_lakeid
    real, allocatable, dimension(:) :: g_lakeLatOut,g_lakeLonOut,g_lakeElevOut
    real, allocatable, dimension(:) :: g_lakeInflowOut,g_lakeOutflowOut
-   integer, allocatable, dimension(:) :: g_lakeTypeOut, g_lakeidOut
+   integer(kind=int64), allocatable, dimension(:) :: g_lakeTypeOut, g_lakeidOut
    real, allocatable, dimension(:) :: g_lake_assimilated_valueOut
    character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_fileOut
    real, allocatable, dimension(:,:) :: varOutReal   ! Array holding output variables in real format
@@ -2858,7 +2860,7 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place inverse_flattening into crs variable.')
 
       ! Create feature_id variable
-      iret = nf90_def_var(ftn,"feature_id",nf90_int,dimId(1),featureVarId)
+      iret = nf90_def_var(ftn,"feature_id",nf90_int64,dimId(1),featureVarId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create feature_id variable.')
       iret = nf90_put_att(ftn,featureVarId,'long_name',trim(fileMeta%featureIdLName))
       call nwmCheck(diagFlag,iret,'ERROR: Uanble to place long_name attribute into feature_id variable')
@@ -3191,7 +3193,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    ! Allocatable array to hold global qlink values
    real, allocatable, dimension(:,:) :: g_qlink
    ! Allocatable array to hold streamflow index values
-   integer, allocatable, dimension(:,:) :: CH_NETLNK
+   integer(kind=int64), allocatable, dimension(:,:) :: CH_NETLNK
    ! allocatable global array to hold grid of output streamflow values
    integer, allocatable, dimension(:,:) :: tmpFlow
    real, allocatable, dimension(:,:) :: tmpFlowReal
@@ -3277,7 +3279,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
       call write_chanel_real(strFlowLocal,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_qlink(:,1))
       call write_chanel_real(RT_DOMAIN(domainId)%qlink(:,2),RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_qlink(:,2))
    endif
-   call write_IO_rt_int(RT_DOMAIN(domainId)%GCH_NETLNK, CH_NETLNK)
+   call write_IO_rt_int8(RT_DOMAIN(domainId)%GCH_NETLNK, CH_NETLNK)
 
    ! Initialize NWM dictionary derived type containing all the necessary metadat
    ! for the output file.
@@ -4190,7 +4192,7 @@ implicit none
    real, allocatable, dimension(:) :: g_chlat, g_chlon, g_hlink, strFlowLocal
    integer, allocatable, dimension(:) :: frxstPtsLocal, g_STRMFRXSTPTSOut
    real, allocatable, dimension(:) :: g_chlatOut, g_chlonOut, g_hlinkOut
-   integer, allocatable, dimension(:) :: g_linkid, g_linkidOut
+   integer(kind=int64), allocatable, dimension(:) :: g_linkid, g_linkidOut
 
 #ifdef MPP_LAND
    mppFlag = 1
@@ -4492,10 +4494,12 @@ subroutine output_chanObs_NWM(domainId)
    ! sorting has taken place by ascending feature_id value.
    real, allocatable, dimension(:) :: strFlowLocal,velocityLocal
    real, allocatable, dimension(:,:) :: g_qlink
-   integer, allocatable, dimension(:) :: g_linkid,g_order
+   integer, allocatable, dimension(:) :: g_order
+   integer(kind=int64), allocatable, dimension(:) :: g_linkid
    real, allocatable, dimension(:) :: g_chlat,g_chlon,g_hlink,g_zelev
    real, allocatable, dimension(:,:) :: g_qlinkOut
-   integer, allocatable, dimension(:) :: g_orderOut,g_linkidOut
+   integer, allocatable, dimension(:) :: g_orderOut
+   integer(kind=int64), allocatable, dimension(:) :: g_linkidOut
    real, allocatable, dimension(:) :: g_chlatOut,g_chlonOut,g_hlinkOut,g_zelevOut
    real, allocatable, dimension(:,:) :: varOutReal   ! Array holding output variables in real format
    integer, allocatable, dimension(:) :: varOutInt ! Array holding output variables after
@@ -4680,7 +4684,7 @@ subroutine output_chanObs_NWM(domainId)
          call write_chanel_real(RT_DOMAIN(domainId)%CHLAT,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlat)
          call write_chanel_real(RT_DOMAIN(domainId)%CHLON,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlon)
          call write_chanel_real(RT_DOMAIN(domainId)%HLINK,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_hlink)
-         call write_chanel_int(RT_DOMAIN(domainId)%linkid,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_linkid)
+         call write_chanel_int8(RT_DOMAIN(domainId)%linkid,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_linkid)
          call write_chanel_int(RT_DOMAIN(domainId)%ORDER,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_order)
          call write_chanel_real(RT_DOMAIN(domainId)%ZELEV,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_zelev)
       else
@@ -4902,7 +4906,7 @@ subroutine output_chanObs_NWM(domainId)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to place inverse_flattening into crs variable.')
 
          ! Create feature_id variable
-         iret = nf90_def_var(ftn,"feature_id",nf90_int,dimId(1),featureVarId)
+         iret = nf90_def_var(ftn,"feature_id",nf90_int64,dimId(1),featureVarId)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to create feature_id variable.')
          ! Specify these attributes based on channel routing methods specified by
          ! user.
@@ -5236,7 +5240,7 @@ subroutine output_gw_NWM(domainId,iGrid)
    integer :: gnbasns
    ! Allocatable arrays to hold output variables.
    real, allocatable, dimension(:) :: g_qin_gwsubbas,g_qout_gwsubbas,g_qloss_gwsubbas,g_z_gwsubbas
-   integer, allocatable, dimension(:) :: g_basnsInd
+   integer(kind=int64), allocatable, dimension(:) :: g_basnsInd
    real, allocatable, dimension(:,:) :: varOutReal   ! Array holding output variables in real format
    integer, allocatable, dimension(:) :: varOutInt ! Array holding output variables after
                                                      ! scale_factor/add_offset
@@ -5515,7 +5519,7 @@ subroutine output_gw_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into reference_time variable')
 
       ! Create feature_id variable
-      iret = nf90_def_var(ftn,"feature_id",nf90_int,dimId(1),featureVarId)
+      iret = nf90_def_var(ftn,"feature_id",nf90_int64,dimId(1),featureVarId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create feature_id variable.')
       iret = nf90_put_att(ftn,featureVarId,'long_name',trim(fileMeta%featureIdLName))
       call nwmCheck(diagFlag,iret,'ERROR: Uanble to place long_name attribute into feature_id variable')
@@ -5613,7 +5617,7 @@ subroutine output_gw_NWM(domainId,iGrid)
             else
                varOutInt(:) = NINT((varOutReal(iTmp,:)-fileMeta%addOffset(iTmp))/fileMeta%scaleFactor(iTmp))
             endif
-            ! Get NetCDF variable id.           
+            ! Get NetCDF variable id.
             iret = nf90_inq_varid(ftn,trim(fileMeta%varNames(iTmp)),varId)
             call nwmCheck(diagFlag,iret,'ERROR: Unable to find variable ID for var: '//trim(fileMeta%varNames(iTmp)))
             ! Put data into NetCDF file
