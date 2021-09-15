@@ -934,22 +934,22 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( CHSTARXY  (XSTART:XEND,YSTART:YEND) )  ! for consistency with MP_init; delete later
   ALLOCATE ( SEAICE    (XSTART:XEND,YSTART:YEND) )  ! seaice fraction
 ! ++ T.EI crocus
-   ALLOCATE ( PSNOWTHRUFALXY   (XSTART:XEND,YSTART:YEND) )  !
-   ALLOCATE ( PSNOWALBXY   (XSTART:XEND,YSTART:YEND) )  !
-   ALLOCATE ( PSNOWHEIGHTXY   (XSTART:XEND,YSTART:YEND) )  !
-   ALLOCATE ( PSNOWTOTSWEXY   (XSTART:XEND,YSTART:YEND) )  !
-   ALLOCATE ( FLOW_SNOW   (XSTART:XEND,YSTART:YEND) )  !
-   ALLOCATE ( FLOW_ICE    (XSTART:XEND,YSTART:YEND) )  !
-   ALLOCATE ( PSNOWHEATXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWRHOXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWSWEXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWGRAN1XY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWGRAN2XY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWAGEXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWLIQXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWTEMPXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWDZXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
-   ALLOCATE ( PSNOWHISTXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWTHRUFALXY   (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( PSNOWALBXY   (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( PSNOWHEIGHTXY   (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( PSNOWTOTSWEXY   (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( FLOW_SNOW   (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( FLOW_ICE    (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( PSNOWHEATXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWRHOXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWSWEXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWGRAN1XY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWGRAN2XY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWAGEXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWLIQXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWTEMPXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWDZXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
+  ALLOCATE ( PSNOWHISTXY  (XSTART:XEND,1:act_lev,YSTART:YEND) )
 ! -- T.EI
 
 
@@ -1310,25 +1310,25 @@ module module_NoahMP_hrldas_driver
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACSNOW"  , ACSNOW   )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAUSS"   , TAUSSXY  )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSFC"    , QSFC     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",SFCRUNOFF   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,UDRUNOFF    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",SFCRUNOFF)
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,UDRUNOFF )
 ! T.EI  crocus
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWAGE" ,PSNOWAGEXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWDZ" ,PSNOWDZXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWGRAN1" ,PSNOWGRAN1XY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWGRAN2" ,PSNOWGRAN2XY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWHEAT" ,PSNOWHEATXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWHIST" ,PSNOWHISTXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWLIQ" ,PSNOWLIQXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWRHO" ,PSNOWRHOXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWSWE" ,PSNOWSWEXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWTEMP" ,PSNOWTEMPXY    )
-    call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWALB" ,PSNOWALBXY    )
-    call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWHEIGHT" ,PSNOWHEIGHTXY    )
-    call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWTHRUFAL" ,PSNOWTHRUFALXY    )
-    call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWTOTSWE" ,PSNOWTOTSWEXY    )
-    call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FLOW_SNOW" ,FLOW_SNOW    )
-    call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FLOW_ICE" ,FLOW_ICE    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWAGE" ,    PSNOWAGEXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWDZ"  ,    PSNOWDZXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWGRAN1",   PSNOWGRAN1XY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWGRAN2",   PSNOWGRAN2XY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWHEAT",    PSNOWHEATXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWHIST",    PSNOWHISTXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWLIQ" ,    PSNOWLIQXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWRHO" ,    PSNOWRHOXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWSWE" ,    PSNOWSWEXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWTEMP",    PSNOWTEMPXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWALB" ,    PSNOWALBXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWHEIGHT",  PSNOWHEIGHTXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWTHRUFAL", PSNOWTHRUFALXY)
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWTOTSWE" , PSNOWTOTSWEXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FLOW_SNOW"   , FLOW_SNOW     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FLOW_ICE"    , FLOW_ICE      )
 
 ! -- T.EI
 #ifdef WRF_HYDRO
@@ -1590,7 +1590,7 @@ endif
                 IOCVARS(varind) = adjustl(VARLIST(1:(index(VARLIST, ',')-1)))
                 VARLIST = VARLIST((index(VARLIST, ',')+1):)
                 varind = varind + 1
-              endif
+        endif
    end do
 
    if(wrf_hydro%finemesh .ne. 0 ) then
@@ -2300,28 +2300,28 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,SFCRUNOFF , "SFCRUNOFF")
   call add_to_restart(ncid,UDRUNOFF  , "UDRUNOFF" )
 ! ++ T.EI crocus
-     call add_to_restart(ncid, PSNOWAGEXY ,"PSNOWAGE" ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWDZXY ,"PSNOWDZ"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWGRAN1XY ,"PSNOWGRAN1"   ,LAYERS="MAXS"  )
-     call add_to_restart(ncid, PSNOWGRAN2XY ,"PSNOWGRAN2"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWHEATXY ,"PSNOWHEAT" ,LAYERS="MAXS"    )
-     call add_to_restart(ncid, PSNOWHISTXY ,"PSNOWHIST"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWLIQXY ,"PSNOWLIQ"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWRHOXY ,"PSNOWRHO"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWSWEXY ,"PSNOWSWE"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWTEMPXY ,"PSNOWTEMP"  ,LAYERS="MAXS"   )
-     call add_to_restart(ncid, PSNOWALBXY ,"PSNOWALB"    )
-     call add_to_restart(ncid, PSNOWHEIGHTXY ,"PSNOWHEIGHT"    )
-     call add_to_restart(ncid, PSNOWTHRUFALXY ,"PSNOWTHRUFAL"    )
-     call add_to_restart(ncid, PSNOWTOTSWEXY ,"PSNOWTOTSWE"    )
-     call add_to_restart(ncid, FLOW_ICE ,"FLOW_ICE"    )
-     call add_to_restart(ncid, FLOW_SNOW ,"FLOW_SNOW"    )
-     ! -- T.EI
+  call add_to_restart(ncid, PSNOWAGEXY    , "PSNOWAGE"  , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWDZXY     , "PSNOWDZ"   , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWGRAN1XY  , "PSNOWGRAN1", LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWGRAN2XY  , "PSNOWGRAN2", LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWHEATXY   , "PSNOWHEAT" , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWHISTXY   , "PSNOWHIST" , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWLIQXY    , "PSNOWLIQ"  , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWRHOXY    , "PSNOWRHO"  , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWSWEXY    , "PSNOWSWE"  , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWTEMPXY   , "PSNOWTEMP" , LAYERS="MAXS")
+  call add_to_restart(ncid, PSNOWALBXY    , "PSNOWALB"    )
+  call add_to_restart(ncid, PSNOWHEIGHTXY , "PSNOWHEIGHT" )
+  call add_to_restart(ncid, PSNOWTHRUFALXY, "PSNOWTHRUFAL")
+  call add_to_restart(ncid, PSNOWTOTSWEXY , "PSNOWTOTSWE" )
+  call add_to_restart(ncid, FLOW_ICE      , "FLOW_ICE"    )
+  call add_to_restart(ncid, FLOW_SNOW     , "FLOW_SNOW"   )
+  ! -- T.EI
 #ifdef WRF_HYDRO
   call add_to_restart(ncid,ACCPRCP   , "ACCPRCP" )
   call add_to_restart(ncid,ACCECAN   , "ACCECAN" )
   call add_to_restart(ncid,ACCEDIR   , "ACCEDIR" )
-  call add_to_restart(ncid,ACCETRAN  , "ACCETRAN" )
+  call add_to_restart(ncid,ACCETRAN  , "ACCETRAN")
 #endif
 ! below for opt_run = 5
   call add_to_restart(ncid,SMOISEQ   , "SMOISEQ"  , layers="SOIL"  )
@@ -2709,22 +2709,22 @@ subroutine define_rst_variables(ncid, state)
   call define_rst_var(ncid,SFCRUNOFF , "SFCRUNOFF")
   call define_rst_var(ncid,UDRUNOFF  , "UDRUNOFF" )
 ! ++ T.EI crocus
-  call define_rst_var(ncid,PSNOWAGEXY  , "PSNOWAGE" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWDZXY  , "PSNOWDZ" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWGRAN1XY  , "PSNOWGRAN1" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWGRAN2XY  , "PSNOWGRAN2" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWHEATXY  , "PSNOWHEAT" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWHISTXY  , "PSNOWHIST" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWLIQXY  , "PSNOWLIQ" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWRHOXY  , "PSNOWRHO" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWSWEXY  , "PSNOWSWE" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWTEMPXY  , "PSNOWTEMP" ,layers="MAXS")
-  call define_rst_var(ncid,PSNOWALBXY  , "PSNOWALB" )
-  call define_rst_var(ncid,PSNOWHEIGHTXY  , "PSNOWHEIGHT" )
-  call define_rst_var(ncid,PSNOWTHRUFALXY  , "PSNOWTHRUFAL" )
-  call define_rst_var(ncid,PSNOWTOTSWEXY  , "PSNOWTOTSWE" )
-  call define_rst_var(ncid,FLOW_SNOW  , "FLOW_SNOW" )
-  call define_rst_var(ncid,FLOW_ICE  , "FLOW_ICE" )
+  call define_rst_var(ncid,PSNOWAGEXY    , "PSNOWAGE"  , layers="MAXS")
+  call define_rst_var(ncid,PSNOWDZXY     , "PSNOWDZ"   , layers="MAXS")
+  call define_rst_var(ncid,PSNOWGRAN1XY  , "PSNOWGRAN1", layers="MAXS")
+  call define_rst_var(ncid,PSNOWGRAN2XY  , "PSNOWGRAN2", layers="MAXS")
+  call define_rst_var(ncid,PSNOWHEATXY   , "PSNOWHEAT" , layers="MAXS")
+  call define_rst_var(ncid,PSNOWHISTXY   , "PSNOWHIST" , layers="MAXS")
+  call define_rst_var(ncid,PSNOWLIQXY    , "PSNOWLIQ"  , layers="MAXS")
+  call define_rst_var(ncid,PSNOWRHOXY    , "PSNOWRHO"  , layers="MAXS")
+  call define_rst_var(ncid,PSNOWSWEXY    , "PSNOWSWE"  , layers="MAXS")
+  call define_rst_var(ncid,PSNOWTEMPXY   , "PSNOWTEMP" , layers="MAXS")
+  call define_rst_var(ncid,PSNOWALBXY    , "PSNOWALB"    )
+  call define_rst_var(ncid,PSNOWHEIGHTXY , "PSNOWHEIGHT" )
+  call define_rst_var(ncid,PSNOWTHRUFALXY, "PSNOWTHRUFAL")
+  call define_rst_var(ncid,PSNOWTOTSWEXY , "PSNOWTOTSWE" )
+  call define_rst_var(ncid,FLOW_SNOW     , "FLOW_SNOW"   )
+  call define_rst_var(ncid,FLOW_ICE      , "FLOW_ICE"    )
   ! -- T.EI
 #ifdef WRF_HYDRO
   call define_rst_var(ncid,ACCPRCP   , "ACCPRCP" )
