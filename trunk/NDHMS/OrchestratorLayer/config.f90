@@ -73,6 +73,7 @@ module config_base
 
      integer :: nsoil, SOLVEG_INITSWC
  !++ T.EI crocus
+     integer            :: crocus_opt
      integer            :: act_lev
 ! -- T.EI
      real,allocatable,dimension(:) :: ZSOIL8
@@ -754,6 +755,7 @@ contains
     endif
 
 ! ++ T.EI crocus
+    nlst(did)%crocus_opt = crocus_opt%crocus_opt
     nlst(did)%act_lev = crocus_opt%act_lev
 ! -- T.EI
     nlst(did)%SUBRTSWCRT = SUBRTSWCRT
@@ -1089,7 +1091,7 @@ contains
     namelist /CROCUS_nlist/ &
          crocus_opt, act_lev
 
-    ! check if file is opened
+    ! check if file is opened if file passed in
     if (present(f_in)) then
        rewind(30)
        read(f_in, NML=CROCUS_nlist, iostat=ierr)
