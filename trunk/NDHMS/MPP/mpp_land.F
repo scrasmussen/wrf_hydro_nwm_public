@@ -22,7 +22,7 @@
 MODULE MODULE_MPP_LAND
 
   use MODULE_CPL_LAND
-  use mpi
+  use mpi_f08
   use iso_fortran_env, only: int64
 
   IMPLICIT NONE
@@ -38,7 +38,7 @@ MODULE MODULE_MPP_LAND
   integer :: local_startx, local_starty
   integer :: local_startx_rt, local_starty_rt, local_endx_rt, local_endy_rt
 
-  integer mpp_status(MPI_STATUS_SIZE)
+  type(MPI_Status) :: mpp_status
 
   integer  overlap_n
   integer, allocatable, DIMENSION(:), public :: local_nx_size,local_ny_size

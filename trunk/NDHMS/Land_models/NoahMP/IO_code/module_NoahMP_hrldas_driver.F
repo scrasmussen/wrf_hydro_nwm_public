@@ -30,7 +30,7 @@ module module_NoahMP_hrldas_driver
   use module_mpp_land, only: MPP_LAND_PAR_INI, mpp_land_init, getLocalXY, mpp_land_bcast_char, mpp_land_sync
   use module_mpp_land, only: check_land, node_info, numprocs
   use module_cpl_land, only: cpl_land_init, fatal_error_stop
-  !use mpi
+  !use mpi_f08
 #endif
 #ifdef WRF_HYDRO
   use module_NWM_io, only: output_NoahMP_NWM
@@ -647,17 +647,17 @@ module module_NoahMP_hrldas_driver
        noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, noah_lsm%start_hour, noah_lsm%start_min, 0
 
   startdate = olddate
-  
+
 #ifdef MPP_LAND
   ix = ix_tmp
   jx = jx_tmp
 #endif
-  
+
 #ifdef WRF_HYDRO
   forcdate = olddate
 #endif
-  
-  ! Convenience variables    
+
+  ! Convenience variables
   xstart = noah_lsm%xstart
   ystart = noah_lsm%ystart
   xend = noah_lsm%xend

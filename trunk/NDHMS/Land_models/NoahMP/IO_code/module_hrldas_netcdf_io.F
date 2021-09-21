@@ -30,7 +30,7 @@ module module_hrldas_netcdf_io
 #endif
 
 #ifdef _PARALLEL_
-  use mpi
+  use mpi_f08
 #endif
   implicit none
 
