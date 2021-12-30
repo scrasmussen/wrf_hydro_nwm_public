@@ -605,6 +605,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    ! Local arrays
    real*8, DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
    ! Local parameters
+   real, parameter :: nexp=1.0  ! local power law exponent
    real :: tmp_dist(9)
 
    ! Initialize temp variables
