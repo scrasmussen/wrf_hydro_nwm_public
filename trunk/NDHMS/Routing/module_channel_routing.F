@@ -30,6 +30,8 @@ use module_reservoir, only: reservoir
 use module_RT_data, only: rt_domain
 use module_hydro_stop, only: HYDRO_stop
 
+use iso_fortran_env, only: int64
+
 #endif
 implicit none
 
@@ -174,7 +176,7 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
         REAL, intent(IN)       :: n          ! mannings coefficient
         REAL, intent(INOUT)    :: vel        ! velocity (m/s)
         REAL, intent(INOUT)    :: qloss      ! channel infiltration (m^3/sec)
-        INTEGER, intent(IN)    :: idx        ! channel id
+        integer(kind=int64), intent(IN)    :: idx        ! channel id
         REAL, intent(INOUT)    :: depth      ! depth of flow in channel
 
 !--local variables
@@ -264,7 +266,7 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
 
            Twl = Bw + 2.0*z*h_0      !--top surface water width of the channel inflow
 
-            if(h_0 .gt. bfd) then !water outside of defined channel
+            if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then !water outside of defined channel
              AREA =  (Bw + bfd * z) * bfd
              AREAC = (TwCC * (h_0 -bfd)) !assume compound component is rect. chan, that's 3 times the Tw
              WP = (Bw + 2.0 * bfd * sqrt(1.0 + z*z))
@@ -283,7 +285,7 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
 
             endif
 
-          if(h_0 .gt. bfd) then !water outside of defined channel
+          if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then !water outside of defined channel
             !weight the celerity by the contributing area, and assume that the mannings
             !of the spills is 2x the manning of the channel
                 Ck = max(0.0,((sqrt(So)/n)*((5./3.)*R**(2./3.) - &
@@ -304,7 +306,8 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
             Km = dt
           endif
 
-          if(h_0 .gt. bfd) then !water outside of defined channel
+          if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) .and. (Ck .gt. 0.0) ) then 
+          !water outside of defined channel
              X = min(0.5,max(0.0,0.5*(1-(Qj_0/(2.0*TwCC*So*Ck*dx)))))
           else
             if(Ck .gt. 0.0) then
@@ -318,8 +321,7 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
             if(D .eq. 0.0) then
               print *, "FATAL ERROR: D is 0 in MUSKINGCUNGE", Km, X, dt,D
               call hydro_stop("In MUSKINGCUNGE() - D is 0.")
-           endif 
- 
+           endif
 
            C1 =  (Km*X + dt/2.000000)/D
            C2 =  (dt/2.0000 - Km*X)/D
@@ -342,14 +344,13 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
            endif
 !           WPk = WP*MIN((h/(modK*SQRT(Bw))),1.0)  ! KINEROS2 Mod. This shouldn't be HERE.
 
-
            !--upper interval -----------
            WPC    = 0.0
            AREAC  = 0.0
 
            Twl = Bw + 2.0*z*h                    !--top width of the channel inflow
 
-           if(h .gt. bfd) then !water outside of defined channel
+           if ( (h .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then !water outside of defined channel
              AREA =  (Bw + bfd * z) * bfd
              AREAC = (TwCC * (h-bfd)) !assume compound component is rect. chan, that's 3 times the Tw
              WP = (Bw + 2.0 * bfd * sqrt(1.0 + z*z))
@@ -368,7 +369,8 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
               endif
            endif
 
-          if(h .gt. bfd) then !water outside of defined channel, assumed rectangular, 3x TW and n = 3x
+          if ( (h .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then
+          !water outside of defined channel, assumed rectangular, 3x TW and n = 3x
                 Ck = max(0.0,((sqrt(So)/n)*((5./3.)*R**(2./3.) - &
                 ((2./3.)*R**(5./3.)*(2.0*sqrt(1.0 + z*z)/(Bw + 2.0*bfd*z))))*AREA &
                 + ((sqrt(So)/(nCC))*(5./3.)*(h-bfd)**(2./3.))*AREAC)/(AREA+AREAC))
@@ -380,22 +382,22 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
                  Ck = 0.0
                endif
           endif
+
            if(Ck .gt. 0.0) then
             Km = max(dt,dx/Ck)
            else
             Km = dt
            endif
-          if(h .gt. bfd) then !water outside of defined channel
+
+          if ( (h .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) .and. (Ck .gt. 0.0) ) then
+          !water outside of defined channel
             X = min(0.5,max(0.25,0.5*(1-(((C1*qup)+(C2*quc)+(C3*qdp) + C4)/(2.0*TwCC*So*Ck*dx)))))
-
           else
-
             if(Ck .gt. 0.0) then
              X = min(0.5,max(0.25,0.5*(1-(((C1*qup)+(C2*quc)+(C3*qdp) + C4)/(2.0*Twl*So*Ck*dx)))))
             else
              X = 0.5
             endif
-
           endif
 
            D = (Km*(1 - X) + dt/2)              !--seconds
@@ -523,7 +525,7 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
 
       qloss = (ChannK * dx * WPk) ! TML -- Compute qloss to pass
 
-      !TML:Added print statement to test qlos function; 
+      !TML:Added print statement to test qlos function;
       !comment out to prevent excessive file sizes when running model
       !print*, "qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D", qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D
       if((qloss*dt)/D > ((ql*dt)/D - C4)) then
@@ -589,17 +591,17 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: LAKEINFLORT
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: ELRT
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QINFLOWBASE
-        INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETLNK
+        INTEGER(kind=int64), INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETLNK
 
         INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETRT
-        INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_LNKRT
-        INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_LNKRT_SL
+        INTEGER(kind=int64), INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_LNKRT
+        INTEGER(kind=int64), INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_LNKRT_SL
 
        real , dimension(ixrt,jxrt):: latval,lonval
 
         INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: LAKE_MSKRT
         INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: ORDER, TYPEL !--link
-        INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: TO_NODE, FROM_NODE
+        INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: TO_NODE, FROM_NODE
         INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: CHANXI, CHANYJ
         REAL,    INTENT(IN), DIMENSION(NLINKS)    :: ZELEV  !--elevation of nodes
         REAL, INTENT(INOUT), DIMENSION(NLINKS)    :: CVOL
@@ -642,8 +644,8 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEI   !-- lake inflow (cms)
         REAL,                DIMENSION(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
-        INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: LAKENODE !-- outflow from lake used in diffusion scheme
-        INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
+        INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LAKENODE !-- outflow from lake used in diffusion scheme
+        INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
         !REAL, DIMENSION(NLINKS)                   :: QLateral !--lateral flow
         REAL, DIMENSION(NLINKS)                   :: QSUM     !--mass bal of node
         REAL*8, DIMENSION(NLINKS)                   :: QSUM8     !--mass bal of node
@@ -666,14 +668,14 @@ END SUBROUTINE SUBMUSKINGCUNGE
         integer lake_index(nlakes)
         integer nlinks_index(nlinks)
         integer mpp_nlinks, iyw, yw_mpp_nlinks
-        integer link_location(ixrt,jxrt)
+        integer(kind=int64) link_location(ixrt,jxrt)
         real     ywtmp(ixrt,jxrt)
         integer LNLINKSL
-        integer, dimension(LNLINKSL) :: LLINKID
+        integer(kind=int64), dimension(LNLINKSL) :: LLINKID
         real*8,  dimension(LNLINKSL) :: LQLateral
 !        real*4,  dimension(LNLINKSL) :: LQLateral
         integer, dimension(:) ::  toNodeInd
-        integer, dimension(:,:) ::  gtoNode
+        integer(kind=int64), dimension(:,:) ::  gtoNode
         integer  :: nToNodeInd
         real, dimension(nToNodeInd,2) :: gQLINK
 #else
@@ -1633,12 +1635,12 @@ end subroutine drive_CHANNEL
        real, intent(IN), dimension(IXRT,JXRT)    :: QINFLOWBASE
        real, dimension(ixrt,jxrt) :: landRunOff
 
-       integer, intent(IN), dimension(IXRT,JXRT) :: CH_LNKRT
-       integer, intent(IN), dimension(IXRT,JXRT) :: CH_LNKRT_SL
+       integer(kind=int64), intent(IN), dimension(IXRT,JXRT) :: CH_LNKRT
+       integer(kind=int64), intent(IN), dimension(IXRT,JXRT) :: CH_LNKRT_SL
 
        integer, intent(IN), dimension(IXRT,JXRT) :: LAKE_MSKRT
        integer, intent(IN), dimension(:)         :: ORDER, TYPEL !--link
-       integer, intent(IN), dimension(:)     :: TO_NODE, FROM_NODE
+       integer(kind=int64), intent(in), dimension(:)     :: TO_NODE, FROM_NODE
        integer, intent(IN), dimension(:)     :: CHANXI, CHANYJ
        real, intent(IN), dimension(:)        :: MUSK, MUSX
        real, intent(IN), dimension(:)        :: CHANLEN
@@ -1674,16 +1676,16 @@ end subroutine drive_CHANNEL
        real, dimension(IXRT,JXRT)                :: ZWATTBLRT          !DJG !!! Match with subsfce/gw routing & Change 'INTENT' to 'INOUT' when ready to update groundwater state...
 
        !-- lake params
-       integer, intent(IN), dimension(:)    :: LAKEIDM  !-- NHDPLUS lakeid for lakes to be modeled
+       integer(kind=int64), intent(IN), dimension(:)    :: LAKEIDM  !-- NHDPLUS lakeid for lakes to be modeled
 
        real, intent(INOUT), dimension(:)    :: RESHT    !-- reservoir height (m)
        real, intent(INOUT), dimension(:)    :: QLAKEI   !-- lake inflow (cms)
        real,                dimension(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
        real, intent(INOUT), dimension(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
 
-       integer, intent(IN), dimension(:)    :: LAKENODE !-- outflow from lake used in diffusion scheme
-       integer, intent(IN), dimension(:)   :: LINKID   !--  id of channel elements for linked scheme
-       integer, intent(IN), dimension(:)   :: LAKEIDA  !--  (don't need) NHDPLUS lakeid for all lakes in domain
+       integer(kind=int64), intent(IN), dimension(:)    :: LAKENODE !-- outflow from lake used in diffusion scheme
+       integer(kind=int64), intent(IN), dimension(:)   :: LINKID   !--  id of channel elements for linked scheme
+       integer(kind=int64), intent(IN), dimension(:)   :: LAKEIDA  !--  (don't need) NHDPLUS lakeid for all lakes in domain
        integer, intent(IN), dimension(:)   :: LAKEIDX  !--  the sequential index of the lakes id by com id
 
        real, dimension(NLINKS)                   :: QSUM     !--mass bal of node
@@ -1711,7 +1713,7 @@ end subroutine drive_CHANNEL
        real     ywtmp(ixrt,jxrt)
        integer LNLINKSL
        integer, dimension(:)         ::  toNodeInd
-       integer, dimension(:,:)       ::  gtoNode
+       integer(kind=int64), dimension(:,:)       ::  gtoNode
        integer  :: nToNodeInd
        real, dimension(nToNodeInd,2) :: gQLINK
 #else
