@@ -54,23 +54,24 @@ contains
         timeslice_offset_hours, rfc_gage_id, lake_number, lookback_seconds, total_counts, &
         observed_counts, time_step_seconds, discharges, forecast_found, all_discharges_synthetic, &
         time_series_file_name)
+        use iso_fortran_env, only: int64
         implicit none
         class(time_series_data_type), intent(inout) :: this ! object being initialized
-        character(len=19),  intent(in)                  :: start_date
-        character(len=256), intent(in)                  :: time_series_path
-        integer,            intent(in)                  :: forecast_lookback_hours
-        integer,            intent(in)                  :: timeslice_offset_hours
-        character(len=5),   intent(in)                  :: rfc_gage_id
-        integer,            intent(in)                  :: lake_number
-        integer,            intent(out)                 :: lookback_seconds
-        integer,            intent(out)                 :: total_counts
-        integer,            intent(out)                 :: observed_counts
-        integer,            intent(out)                 :: time_step_seconds
-        real, allocatable, dimension(:), intent(inout)  :: discharges
-        logical,            intent(inout)               :: forecast_found
-        logical,            intent(inout)               :: all_discharges_synthetic
-        character(len=256), intent(out)                 :: time_series_file_name
-        character(len=15)                               :: lake_number_string
+        character(len=19),   intent(in)                  :: start_date
+        character(len=256),  intent(in)                  :: time_series_path
+        integer,             intent(in)                  :: forecast_lookback_hours
+        integer,             intent(in)                  :: timeslice_offset_hours
+        character(len=5),    intent(in)                  :: rfc_gage_id
+        integer(kind=int64), intent(in)                  :: lake_number
+        integer,             intent(out)                 :: lookback_seconds
+        integer,             intent(out)                 :: total_counts
+        integer,             intent(out)                 :: observed_counts
+        integer,             intent(out)                 :: time_step_seconds
+        real, allocatable, dimension(:), intent(inout)   :: discharges
+        logical,             intent(inout)               :: forecast_found
+        logical,             intent(inout)               :: all_discharges_synthetic
+        character(len=256),  intent(out)                 :: time_series_file_name
+        character(len=15)                                :: lake_number_string
 
         this%forecast_found = .false.
         this%all_discharges_synthetic = .false.

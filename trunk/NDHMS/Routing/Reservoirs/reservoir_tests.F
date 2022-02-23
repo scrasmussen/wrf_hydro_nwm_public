@@ -8,6 +8,7 @@ program reservoir_unit_tests
     use module_levelpool_tests
     use module_persistence_levelpool_hybrid_tests
     use module_rfc_forecasts_tests
+    use iso_fortran_env, only: int64
 
     implicit none
 
@@ -130,7 +131,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -224,7 +226,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -315,7 +318,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coeffecient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -407,7 +411,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coeffecient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -495,7 +500,7 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation
         real :: orifice_coefficient, orifice_area, max_depth
-        integer :: lake_number
+        integer(kind=int64) :: lake_number
         real :: inflow, prev_time_inflow, outflow, water_elevation
         real, dimension(108) :: inflow_array_overflow
         integer :: timestep_count
@@ -661,7 +666,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -743,7 +749,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -822,7 +829,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -901,7 +909,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -981,7 +990,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -1062,7 +1072,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type

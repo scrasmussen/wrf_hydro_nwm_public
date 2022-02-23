@@ -19,18 +19,18 @@ module module_rfc_forecasts_properties
     ! Extend/derive rfc forecasts properties from the abstract base
     ! type for reservoir properties.
     type, extends(reservoir_properties) :: rfc_forecasts_properties_interface
-        integer           :: lake_number                  ! lake number
-        integer           :: reservoir_type               ! reservoir type
-        character(len=5)  :: rfc_gage_id
-        integer           :: lookback_seconds
-        integer           :: total_counts
-        integer           :: observed_counts
-        integer           :: time_step_seconds
-        integer           :: rfc_forecast_persist_days
-        integer           :: rfc_forecast_persist_seconds
-        integer           :: rfc_timeslice_offset_hours
-        integer           :: observation_hours
-        character(len=256):: time_series_file_name
+        integer(kind=int64) :: lake_number                  ! lake number
+        integer             :: reservoir_type               ! reservoir type
+        character(len=5)    :: rfc_gage_id
+        integer             :: lookback_seconds
+        integer             :: total_counts
+        integer             :: observed_counts
+        integer             :: time_step_seconds
+        integer             :: rfc_forecast_persist_days
+        integer             :: rfc_forecast_persist_seconds
+        integer             :: rfc_timeslice_offset_hours
+        integer             :: observation_hours
+        character(len=256)  :: time_series_file_name
 
     contains
 
