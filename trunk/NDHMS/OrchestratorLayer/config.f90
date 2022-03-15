@@ -41,7 +41,7 @@ module config_base
      integer            :: pedotransfer_option = 0
      integer            :: crop_option = 0
 
-     integer            :: split_output_count = 1 
+     integer            :: split_output_count = 1
      integer            :: khour
      integer            :: kday = -999
      real               :: zlvl
@@ -157,6 +157,8 @@ module config_base
      character(len=256) :: timeSlicePath
      integer            :: nLastObs
      integer            :: bucket_loss
+
+     logical            :: channel_bypass = .FALSE.
 
    contains
 
@@ -332,6 +334,10 @@ contains
       call hydro_stop('hydro.namelist ERROR: Invalid CHANRTSWCRT specified')
    endif
    if(self%CHANRTSWCRT .eq. 1) then
+      if ( self%channel_option .eq. -1 ) then
+         self%channel_option = 2
+         self%channel_bypass = .TRUE.
+      endif
       if( (self%channel_option .lt. 1 ) .or. (self%channel_option .gt. 3) ) then
          call hydro_stop('hydro.namelist ERROR: Invalid channel_option specified')
       endif
@@ -907,7 +913,7 @@ contains
          frozen_soil_option, radiative_transfer_option, snow_albedo_option, &
          pcp_partition_option, tbot_option, temp_time_scheme_option, &
          glacier_option, surface_resistance_option, &
-         
+
          soil_data_option, pedotransfer_option, crop_option, &
 
          split_output_count, &
