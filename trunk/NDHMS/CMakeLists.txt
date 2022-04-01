@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.14)
 
 if (NOT CMAKE_C_COMPILER)
 	set (CMAKE_C_COMPILER "mpicc")
@@ -235,6 +235,7 @@ add_subdirectory("Data_Rec")
 add_subdirectory("Routing")
 add_subdirectory("HYDRO_drv")
 
+
 if (WRF_HYDRO_NUDGING STREQUAL "1")
 	add_subdirectory("nudging")
 	add_dependencies(hydro_driver hydro_nudging)
@@ -402,3 +403,10 @@ else()
 	message ("Unknown land surface model:" ${HYDRO_LSM} )
 endif (HYDRO_LSM MATCHES "NoahMP")
 
+# handle unit testing
+if (UNIT_TESTS)
+  message("-- Unit testing turn on")
+  find_package(PFUNIT REQUIRED)
+  enable_testing()
+  add_subdirectory("unit")
+endif()

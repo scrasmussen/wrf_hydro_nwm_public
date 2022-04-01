@@ -1,0 +1,52 @@
+! Test iomanager netcdf_layer values
+module io_manager_test_2
+   use funit
+   implicit none
+   public
+contains
+   @Test
+   subroutine test_iomanager_netcdf_parallel_type1()
+     use io_manager_base, only : IOManager_
+     use netcdf_layer_base, only : NetCDF_layer_, NetCDF_serial_, &
+          NetCDF_parallel_
+     type(IOManager_) :: io_manager
+     logical, parameter :: parallel = .true.
+     io_manager = IOManager_(parallel)
+     call test_parallel_layer_type(io_manager%netcdf_layer)
+   end subroutine test_iomanager_netcdf_parallel_type1
+
+   @Test
+   subroutine test_iomanager_netcdf_serial_type1()
+     use io_manager_base, only : IOManager_
+     use netcdf_layer_base, only : NetCDF_layer_, NetCDF_serial_, &
+          NetCDF_parallel_
+     type(IOManager_) :: io_manager
+     logical, parameter :: parallel = .false.
+     io_manager = IOManager_(parallel)
+     call test_serial_layer_type(io_manager%netcdf_layer)
+   end subroutine test_iomanager_netcdf_serial_type1
+
+   subroutine test_parallel_layer_type(layer)
+     use netcdf_layer_base
+     class(*), target :: layer
+     class(*), pointer :: test
+     select type(test=>layer)
+     type is (NetCDF_parallel_)
+        @assertTrue(.true.)
+     type is (NetCDF_serial_)
+        @assertTrue(.false.)
+     end select
+   end subroutine test_parallel_layer_type
+
+   subroutine test_serial_layer_type(layer)
+     use netcdf_layer_base
+     class(*), target :: layer
+     class(*), pointer :: test
+     select type(test=>layer)
+     type is (NetCDF_parallel_)
+        @assertTrue(.false.)
+     type is (NetCDF_serial_)
+        @assertTrue(.true.)
+     end select
+   end subroutine test_serial_layer_type
+end module io_manager_test_2

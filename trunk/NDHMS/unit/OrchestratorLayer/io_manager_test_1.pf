@@ -1,0 +1,32 @@
+! Test iomanager parallel value
+module io_manager_test_1
+   use funit
+   implicit none
+
+contains
+   @test
+   subroutine test_iomanager_init1()
+     use io_manager_base, only : IOManager_
+     type(IOManager_) :: io_manager
+     io_manager = IOManager_()
+     @assertTrue(io_manager%parallel .eqv. .false.)
+   end subroutine test_iomanager_init1
+
+   @test
+   subroutine test_iomanager_init2()
+     use io_manager_base, only : IOManager_
+     type(IOManager_) :: io_manager
+     logical, parameter :: parallel = .true.
+     io_manager = IOManager_(parallel)
+     @assertTrue(io_manager%parallel .eqv. .true.)
+   end subroutine test_iomanager_init2
+
+   @test
+   subroutine test_iomanager_init3()
+     use io_manager_base, only : IOManager_
+     type(IOManager_) :: io_manager
+     logical, parameter :: parallel = .false.
+     io_manager = IOManager_(parallel)
+     @assertTrue(io_manager%parallel .eqv. .false.)
+   end subroutine test_iomanager_init3
+end module io_manager_test_1
