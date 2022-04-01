@@ -1,0 +1,16 @@
+! Test iomanager parallel value
+module config_test_1
+   use funit
+   implicit none
+
+contains
+   @test
+   subroutine test_config_init1()
+     use config_base, only : Configuration_
+     type(Configuration_) :: configuration
+     configuration = Configuration_()
+     ! call configuration%init()
+     @assertTrue(.false.)
+   end subroutine test_config_init1
+
+end module config_test_1
