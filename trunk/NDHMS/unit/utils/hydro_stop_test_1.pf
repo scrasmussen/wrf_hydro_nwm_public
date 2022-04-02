@@ -1,0 +1,14 @@
+module hydro_stop_test_1
+  use funit
+  implicit none
+contains
+  @test(ifdef=INCLUDE_INTENTIONALLY_BROKEN)
+  subroutine test_hydro_stop_1()
+    use module_mpp_land
+    use module_hydro_stop, only : hydro_stop
+    character (len=512) :: stop_s
+    stop_s = "test stop"
+    call MPP_LAND_INIT()
+    call HYDRO_stop(stop_s)
+  end subroutine test_hydro_stop_1
+end module hydro_stop_test_1
