@@ -13,3 +13,4 @@ add_pfunit_ctest (unit_test_example2
 add_subdirectory(OrchestratorLayer)
 # add_subdirectory(nudging)
 add_subdirectory(utils)
+add_subdirectory(Routing)

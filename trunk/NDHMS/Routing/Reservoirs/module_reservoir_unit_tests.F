@@ -4,94 +4,31 @@
 ! "All Reservoir Tests Passed". To compile and run these tests, go to the Reservoir
 ! directory in the terminal and type "make" and then "make test". Then type "./reservoir_tests".
 
-program reservoir_unit_tests
+module module_reservoir_unit_tests
     use module_levelpool_tests
     use module_persistence_levelpool_hybrid_tests
     use module_rfc_forecasts_tests
 
     implicit none
 
-    logical :: rv1 = .false.
-    logical :: rv2 = .false.
-    logical :: rv3 = .false.
-    logical :: rv4 = .false.
-    logical :: rv5 = .false.
-    logical :: rv6 = .false.
-    logical :: rv7 = .false.
-    logical :: rv8 = .false.
-    logical :: rv9 = .false.
-    logical :: rv10 = .false.
-    logical :: rv11 = .false.
-    logical :: rv12 = .false.
-    logical :: rv13 = .false.
-    logical :: rv14 = .false.
-    logical :: rv15 = .false.
-    logical :: rv16 = .false.
-    logical :: rv17 = .false.
+    real, dimension(120) :: inflow_array = &
+         (/189.22899, 189.27005, 189.31049, 189.35042, 189.38965, 189.42819, 189.46588, 189.50273, &
+         189.53859, 189.57346, 189.60719, 189.63979, 189.6711, 189.7011, 189.72968, &
+         189.75679, 189.7823, 189.80617, 189.82822, 189.84842, 189.86653, 189.88255, 189.89622, &
+         189.90752, 189.91612, 189.922, 189.92482, 189.92447, 189.92067, 189.91319, 189.90175, &
+         189.88611, 189.86592, 189.84088, 189.81064, 189.77487, 189.73317, 189.6852, 189.63051, &
+         189.56873, 189.49939, 189.42207, 189.33635, 189.24176, 189.13782, 189.02408, &
+         188.90009, 188.76535, 188.61945, 188.46188, 188.29224, 188.11006, 187.91493, 187.70644, &
+         187.48419, 187.24779, 186.9969, 186.73119, 186.45035, 186.15407, 185.84213, 185.51424, &
+         185.17023, 184.80989, 184.43312, 184.03975, 183.62973, 183.20296, 182.75943, 182.29909, &
+         181.82205, 181.32828, 180.81792, 80.29099, 179.74774, 179.1882, 178.61267, 178.02129, &
+         177.41437, 176.79207, 176.15475, 175.50269, 174.83627, 174.15576, 173.46162, &
+         172.75417, 172.03389, 171.3011, 170.55634, 169.79997, 169.03255, 168.25441, 167.46616, &
+         166.66815, 165.86099, 165.04509, 164.22101, 163.38913, 162.55011, 161.70428, 160.85229, &
+         159.99452, 159.13156, 158.26382, 157.39188, 156.51611, 155.63715, 154.75531, 153.8712, &
+         152.98517, 152.09779, 151.2094, 150.32057, 149.43166, 148.54315, 147.6554, 146.76892, &
+         145.88405, 145.00128, 144.12091/)
 
-    real, dimension(120) :: inflow_array
-
-    inflow_array = (/189.22899, 189.27005, 189.31049, 189.35042, 189.38965, 189.42819, 189.46588, 189.50273, &
-    189.53859, 189.57346, 189.60719, 189.63979, 189.6711, 189.7011, 189.72968, &
-    189.75679, 189.7823, 189.80617, 189.82822, 189.84842, 189.86653, 189.88255, 189.89622, &
-    189.90752, 189.91612, 189.922, 189.92482, 189.92447, 189.92067, 189.91319, 189.90175, &
-    189.88611, 189.86592, 189.84088, 189.81064, 189.77487, 189.73317, 189.6852, 189.63051, &
-    189.56873, 189.49939, 189.42207, 189.33635, 189.24176, 189.13782, 189.02408, &
-    188.90009, 188.76535, 188.61945, 188.46188, 188.29224, 188.11006, 187.91493, 187.70644, &
-    187.48419, 187.24779, 186.9969, 186.73119, 186.45035, 186.15407, 185.84213, 185.51424, &
-    185.17023, 184.80989, 184.43312, 184.03975, 183.62973, 183.20296, 182.75943, 182.29909, &
-    181.82205, 181.32828, 180.81792, 80.29099, 179.74774, 179.1882, 178.61267, 178.02129, &
-    177.41437, 176.79207, 176.15475, 175.50269, 174.83627, 174.15576, 173.46162, &
-    172.75417, 172.03389, 171.3011, 170.55634, 169.79997, 169.03255, 168.25441, 167.46616, &
-    166.66815, 165.86099, 165.04509, 164.22101, 163.38913, 162.55011, 161.70428, 160.85229, &
-    159.99452, 159.13156, 158.26382, 157.39188, 156.51611, 155.63715, 154.75531, 153.8712, 152.98517, &
-    152.09779, 151.2094, 150.32057, 149.43166, 148.54315, 147.6554, 146.76892, 145.88405, 145.00128, 144.12091/)
-
-    rv1 = test_levelpool()
-
-    rv2 = test_levelpool_overflow_max_height()
-
-    rv3 = test_persistence_levelpool_hybrid_usgs()
-
-    rv4 = test_persistence_levelpool_hybrid_usace()
-
-    rv5 = test_rfc_forecasts_object()
-
-    rv6 = test_rfc_forecasts_time_series_object()
-
-    rv7 = test_rfc_forecasts_levelpool_fallback()
-
-    rv8 = test_rfc_forecasts_time_series_output_with_lookback_and_offset()
-
-    rv9 = test_rfc_forecasts_time_series_output_with_negative_data()
-
-    rv10 = test_rfc_forecasts_time_series_output_all_synthetic_data()
-
-    rv11 = test_rfc_forecasts_data_exceeding_max_range()
-
-    rv12 = test_rfc_forecasts_with_offset_for_extended_AnA()
-
-    rv13 = test_persistence_levelpool_hybrid_usace_overtop()
-
-    rv14 = test_persistence_levelpool_hybrid_usace_no_timeslice_available()
-
-    rv15 = test_ak_rfc_forecasts_pass_through_fallback()
-
-    rv16 = test_ak_rfc_forecasts_time_series_with_lookback_and_offset()
-
-    rv17 = test_rfc_forecasts_over_max_water_elevation()
-
-    if (rv1 .and. rv2 .and. rv3 .and. rv4 .and. rv5 .and. rv6 .and. rv7 .and. rv8 .and. rv9 .and. &
-    rv10 .and. rv11 .and. rv12 .and. rv13 .and. rv14 .and. rv15 .and. rv16 .and. rv17) then
-        print *, "========================================================================"
-        print *, 'All Reservoir Tests Passed'
-        print *, "========================================================================"
-
-    else
-        print *, "========================================================================"
-        print *, 'Not All Reservoir Tests Passed'
-        print *, "========================================================================"
-    end if
 
     contains
 
@@ -1264,7 +1201,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -1349,7 +1287,8 @@ program reservoir_unit_tests
         real :: lake_area, weir_elevation, weir_coefficient
         real :: weir_length, dam_length, orifice_elevation, orifice_coefficient
         real :: orifice_area, max_depth, initial_fractional_depth
-        integer :: lake_number, reservoir_type
+        integer(kind=int64) :: lake_number
+        integer :: reservoir_type
         integer :: timestep_count
         character*256 :: cwd_full
         integer :: dynamic_reservoir_type
@@ -1416,4 +1355,4 @@ program reservoir_unit_tests
 
     end function test_rfc_forecasts_with_offset_for_long_range_AnA
 
-end program
+end module module_reservoir_unit_tests
