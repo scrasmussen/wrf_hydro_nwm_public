@@ -7,4 +7,4 @@ add_library(hydro_routing_reservoirs_hybrid STATIC
 	module_persistence_levelpool_hybrid_tests.F
 )
 
-add_dependencies(hydro_routing_reservoirs_hybrid hydro_routing_reservoirs)
+link_libraries(hydro_routing_reservoirs_hybrid hydro_routing_reservoirs)

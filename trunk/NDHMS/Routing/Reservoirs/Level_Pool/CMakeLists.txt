@@ -3,16 +3,15 @@ cmake_minimum_required (VERSION 2.8)
 add_library(hydro_routing_reservoirs_levelpool STATIC
 	module_levelpool.F
 	module_levelpool_state.F
-	module_levelpool_properties.F
-)
-
+	module_levelpool_properties.F)
 
 add_library(hydro_levelpool_tests STATIC
-  	module_levelpool_tests.F
-  )
+  	module_levelpool_tests.F)
 
-add_dependencies(hydro_levelpool_tests
+target_link_libraries(hydro_routing_reservoirs_levelpool
+  hydro_routing_reservoirs)
+
+target_link_libraries(hydro_levelpool_tests
   hydro_routing_reservoirs_levelpool
   hydro_routing_reservoirs
-  hydro_routing_reservoirs_hybrid
-  )
+  hydro_routing_reservoirs_hybrid)
