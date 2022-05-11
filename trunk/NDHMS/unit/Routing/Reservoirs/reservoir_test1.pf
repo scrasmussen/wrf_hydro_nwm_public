@@ -17,9 +17,37 @@ contains
   @test
   subroutine run_test_persistence_levelpool_hybrid_usgs()
     logical :: res
-    res =  test_persistence_levelpool_hybrid_usgs("../../../../../../tests/local/reservoir_testing_files/")
-    @assertTrue(res)
+    character(len=256) ::  reservoir_testing_files_dir
+    reservoir_testing_files_dir = "../../../../../../tests/local/reservoir_testing_files"
+    res =  test_persistence_levelpool_hybrid_usgs(reservoir_testing_files_dir)
+    @assertTrue(res, message='test_persistence_levelpool_hybrid_usgs returned False')
   end subroutine run_test_persistence_levelpool_hybrid_usgs
 
+  @test
+  subroutine run_test_persistence_levelpool_hybrid_usace()
+    logical :: res
+    character(len=256) ::  reservoir_testing_files_dir
+    reservoir_testing_files_dir = "../../../../../../tests/local/reservoir_testing_files"
+    res =  test_persistence_levelpool_hybrid_usace(reservoir_testing_files_dir)
+    @assertTrue(res, message='test_persistence_levelpool_hybrid_usace returned False')
+  end subroutine run_test_persistence_levelpool_hybrid_usace
+
+  @test
+  subroutine run_test_persistence_levelpool_hybrid_usace_overtop()
+    logical :: res
+    character(len=256) ::  reservoir_testing_files_dir
+    reservoir_testing_files_dir = "../../../../../../tests/local/reservoir_testing_files"
+    res =  test_persistence_levelpool_hybrid_usace_overtop(reservoir_testing_files_dir)
+    @assertTrue(res, message='test_persistence_levelpool_hybrid_usace_overtop returned False')
+  end subroutine run_test_persistence_levelpool_hybrid_usace_overtop
+
+  @test
+  subroutine run_test_persistence_levelpool_hybrid_usace_no_timeslice()
+    logical :: res
+    character(len=256) ::  reservoir_testing_files_dir
+    reservoir_testing_files_dir = "../../../../../../tests/local/reservoir_testing_files"
+    res =  test_persistence_levelpool_hybrid_usace_no_timeslice_available(reservoir_testing_files_dir)
+    @assertTrue(res, message='test_persistence_levelpool_hybrid_usace_no_timeslice_available returned False')
+  end subroutine run_test_persistence_levelpool_hybrid_usace_no_timeslice
 
 end module reservoir_test1

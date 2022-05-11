@@ -69,7 +69,7 @@ module module_reservoir_unit_tests
     ! a gage discharge from the provided USGS Timeslice file.
     function test_persistence_levelpool_hybrid_usgs(reservoir_testing_files_dir) result(rv)
         implicit none
-        character(len=*), intent(in), optional :: reservoir_testing_files_dir
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (persistence_levelpool_hybrid) :: persistence_levelpool_hybrid_reservoir_data
         real :: outflow, inflow
@@ -81,11 +81,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character(len=:), allocatable :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
-        character(len=:), allocatable :: reservoir_index_short_range_f
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -110,12 +110,12 @@ module module_reservoir_unit_tests
         print *, "calling init for persistence_levelpool_hybrid USGS type reservoir"
 
         if (present(reservoir_testing_files_dir)) then
-           cwd_full = reservoir_testing_files_dir
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
         else
-           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
         end if
 
-        reservoir_index_short_range_f = cwd_full // "/reservoir_index_short_range.nc"
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call persistence_levelpool_hybrid_reservoir_data%init(water_elevation, lake_area, weir_elevation, &
         weir_coefficient, weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, &
@@ -170,8 +170,10 @@ module module_reservoir_unit_tests
     ! This tests the Persistence Levelpool Hybrid Module run reservoir function for U.S. Army Corps of Engineers (USACE)
     ! type reservoirs. It also reads the USACE persistence parameters from the provided reservoir parameter file
     ! and a gage discharge from the provided USACE Timeslice file.
-    function test_persistence_levelpool_hybrid_usace() result(rv)
+    function test_persistence_levelpool_hybrid_usace(reservoir_testing_files_dir) result(rv)
+
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (persistence_levelpool_hybrid) :: persistence_levelpool_hybrid_reservoir_data
         real :: outflow, inflow
@@ -183,10 +185,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -209,12 +212,18 @@ module module_reservoir_unit_tests
 
         print *, "calling init for persistence_levelpool_hybrid USACE type reservoir"
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call persistence_levelpool_hybrid_reservoir_data%init(water_elevation, lake_area, weir_elevation, &
         weir_coefficient, weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, &
         max_depth, initial_fractional_depth, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", &
+        reservoir_index_short_range_f, &
         "2016-10-10_02:00:00", cwd_full, cwd_full, 12, 1000000000)
 
         print *, "calling reservoir run for persistence_levelpool_hybrid for USACE type reservoir"
@@ -261,9 +270,10 @@ module module_reservoir_unit_tests
 
     ! This tests the Persistence Levelpool Hybrid Module run reservoir function USACE
     ! type reservoirs to output level pool whenever it reaches the overtop condition.
-    function test_persistence_levelpool_hybrid_usace_overtop() result(rv)
+    function test_persistence_levelpool_hybrid_usace_overtop(reservoir_testing_files_dir) result(rv)
 
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (persistence_levelpool_hybrid) :: persistence_levelpool_hybrid_reservoir_data
         real :: outflow, inflow
@@ -275,10 +285,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -301,12 +312,18 @@ module module_reservoir_unit_tests
 
         print *, "calling init for persistence_levelpool_hybrid USACE type reservoir"
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call persistence_levelpool_hybrid_reservoir_data%init(water_elevation, lake_area, weir_elevation, &
         weir_coeffecient, weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, &
         max_depth, initial_fractional_depth, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", &
+        reservoir_index_short_range_f, &
         "2016-10-10_02:00:00", cwd_full, cwd_full, 12, 1000000000)
 
         print *, "calling reservoir run for persistence_levelpool_hybrid for USACE type reservoir"
@@ -354,9 +371,10 @@ module module_reservoir_unit_tests
 
     ! This tests the Persistence Levelpool Hybrid Module run reservoir function USACE
     ! type reservoirs to output level pool whenever no timeslices are available.
-    function test_persistence_levelpool_hybrid_usace_no_timeslice_available() result(rv)
+    function test_persistence_levelpool_hybrid_usace_no_timeslice_available(reservoir_testing_files_dir) result(rv)
 
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (persistence_levelpool_hybrid) :: persistence_levelpool_hybrid_reservoir_data
         real :: outflow, inflow
@@ -368,10 +386,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -394,12 +413,18 @@ module module_reservoir_unit_tests
 
         print *, "calling init for persistence_levelpool_hybrid USACE type reservoir"
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call persistence_levelpool_hybrid_reservoir_data%init(water_elevation, lake_area, weir_elevation, &
         weir_coeffecient, weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, &
         max_depth, initial_fractional_depth, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", &
+        reservoir_index_short_range_f, &
         "2016-10-12_02:00:00", cwd_full, cwd_full, 12, 1000000000)
 
         print *, "calling reservoir run for persistence_levelpool_hybrid for USACE type reservoir"
