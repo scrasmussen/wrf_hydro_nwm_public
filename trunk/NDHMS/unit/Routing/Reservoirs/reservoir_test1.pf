@@ -1,0 +1,25 @@
+module reservoir_test1
+  use funit
+  ! use module_levelpool_tests
+  ! use module_persistence_levelpool_hybrid_tests
+  ! use module_rfc_forecasts_tests
+  use module_reservoir_unit_tests
+  implicit none
+contains
+  @test
+  subroutine run_test_levelpool()
+    logical :: res
+    res =  test_levelpool()
+    @assertTrue(res)
+  end subroutine run_test_levelpool
+
+
+  @test
+  subroutine run_test_persistence_levelpool_hybrid_usgs()
+    logical :: res
+    res =  test_persistence_levelpool_hybrid_usgs("../../../../../../tests/local/reservoir_testing_files/")
+    @assertTrue(res)
+  end subroutine run_test_persistence_levelpool_hybrid_usgs
+
+
+end module reservoir_test1
