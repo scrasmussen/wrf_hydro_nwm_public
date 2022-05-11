@@ -215,7 +215,7 @@ module module_reservoir_unit_tests
         if (present(reservoir_testing_files_dir)) then
            cwd_full = trim(adjustl(reservoir_testing_files_dir))
         else
-           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
         end if
 
         reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
@@ -315,7 +315,7 @@ module module_reservoir_unit_tests
         if (present(reservoir_testing_files_dir)) then
            cwd_full = trim(adjustl(reservoir_testing_files_dir))
         else
-           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
         end if
 
         reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
@@ -416,7 +416,7 @@ module module_reservoir_unit_tests
         if (present(reservoir_testing_files_dir)) then
            cwd_full = trim(adjustl(reservoir_testing_files_dir))
         else
-           cwd_full = "../../../../tests/local/reservoir_testing_files/"
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
         end if
 
         reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
@@ -549,7 +549,7 @@ module module_reservoir_unit_tests
             print *, "========================================================================"
             print *, 'Levelpool Overflow Max Height Test Failed'
             print *, 'Final outflow should be 17.0451450'
-             print *, 'dynamic_reservoir_type needs to be 1 for level pool type'
+            print *, 'dynamic_reservoir_type needs to be 1 for level pool type'
             print *, "========================================================================"
         end if
 
@@ -557,28 +557,33 @@ module module_reservoir_unit_tests
 
 
     ! This tests the basic object creation of an RFC Forecast type reservoir.
-    function test_rfc_forecasts_object() result(rv)
+    function test_rfc_forecasts_object(reservoir_testing_files_dir) result(rv)
         implicit none
-
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv                        ! test result
         logical :: call_status
-
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         type (time_series_data_type) :: time_series_data
         character*256 :: cwd_full
         integer(kind=int64):: lake_number
-
         real :: water_elevation = 2.
+        character(len=256) :: reservoir_index_short_range_f
 
         lake_number = 3745478
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call_status = .false.
 
         print *, "calling init for rfc_forecasts"
         call rfc_forecasts_reservoir_data%init(water_elevation, 4., 6., 8., 10., 11., 12., 14., 16., 18., 0.9, lake_number, 4, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-08-18_07:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-08-18_07:00:00", cwd_full, 24)
 
         print *, "testing data in rfc_forecasts"
 
@@ -592,13 +597,13 @@ module module_reservoir_unit_tests
 
 
     ! This tests the object creation and function of the RFC Forecasts Time Series Reader.
-    function test_rfc_forecasts_time_series_object() result(rv)
+    function test_rfc_forecasts_time_series_object(reservoir_testing_files_dir) result(rv)
         implicit none
-
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv                        ! test result
         logical :: call_status
         type (time_series_data_type) :: time_series_data, time_series_data_second
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: lookback_seconds, total_counts, observed_counts, time_step_seconds
         integer :: timeslice_offset_hours
         real, allocatable, dimension(:) :: forecast_discharges
@@ -611,7 +616,11 @@ module module_reservoir_unit_tests
 
         call_status = .false.
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
 
         forecast_found = .false.
 
@@ -641,8 +650,9 @@ module module_reservoir_unit_tests
 
     ! This tests an RFC Forecasts Reservoir functionality to run levelpool whenever it does
     ! not find its corresponding time series file within a given lookback window.
-    function test_rfc_forecasts_levelpool_fallback() result(rv)
+    function test_rfc_forecasts_levelpool_fallback(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -654,10 +664,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -678,11 +689,17 @@ module module_reservoir_unit_tests
         lake_number = 3745478
         reservoir_type = 4
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-05-01_22:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-05-01_22:00:00", cwd_full, 24)
 
         water_elevation = 1331.18005
 
@@ -724,8 +741,9 @@ module module_reservoir_unit_tests
     ! and look back up to 24 hours to find a time series file and output the appropriate
     ! discharge in the array that matches up with model time as would be done in a standard
     ! analysis and assimilation run.
-    function test_rfc_forecasts_time_series_output_with_lookback_and_offset() result(rv)
+    function test_rfc_forecasts_time_series_output_with_lookback_and_offset(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -737,10 +755,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -760,11 +779,17 @@ module module_reservoir_unit_tests
         lake_number = 17609317
         reservoir_type = 4
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-08-18_09:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-08-18_09:00:00", cwd_full, 24)
 
         water_elevation = 1331.18005
 
@@ -805,8 +830,9 @@ module module_reservoir_unit_tests
 
     ! This tests an RFC Forecast Reservoir's functionality to run levelpool if
     ! it receives any values from a Time Series Forecast file that are negative.
-    function test_rfc_forecasts_time_series_output_with_negative_data() result(rv)
+    function test_rfc_forecasts_time_series_output_with_negative_data(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -818,10 +844,12 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
+
         prev_time_inflow = 0.0
         timestep_count = 0
         water_elevation = 0.0
@@ -838,10 +866,18 @@ module module_reservoir_unit_tests
         initial_fractional_depth = 8.999999761581420898e-01
         lake_number = 17609317
         reservoir_type = 4
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
+
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-09-18_09:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-09-18_09:00:00", cwd_full, 24)
         water_elevation = 1331.18005
         do timestep_count = 1, 120
             inflow = inflow_array(timestep_count)
@@ -868,10 +904,12 @@ module module_reservoir_unit_tests
             print *, "========================================================================"
         end if
     end function test_rfc_forecasts_time_series_output_with_negative_data
+
     ! This tests an RFC Forecast Reservoir's functionality to run levelpool if
     ! it receives all synthetic values from a Time Series Forecast file.
-    function test_rfc_forecasts_time_series_output_all_synthetic_data() result(rv)
+    function test_rfc_forecasts_time_series_output_all_synthetic_data(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -883,10 +921,11 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -906,11 +945,17 @@ module module_reservoir_unit_tests
         lake_number = 17609317
         reservoir_type = 4
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-10-18_09:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-10-18_09:00:00", cwd_full, 24)
 
         water_elevation = 1331.18005
 
@@ -951,8 +996,9 @@ module module_reservoir_unit_tests
     ! This tests an RFC Forecast Reservoir's functionality to run levelpool if
     ! it receives any values from a Time Series Forecast file that are greater than the max
     ! historical MS river flow.
-    function test_rfc_forecasts_data_exceeding_max_range() result(rv)
+    function test_rfc_forecasts_data_exceeding_max_range(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -964,10 +1010,12 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
+
         prev_time_inflow = 0.0
         timestep_count = 0
         water_elevation = 0.0
@@ -984,10 +1032,18 @@ module module_reservoir_unit_tests
         initial_fractional_depth = 8.999999761581420898e-01
         lake_number = 17609317
         reservoir_type = 4
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
+
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-11-18_09:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-11-18_09:00:00", cwd_full, 24)
         water_elevation = 1331.18005
         do timestep_count = 1, 120
             inflow = inflow_array(timestep_count)
@@ -1014,12 +1070,14 @@ module module_reservoir_unit_tests
             print *, "========================================================================"
         end if
     end function test_rfc_forecasts_data_exceeding_max_range
+
     ! This tests an RFC Forecast Reservoirs functionality to offset 28 hours in the future
     ! and look back up to 24 hours to find a time series file and output the appropriate
     ! discharge in the array that matches up with model time as would be done in an extended
     ! analysis and assimilation run.
-    function test_rfc_forecasts_with_offset_for_extended_AnA() result(rv)
+    function test_rfc_forecasts_with_offset_for_extended_AnA(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -1031,10 +1089,12 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_ana_f
+
         prev_time_inflow = 0.0
         timestep_count = 0
         water_elevation = 0.0
@@ -1051,10 +1111,18 @@ module module_reservoir_unit_tests
         initial_fractional_depth = 8.999999761581420898e-01
         lake_number = 17609317
         reservoir_type = 4
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_ana_f = trim(adjustl(cwd_full)) // "/reservoir_index_AnA_represents_Extended_MR.nc"
+
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_AnA_represents_Extended_MR.nc", &
+        reservoir_index_ana_f, &
         "2019-12-18_03:00:00", cwd_full, 24)
         water_elevation = 1331.18005
         do timestep_count = 1, 35
@@ -1086,8 +1154,9 @@ module module_reservoir_unit_tests
     ! This tests an Alaska RFC Forecasts Reservoir/Glacier functionality to pass inflow directly to
     ! outflow whenever it does not find its corresponding time series file within a given
     ! lookback window.
-    function test_ak_rfc_forecasts_pass_through_fallback() result(rv)
+    function test_ak_rfc_forecasts_pass_through_fallback(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -1099,10 +1168,12 @@ module module_reservoir_unit_tests
         integer(kind=int64):: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_standard_f
+
         prev_time_inflow = 0.0
         timestep_count = 0
         water_elevation = 0.0
@@ -1120,10 +1191,18 @@ module module_reservoir_unit_tests
         initial_fractional_depth = 0.0
         lake_number = 1
         reservoir_type = 5
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_standard_f = trim(adjustl(cwd_full)) // "/reservoir_index_Standard_AnA_APRFC_GDLs.nc"
+
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.0, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_Standard_AnA_APRFC_GDLs.nc", "2019-05-01_22:00:00", cwd_full, 24)
+        reservoir_index_standard_f, "2019-05-01_22:00:00", cwd_full, 24)
         water_elevation = 0.0
         do timestep_count = 1, 120
             inflow = inflow_array(timestep_count)
@@ -1156,8 +1235,9 @@ module module_reservoir_unit_tests
     ! and look back up to 24 hours to find a time series file and output the appropriate
     ! discharge in the array that matches up with model time as would be done in a standard
     ! analysis and assimilation run.
-    function test_ak_rfc_forecasts_time_series_with_lookback_and_offset() result(rv)
+    function test_ak_rfc_forecasts_time_series_with_lookback_and_offset(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -1173,6 +1253,8 @@ module module_reservoir_unit_tests
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_standard_f
+
         prev_time_inflow = 0.0
         timestep_count = 0
         water_elevation = 0.0
@@ -1190,10 +1272,18 @@ module module_reservoir_unit_tests
         initial_fractional_depth = 0.0
         lake_number = 1
         reservoir_type = 5
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_standard_f = trim(adjustl(cwd_full)) // "/reservoir_index_Standard_AnA_APRFC_GDLs.nc"
+
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.0, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_Standard_AnA_APRFC_GDLs.nc", "2019-08-18_09:00:00", cwd_full, 24)
+        reservoir_index_standard_f, "2019-08-18_09:00:00", cwd_full, 24)
         water_elevation = 0.0
         do timestep_count = 1, 80
             inflow = inflow_array(timestep_count)
@@ -1224,8 +1314,9 @@ module module_reservoir_unit_tests
 
     ! This tests an RFC Forecast Reservoirs functionality to correct water elevation going
     ! over max water elevation
-    function test_rfc_forecasts_over_max_water_elevation() result(rv)
+    function test_rfc_forecasts_over_max_water_elevation(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -1237,10 +1328,11 @@ module module_reservoir_unit_tests
         integer(kind=int64) :: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_short_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -1260,11 +1352,17 @@ module module_reservoir_unit_tests
         lake_number = 17609317
         reservoir_type = 4
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_short_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_short_range.nc"
 
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_short_range.nc", "2019-08-18_09:00:00", cwd_full, 24)
+        reservoir_index_short_range_f, "2019-08-18_09:00:00", cwd_full, 24)
 
         !water_elevation = 1331.18005
 
@@ -1310,8 +1408,9 @@ module module_reservoir_unit_tests
     ! and look back up to 24 hours to find a time series file and output the appropriate
     ! discharge in the array that matches up with model time as would be done in a long range
     ! analysis and assimilation run.
-    function test_rfc_forecasts_with_offset_for_long_range_AnA() result(rv)
+    function test_rfc_forecasts_with_offset_for_long_range_AnA(reservoir_testing_files_dir) result(rv)
         implicit none
+        character(len=256), intent(in), optional :: reservoir_testing_files_dir
         logical rv, rv1, rv2                        ! test result
         type (rfc_forecasts) :: rfc_forecasts_reservoir_data
         real :: outflow, inflow
@@ -1323,10 +1422,11 @@ module module_reservoir_unit_tests
         integer(kind=int64) :: lake_number
         integer :: reservoir_type
         integer :: timestep_count
-        character*256 :: cwd_full
+        character(len=256) :: cwd_full
         integer :: dynamic_reservoir_type
         real :: assimilated_value
         character(len=256) :: assimilated_source_file
+        character(len=256) :: reservoir_index_long_range_f
 
         prev_time_inflow = 0.0
         timestep_count = 0
@@ -1346,11 +1446,17 @@ module module_reservoir_unit_tests
         lake_number = 17609317
         reservoir_type = 4
 
-        cwd_full = "../../../../tests/local/reservoir_testing_files/"
+        if (present(reservoir_testing_files_dir)) then
+           cwd_full = trim(adjustl(reservoir_testing_files_dir))
+        else
+           cwd_full = "../../../../tests/local/reservoir_testing_files"
+        end if
+
+        reservoir_index_long_range_f = trim(adjustl(cwd_full)) // "/reservoir_index_Long_Range_AnA.nc"
 
         call rfc_forecasts_reservoir_data%init(water_elevation, lake_area, weir_elevation, weir_coefficient, &
         weir_length, dam_length, orifice_elevation, orifice_coefficient, orifice_area, max_depth, 0.9, lake_number, reservoir_type, &
-        "../../../../tests/local/reservoir_testing_files/reservoir_index_Long_Range_AnA.nc", &
+        reservoir_index_long_range_f, &
         "2019-12-18_19:00:00", cwd_full, 24)
 
         water_elevation = 1331.18005
