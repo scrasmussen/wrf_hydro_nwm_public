@@ -1,4 +1,4 @@
-module reservoir_unit_tests_all
+module all_reservoir_unit_tests
   use funit
   ! use module_levelpool_tests
   ! use module_persistence_levelpool_hybrid_tests
@@ -158,4 +158,4 @@ contains
      @assertTrue(res, message='test_rfc_forecasts_with_offset_for_long_range_AnA returned False')
    end subroutine run_test_rfc_forecasts_with_offset_for_long_range_AnA
 
- end module reservoir_unit_tests_all
+end module all_reservoir_unit_tests
