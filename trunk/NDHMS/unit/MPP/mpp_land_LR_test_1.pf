@@ -1,0 +1,17 @@
+module mpp_land_LR_test_1
+  use funit
+  implicit none
+contains
+  @test
+  subroutine test_version_1()
+    use module_version, only : get_model_version
+    character (len=512) :: model_version_s
+    model_version_s = get_model_version()
+
+#ifdef NWM_META
+    @assertTrue(model_version_s(1:4) == "NWM ")
+#else
+    @assertTrue(model_version_s(1:10) == "WRF-Hydro ")
+#endif
+  end subroutine test_version_1
+end module mpp_land_LR_test_1

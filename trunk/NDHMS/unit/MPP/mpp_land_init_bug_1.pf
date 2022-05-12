@@ -1,0 +1,11 @@
+module mpp_land_init_bug_1
+  use funit
+  implicit none
+contains
+  @test
+  subroutine test_mpp_land_init_bug_1()
+    use module_mpp_land, only : MPP_LAND_INIT
+    call MPP_LAND_INIT()
+    @assertTrue(.true.)
+  end subroutine test_mpp_land_init_bug_1
+end module mpp_land_init_bug_1
