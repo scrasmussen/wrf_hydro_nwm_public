@@ -20,8 +20,8 @@ To turn on the unit tests add the following flags during CMake configuration.
 Create a new `.pf` module file. Add a new entry to `CMakeLists.txt` using
 	`add_pfunit_ctest`, making sure that the module name matches the file
 	name.
-Also, make sure that `add_pfunit_ctest` has a `LINK_LIBRARIES` entry or the
-	needs files may not be populated correctly.
+Also, make sure that `add_pfunit_ctest` function has a `LINK_LIBRARIES`
+    argument or the needed files may not be populated correctly.
 
 
 ## `.pf` Fortran Formatting in Editor
