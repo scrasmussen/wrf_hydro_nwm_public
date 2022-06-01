@@ -47,9 +47,4 @@ contains
     @mpiAssertEqual(left_id, -1)
     @mpiAssertEqual(right_id, -1)
   end subroutine test_mpp_land_LOG_MAP2d
-
-
-  ! @assertTrue(.false.)
-  ! @assertExceptionRaised('ARTLESS: THIS SHOULD FAIL')
-  ! mpi_initialized
 end module mpp_land_init_test_1

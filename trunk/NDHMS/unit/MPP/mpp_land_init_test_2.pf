@@ -1,0 +1,30 @@
+module mpp_land_init_test_2
+  use mpi
+  use pfunit
+  implicit none
+contains
+
+  @before
+  subroutine run_mpi_init()
+    integer :: ierr
+    logical :: flag
+    call MPI_Initialized(flag, ierr)
+    if (flag .eqv. .false.) &
+         call MPI_Init(ierr)
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  end subroutine run_mpi_init
+
+  @test
+  subroutine run_test_mpp_land_init_1()
+    integer :: me, ierr
+    call MPI_Comm_rank(MPI_COMM_WORLD, me, ierr)
+    @MPIassertEqual(me,me)
+  end subroutine run_test_mpp_land_init_1
+
+  @test
+  subroutine run_mpi_finalize()
+    integer :: ierr
+    call MPI_Finalize(ierr)
+    print *, "MPI Finalized"
+  end subroutine run_mpi_finalize
+end module mpp_land_init_test_2
