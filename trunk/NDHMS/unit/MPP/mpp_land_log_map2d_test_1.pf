@@ -1,0 +1,67 @@
+module mpp_land_log_map2d_test_1
+  use mpi
+  use pfunit
+  ! use pf_test
+  implicit none
+contains
+
+  @before
+  subroutine run_mpi_init()
+    use MODULE_MPP_LAND, only : MPP_Land_init
+    use MODULE_CPL_LAND, only : HYDRO_COMM_WORLD
+    integer :: ierr
+    logical :: flag
+
+    call MPP_LAND_INIT(10,10)
+    call MPI_Barrier(HYDRO_COMM_WORLD, ierr)
+  end subroutine run_mpi_init
+
+  @test
+  subroutine test_mpp_land_LOG_MAP2d()
+    use module_mpp_land, only : LOG_MAP2d, my_id, numprocs
+    use module_mpp_land, only : down_id, up_id, left_id, right_id
+
+    call LOG_MAP2d()
+
+    if (numprocs .eq. 2) then
+       if (my_id .eq. 0) then
+          @mpiAssertEqual(left_id, -1)
+          @mpiAssertEqual(right_id, 1)
+       else if (my_id .eq. 1) then
+          @mpiAssertEqual(left_id, 0)
+          @mpiAssertEqual(right_id, -1)
+       end if
+       @mpiAssertEqual(down_id, -1)
+       @mpiAssertEqual(up_id, -1)
+    else if (numprocs .eq. 4) then
+       if (my_id .eq. 0) then
+          @mpiAssertEqual(down_id, -1)
+          @mpiAssertEqual(up_id, 2)
+          @mpiAssertEqual(left_id, -1)
+          @mpiAssertEqual(right_id, 1)
+       else if (my_id .eq. 1) then
+          @mpiAssertEqual(down_id, -1)
+          @mpiAssertEqual(up_id, 3)
+          @mpiAssertEqual(left_id, 0)
+          @mpiAssertEqual(right_id, -1)
+       else if (my_id .eq. 2) then
+          @mpiAssertEqual(down_id, 0)
+          @mpiAssertEqual(up_id, -1)
+          @mpiAssertEqual(left_id, -1)
+          @mpiAssertEqual(right_id, 3)
+       else if (my_id .eq. 3) then
+          @mpiAssertEqual(down_id, 1)
+          @mpiAssertEqual(up_id, -1)
+          @mpiAssertEqual(left_id, 2)
+          @mpiAssertEqual(right_id, -1)
+       end if
+    end if
+  end subroutine test_mpp_land_LOG_MAP2d
+
+  @test
+  subroutine run_mpi_finalize()
+    integer :: ierr
+    call MPI_Finalize(ierr)
+    print *, "MPI Finalized"
+  end subroutine run_mpi_finalize
+end module mpp_land_log_map2d_test_1
