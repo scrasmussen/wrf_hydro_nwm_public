@@ -196,7 +196,7 @@ message("=============================================================")
 if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
     # set compile flags for gfortran
     message ( "-- Using gfortran")
-    set (CMAKE_Fortran_FLAGS "-cpp -O2 -g -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4 -fallow-argument-mismatch")
+    set (CMAKE_Fortran_FLAGS "-fprofile-arcs -ftest-coverage -cpp -O0 -g -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4 -fallow-argument-mismatch")
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "Intel.*")
     # set compile flags for ifort
     message ( "Using ifort")
@@ -405,8 +405,15 @@ endif (HYDRO_LSM MATCHES "NoahMP")
 
 # handle unit testing
 if (UNIT_TESTS)
-  message("-- Unit testing turn on")
+  message("-- Unit testing on")
+  set(CMAKE_Fortran_FLAGS "-fprofile-arcs -ftest-coverage ${CMAKE_Fortran_FLAGS}")
   find_package(PFUNIT REQUIRED)
+  find_package(MPI REQUIRED)
   enable_testing()
+  add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND}
+     --force-new-ctest-process
+     --verbose
+      --output-on-failure
+      )
   add_subdirectory("unit")
 endif()
