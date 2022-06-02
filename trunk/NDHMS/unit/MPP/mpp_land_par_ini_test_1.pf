@@ -1,0 +1,27 @@
+module mpp_land_par_ini_test_1
+  use mpi
+  use pfunit
+  implicit none
+contains
+
+  @test
+  subroutine run_mpi_init()
+    use module_mpp_land, only : mpp_land_par_ini
+    integer :: ierr, in_global_nx, in_global_ny
+    logical :: flag
+    call MPI_Initialized(flag, ierr)
+    in_global_nx = 10
+    in_global_ny = 10
+    if (flag .eqv. .false.) then
+       call MPP_Land_par_ini(1, in_global_nx, in_global_ny, 1)
+    end if
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  end subroutine run_mpi_init
+
+  @test
+  subroutine run_mpi_finalize()
+    integer :: ierr
+    call MPI_Finalize(ierr)
+    print *, "MPI Finalized"
+  end subroutine run_mpi_finalize
+end module mpp_land_par_ini_test_1
