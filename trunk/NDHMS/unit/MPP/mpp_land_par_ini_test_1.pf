@@ -13,6 +13,10 @@ contains
     in_global_nx = 10
     in_global_ny = 10
     if (flag .eqv. .false.) then
+       ! This shouldn't break but it does in mpp_land.F
+       ! ```
+       ! global_rt_ny = in_global_ny * AGGFACTRT
+       ! ```
        call MPP_Land_par_ini(1, in_global_nx, in_global_ny, 1)
     end if
     call MPI_Barrier(MPI_COMM_WORLD, ierr)
