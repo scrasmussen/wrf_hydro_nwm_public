@@ -82,7 +82,7 @@ MODEL_RDIR   := $(abspath $(DIR)/../../../..)
 else
 MODEL_RDIR   := $(abspath $(WRFHYDRO_DIR))
 endif
-MODEL_DIR    := $(abspath $(MODEL_RDIR)/trunk/NDHMS)
+MODEL_DIR    := $(abspath $(MODEL_RDIR)/src)
 MODEL_MKDIR  := $(abspath $(MODEL_DIR))
 MODEL_LIBDIR := $(abspath $(MODEL_DIR)/lib)
 MODEL_SRCDIR := $(abspath $(MODEL_DIR)/Data_Rec)
