@@ -1,5 +1,3 @@
-#define FILENAME "WRFHydro_NUOPC_Flags.F90"
-#define MODNAME "wrfhydro_nuopc_flags"
 #include "WRFHydro_NUOPC_Macros.h"
 
 module wrfhydro_nuopc_flags
