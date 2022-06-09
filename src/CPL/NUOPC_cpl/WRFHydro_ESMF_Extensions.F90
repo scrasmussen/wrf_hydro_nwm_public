@@ -4,24 +4,7 @@
 ! CONFIGURATION IDENTIFICATION $HeadURL$
 ! CONFIGURATION IDENTIFICATION @(#)$Id$
 !=========================================================================================
-
-! ESMF macros for logging
-#define FILENAME "WRFHydro_ESMF_Extensions.F90"
-#define CONTEXT  line=__LINE__,file=FILENAME,method=METHOD
-#define PASSTHRU msg=ESMF_LOGERR_PASSTHRU,CONTEXT
-
-! Define ESMF real kind to match WRFHYDRO single/double precision
-#if defined(SINGLE)
-#define ESMF_KIND_RX ESMF_KIND_R4
-#define ESMF_TYPEKIND_RX ESMF_TYPEKIND_R4
-#else
-#define ESMF_KIND_RX ESMF_KIND_R8
-#define ESMF_TYPEKIND_RX ESMF_TYPEKIND_R8
-#endif
-
-! Macros for debugging
-#define DEBUG_ESMF_IMPORT___disabled
-#define DEBUG_ESMF_EXPORT___disabled
+#include "WRFHydro_NUOPC_Macros.h"
 
 !=========================================================================================
 ! WRFHYDRO ESMF Extensions Module
@@ -145,7 +128,7 @@ module WRFHydro_ESMF_Extensions
 contains
 
   !-----------------------------------------------------------------------------
-#define METHOD "WRFHYDRO_ESMF_GridWrite"
+
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_GridWrite - Write Grid data to file
 ! !INTERFACE:
@@ -235,14 +218,12 @@ contains
     call WRFHYDRO_ESMF_GridWrite(grid, fileName=fileName, overwrite=overwrite, &
       status=status, timeslice=timeslice, iofmt=iofmt, &
       relaxedflag=relaxedflag, nclScript=nclScript, map=map, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_GridWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_GridWrite - Write Grid data to file
 ! !INTERFACE:
@@ -324,22 +305,22 @@ contains
         call WRFHYDRO_ESMF_GridWrite(grid, fileName=fileName, overwrite=overwrite, &
           timeslice=timeslice, iofmt=iofmt, relaxedflag=relaxedflag, &
           nclScript=nclScript, map=WRFHYDRO_ESMF_MAPPRESET_GLOBAL, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('conus','CONUS','Conus')
         call WRFHYDRO_ESMF_GridWrite(grid, fileName=fileName, overwrite=overwrite, &
           timeslice=timeslice, iofmt=iofmt, relaxedflag=relaxedflag, &
           nclScript=nclScript, map=WRFHYDRO_ESMF_MAPPRESET_CONUS, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('irene','IRENE','Irene')
         call WRFHYDRO_ESMF_GridWrite(grid, fileName=fileName, overwrite=overwrite, &
           timeslice=timeslice, iofmt=iofmt, relaxedflag=relaxedflag, &
           nclScript=nclScript, map=WRFHYDRO_ESMF_MAPPRESET_IRENE, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('frontrange','FRONTRANGE','FrontRange')
         call WRFHYDRO_ESMF_GridWrite(grid, fileName=fileName, overwrite=overwrite, &
           timeslice=timeslice, iofmt=iofmt, relaxedflag=relaxedflag, &
           nclScript=nclScript, map=WRFHYDRO_ESMF_MAPPRESET_FRONTRANGE, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case default
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_VALUE,   &
           msg="Unknown map preset value "//trim(mapPreset)//".", &
@@ -348,11 +329,9 @@ contains
     endselect
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_GridWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_GridWrite - Write Grid data to file
 ! !INTERFACE:
@@ -457,56 +436,56 @@ contains
         lfileName = trim(fileName)
       else
         call ESMF_GridGet(grid, name=gridName, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         lfileName = trim(gridName)//".nc"
       endif
 
       arraybundle = ESMF_ArrayBundleCreate(rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
       ! -- centers --
 
       call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
         isPresent=isPresent, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       if (isPresent) then
         call ESMF_GridGetCoord(grid, coordDim=1, &
           staggerLoc=ESMF_STAGGERLOC_CENTER, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArraySet(array, name="lon_center", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_GridGetCoord(grid, coordDim=2, &
           staggerLoc=ESMF_STAGGERLOC_CENTER, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArraySet(array, name="lat_center", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       endif
 
       ! -- corners --
 
       call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CORNER, &
         isPresent=hasCorners, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       if (hasCorners) then
         call ESMF_GridGetCoord(grid, coordDim=1, &
           staggerLoc=ESMF_STAGGERLOC_CORNER, array=array, rc=rc)
         if (.not. ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) then
           call ESMF_ArraySet(array, name="lon_corner", rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
           call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         endif
         call ESMF_GridGetCoord(grid, coordDim=2, &
           staggerLoc=ESMF_STAGGERLOC_CORNER, array=array, rc=rc)
         if (.not. ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) then
           call ESMF_ArraySet(array, name="lat_corner", rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
           call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         endif
       endif
 
@@ -514,38 +493,38 @@ contains
 
       call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_MASK, &
         staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       if (isPresent) then
         call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
           itemflag=ESMF_GRIDITEM_MASK, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArraySet(array, name="mask", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       endif
 
       ! -- area --
 
       call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_AREA, &
         staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       if (isPresent) then
         call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
           itemflag=ESMF_GRIDITEM_AREA, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArraySet(array, name="area", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       endif
 
       call ESMF_ArrayBundleWrite(arraybundle, &
         fileName=trim(lfileName),rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
       call ESMF_ArrayBundleDestroy(arraybundle,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
       if (present(nclScript)) then
         lnclScript = nclScript
@@ -555,18 +534,18 @@ contains
 
       if (lnclScript) then
         call ESMF_GridGet(grid,dimCount=dimCount,rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
         ! allocate coordDim info accord. to dimCount and tileCount
         allocate(coordDimCount(dimCount), stat=stat)
         if (ESMF_LogFoundAllocError(statusToCheck=stat, &
           msg="Allocation of coordinate dimensions memory failed.", &
-          CONTEXT, rcToReturn=rc)) return  ! bail out
+          CONTEXT, rcToReturn=rc)) return
 
         ! get coordDim info
         call ESMF_GridGet(grid, coordDimCount=coordDimCount, &
           rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
         coordDimMax = 0
         do dimIndex=1,dimCount
@@ -577,25 +556,23 @@ contains
         deallocate(coordDimCount, stat=stat)
         if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
           msg="Deallocation of coordinate dimensions memory failed.", &
-          CONTEXT, rcToReturn=rc)) return  ! bail out
+          CONTEXT, rcToReturn=rc)) return
 
         if (coordDimMax == 1) then
           call WRFHYDRO_ESMF_NclScriptWrite(gridFile=lfileName, map=map, &
             uniformRect=.TRUE., writeCorners=hasCorners, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         else
           call WRFHYDRO_ESMF_NclScriptWrite(gridFile=lfileName, map=map, &
             writeCorners=hasCorners, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         endif
       endif
     endif
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NclScriptWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NclScriptWrite_coords - Write NCL Script to file
 ! !INTERFACE:
@@ -648,14 +625,12 @@ contains
     call WRFHYDRO_ESMF_NclScriptWrite(gridFile, map=map, title=title, &
       nclFile=nclFile, uniformRect=uniformRect, writeCorners=writeCorners, &
       rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NclScriptWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NclScriptWrite_preset - Write NCL Script to file
 ! !INTERFACE:
@@ -700,22 +675,22 @@ contains
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_GLOBAL, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('conus','CONUS','Conus')
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_CONUS, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('irene','IRENE','Irene')
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_IRENE, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('frontrange','FRONTRANGE','FrontRange')
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_FRONTRANGE, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case default
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_VALUE,   &
           msg="Unknown map preset value "//trim(mapPreset)//".", &
@@ -724,11 +699,9 @@ contains
     endselect
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NclScriptWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NclScriptWrite_default - Write NCL Script to file
 ! !INTERFACE:
@@ -782,10 +755,10 @@ contains
 
     ! Get current VM and pet number
     call ESMF_VMGetCurrent(vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     call ESMF_VMGet(vm, localPet=lpe, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (lpe /= 0) return
 
@@ -833,7 +806,7 @@ contains
     endif
 
     call ESMF_UtilIOUnitGet(fUnit, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
     open (fUnit,file=trim(lnclFile),action="write", &
       status="new",iostat=stat)
     if (stat /= 0) then
@@ -899,11 +872,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_FerretScriptWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_FerretScriptWrite_coords - Write Ferret Script to file
 ! !INTERFACE:
@@ -962,14 +933,12 @@ contains
 
     call WRFHYDRO_ESMF_FerretScriptWrite(varName,dataFile,gridFile,slices, &
       map=map,scale=scale,jnlFile=jnlFile, uniformRect=uniformRect,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_FerretScriptWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_FerretScriptWrite_preset - Write Ferret Script to file
 ! !INTERFACE:
@@ -1021,22 +990,22 @@ contains
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_GLOBAL, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('conus','CONUS','Conus')
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_CONUS, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('irene','IRENE','Irene')
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_IRENE, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case ('frontrange','FRONTRANGE','FrontRange')
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_FRONTRANGE, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       case default
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_VALUE,   &
           msg="Unknown map preset value "//trim(mapPreset)//".", &
@@ -1045,11 +1014,9 @@ contains
     endselect
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_FerretScriptWrite"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_FerretScriptWrite_default - Write Ferret Script to file
 ! !INTERFACE:
@@ -1109,10 +1076,10 @@ contains
 
     ! Get current VM and pet number
     call ESMF_VMGetCurrent(vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     call ESMF_VMGet(vm, localPet=lpe, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (lpe /= 0) return
 
@@ -1161,7 +1128,7 @@ contains
     endif
 
     call ESMF_UtilIOUnitGet(fUnit, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
     open (fUnit,file=trim(ljnlFile),action="write", &
       status="new",iostat=stat)
     if (stat /= 0) then
@@ -1202,11 +1169,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfIsPresent"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfIsPresent - Check NetCDF file for varname
 ! !INTERFACE:
@@ -1265,11 +1230,9 @@ contains
     endif
 
   end function
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfReadIXJX_Field"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfReadIXJX_Field - Read NetCDF var into ESMF field
 ! !INTERFACE:
@@ -1296,17 +1259,15 @@ contains
     if (present(rc)) rc = ESMF_SUCCESS
 
     call ESMF_FieldGet(field,array=array,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,array=array,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfReadIXJX_Array"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfReadIXJX_Array - Read NetCDF var into ESMF array
 ! !INTERFACE:
@@ -1340,36 +1301,36 @@ contains
     if (present(rc)) rc = ESMF_SUCCESS
 
     call ESMF_ArrayGet(array,typekind=typekind,rank=rank,localDeCount=localDeCount,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (rank == 2) then
       if (typekind == ESMF_TYPEKIND_I4) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_I42D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_I42D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         enddo
       elseif (typekind == ESMF_TYPEKIND_I8) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_I82D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_I82D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         enddo
       elseif (typekind == ESMF_TYPEKIND_R4) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_R42D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_R42D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         enddo
       elseif (typekind == ESMF_TYPEKIND_R8) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_R82D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_R82D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         enddo
       else
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_RANK,   &
@@ -1385,11 +1346,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfReadIXJX_I4"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfReadIXJX_I4 - Read NetCDF variable into I4 array
 ! !INTERFACE:
@@ -1493,11 +1452,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfReadIXJX_I8"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfReadIXJX_I8 - Read NetCDF variable into I8 array
 ! !INTERFACE:
@@ -1601,11 +1558,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfReadIXJX_R4"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfReadIXJX_R4 - Read NetCDF variable into R4 array
 ! !INTERFACE:
@@ -1709,11 +1664,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_NetcdfReadIXJX_R8"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_NetcdfReadIXJX_R8 - Read NetCDF variable into R8 array
 ! !INTERFACE:
@@ -1817,11 +1770,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogStateList"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogStateList - Write ESMF state information to PET Logs
 ! !INTERFACE:
@@ -1855,15 +1806,13 @@ contains
 
     do sIndex=1, size(stateList)
       call WRFHYDRO_ESMF_LogState(stateList(sIndex),nestedFlag,label,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
     enddo
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogState"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogState - Write ESMF state information to PET Logs
 ! !INTERFACE:
@@ -1913,18 +1862,18 @@ contains
 
     call ESMF_StateGet(state, nestedFlag=nestedFlag, &
       itemCount=itemCount, name=stateName, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (itemCount > 0 ) then
 
       allocate(itemNameList(itemCount),itemTypeList(itemCount),stat=stat)
       if (ESMF_LogFoundAllocError(statusToCheck=stat, &
         msg="Allocation of item list memory failed.", &
-        CONTEXT, rcToReturn=rc)) return  ! bail out
+        CONTEXT, rcToReturn=rc)) return
 
       call ESMF_StateGet(state, nestedFlag=nestedFlag, &
         itemNameList=itemNameList,itemTypeList=itemTypeList, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
       do iIndex=1, itemCount
 
@@ -1955,7 +1904,7 @@ contains
       deallocate(itemNameList,itemTypeList,stat=stat)
       if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
         msg="Deallocation of item list memory failed.", &
-        CONTEXT, rcToReturn=rc)) return  ! bail out
+        CONTEXT, rcToReturn=rc)) return
 
     else
       write (logMsg,"(A,A)") trim(llabel)//": ", &
@@ -1964,11 +1913,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFieldConnections"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFieldConnections - Write ESMF state connection to logs
 ! !INTERFACE:
@@ -2001,7 +1948,7 @@ contains
 
     call ESMF_StateGet(state, itemCount=itemCount, &
       nestedFlag=nestedFlag,name=stateName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if(present(label)) then
       llabel = trim(label)
@@ -2011,16 +1958,16 @@ contains
 
     call ESMF_StateGet(state, itemCount=itemCount, &
       nestedFlag=nestedFlag,name=stateName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     allocate(itemNameList(itemCount),itemTypeList(itemCount),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of item name and type list memory failed.", &
-      CONTEXT, rcToReturn=rc)) return  ! bail out
+      CONTEXT, rcToReturn=rc)) return
 
     call ESMF_StateGet(state, itemNameList=itemNameList, &
       itemTypeList=itemTypeList, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     do iIndex=1, itemCount
       if (itemTypeList(iIndex) /= ESMF_STATEITEM_FIELD) then
@@ -2039,14 +1986,12 @@ contains
     deallocate(itemNameList,itemTypeList,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
       msg="Deallocation of item name and type list memory failed.", &
-      CONTEXT, rcToReturn=rc)) return  ! bail out
+      CONTEXT, rcToReturn=rc)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogGrid"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogGrid - Write ESMF grid information to PET logs
 ! !INTERFACE:
@@ -2090,19 +2035,19 @@ contains
     call ESMF_GridGet(grid, name=gridName, &
       localDeCount=localDeCount, distgrid=distgrid, &
       dimCount=dimCount,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     ! allocate coordDim info accord. to dimCount and tileCount
     allocate(coordDimCount(dimCount), &
       stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of coordinate dimensions memory failed.", &
-      CONTEXT, rcToReturn=rc)) return  ! bail out
+      CONTEXT, rcToReturn=rc)) return
 
     ! get coordDim info
     call ESMF_GridGet(grid, coordDimCount=coordDimCount, &
       rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     coordDimMax = 0
     do dimIndex=1,dimCount
@@ -2120,7 +2065,7 @@ contains
       stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Dellocation of coordinate dimensions memory failed.", &
-      CONTEXT, rcToReturn=rc)) return  ! bail out
+      CONTEXT, rcToReturn=rc)) return
 
     write (logMsg,"(A,A,(A,I0))") trim(llabel)//": ", &
       trim(gridName), &
@@ -2129,7 +2074,7 @@ contains
 
     ! get dimCount and tileCount
     call ESMF_DistGridGet(distgrid, dimCount=dimCount, tileCount=tileCount, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     write (logMsg,"(A,A,(A,I0))") trim(llabel)//": ", &
       trim(gridName), &
@@ -2145,12 +2090,12 @@ contains
       maxIndexPTile(dimCount, tileCount),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of index array memory failed.", &
-      CONTEXT, rcToReturn=rc)) return  ! bail out
+      CONTEXT, rcToReturn=rc)) return
 
     ! get minIndex and maxIndex arrays
     call ESMF_DistGridGet(distgrid, minIndexPTile=minIndexPTile, &
        maxIndexPTile=maxIndexPTile, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     do tileIndex=1,tileCount
     do dimIndex=1,dimCount
@@ -2167,14 +2112,12 @@ contains
     deallocate(minIndexPTile, maxIndexPTile,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
       msg="Deallocation of index array memory failed.", &
-      CONTEXT, rcToReturn=rc)) return  ! bail out
+      CONTEXT, rcToReturn=rc)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFieldList"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFieldList - Write ESMF field information to PET logs
 ! !INTERFACE:
@@ -2207,15 +2150,13 @@ contains
 
     do fIndex=1,size(fieldList)
       call WRFHYDRO_ESMF_LogField(fieldList(fIndex),llabel,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
     enddo
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogField"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogField - Write ESMF field information to PET logs
 ! !INTERFACE:
@@ -2256,7 +2197,7 @@ contains
     endif
 
     call ESMF_FieldGet(field,status=fieldStatus,name=fieldName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (fieldStatus == ESMF_FIELDSTATUS_EMPTY) then
       fieldStatusStr = 'EMPTY'
@@ -2271,7 +2212,7 @@ contains
     if (fieldStatus == ESMF_FIELDSTATUS_COMPLETE .OR. &
     fieldStatus == ESMF_FIELDSTATUS_GRIDSET ) then
       call ESMF_FieldGet(field, geomtype=fieldGeomtype,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       if (fieldGeomtype == ESMF_GEOMTYPE_GRID) then
         fieldGeomtypeStr = 'GRID'
       elseif (fieldGeomtype == ESMF_GEOMTYPE_MESH) then
@@ -2289,15 +2230,15 @@ contains
 
     call NUOPC_GetAttribute(field, name="ConsumerConnection", &
       value=fieldConsumerConn, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     call NUOPC_GetAttribute(field, name="TransferOfferGeomObject", &
       value=fieldTransferOffer, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     call NUOPC_GetAttribute(field, name="TransferActionGeomObject", &
       value=fieldTransferAction, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     write (logMsg,"(A,A,(2A))") trim(llabel)//": ", &
       trim(fieldName), &
@@ -2318,11 +2259,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFieldLclVal"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFieldLclVal - Write ESMF field local vals to PET logs
 ! !INTERFACE:
@@ -2355,17 +2294,15 @@ contains
     endif
 
     call ESMF_FieldGet(field,array=array,name=fieldName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     call WRFHYDRO_ESMF_LogArrayLclVal(array,fieldName=fieldName,label=llabel,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogArrayLclVal"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogArrayLclVal - Write ESMF array local vals to PET logs
 ! !INTERFACE:
@@ -2411,27 +2348,27 @@ contains
     endif
 
     call ESMF_ArrayGet(array, typekind=typekind,rank=rank, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (typekind == ESMF_TYPEKIND_I4) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I4_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I4_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I4_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I4_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I4_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I4_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log utility range.", &
           ESMF_LOGMSG_INFO)
@@ -2439,22 +2376,22 @@ contains
     elseif (typekind == ESMF_TYPEKIND_I8) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I8_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I8_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I8_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I8_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I8_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I8_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log uttility range.", &
           ESMF_LOGMSG_INFO)
@@ -2462,22 +2399,22 @@ contains
     elseif (typekind == ESMF_TYPEKIND_R4) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R4_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R4_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R4_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R4_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R4_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R4_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log utility range.", &
           ESMF_LOGMSG_INFO)
@@ -2485,22 +2422,22 @@ contains
     elseif (typekind == ESMF_TYPEKIND_R8) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R8_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R8_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R8_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R8_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R8_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R8_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log utility range.", &
           ESMF_LOGMSG_INFO)
@@ -2511,11 +2448,9 @@ contains
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_I41D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_I41D - Write I41D array local vals to log
 ! !INTERFACE:
@@ -2562,11 +2497,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_I42D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_I42D - Write I42D array local vals to log
 ! !INTERFACE:
@@ -2613,11 +2546,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_I43D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_I43D - Write I43D array local vals to log
 ! !INTERFACE:
@@ -2664,11 +2595,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_I81D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_I81D - Write I81D array local vals to log
 ! !INTERFACE:
@@ -2715,11 +2644,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_I82D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_I82D - Write I82D array local vals to log
 ! !INTERFACE:
@@ -2766,11 +2693,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_I83D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_I83D - Write I83D array local vals to log
 ! !INTERFACE:
@@ -2817,11 +2742,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_R41D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_R41D - Write R41D array local vals to log
 ! !INTERFACE:
@@ -2868,11 +2791,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_R42D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_R42D - Write R42D array local vals to log
 ! !INTERFACE:
@@ -2919,11 +2840,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_R43D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_R43D - Write R43D array local vals to log
 ! !INTERFACE:
@@ -2970,11 +2889,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_R81D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_R81D - Write R81D array local vals to log
 ! !INTERFACE:
@@ -3021,11 +2938,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_R82D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_R82D - Write R82D array local vals to log
 ! !INTERFACE:
@@ -3072,11 +2987,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogFarrayLclVal_R83D"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogFarrayLclVal_R83D - Write R83D array local vals to log
 ! !INTERFACE:
@@ -3123,11 +3036,9 @@ contains
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_LogCplList"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_LogCplList - Write ESMF CplList to PET logs
 ! !INTERFACE:
@@ -3165,21 +3076,21 @@ contains
 
     ! query the CplComp for info
     call ESMF_CplCompGet(cplcomp, name=name, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     ! get the CplList Attribute
     call NUOPC_CompAttributeGet(cplcomp, name="CplList", &
       itemCount=cplListSize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
 
     if (cplListSize>0) then
       allocate(cplList(cplListSize), stat=stat)
       if (ESMF_LogFoundAllocError(statusToCheck=stat, &
         msg="Allocation of internal CplList memory failed.", &
-        CONTEXT, rcToReturn=rc)) return  ! bail out
+        CONTEXT, rcToReturn=rc)) return
       call NUOPC_CompAttributeGet(cplcomp, name="CplList", valueList=cplList, &
         rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return
    else
      write (logMsg,"(A,A,A)") trim(llabel)//": ", &
        trim(name), &
@@ -3201,15 +3112,13 @@ contains
       deallocate(cplList,stat=stat)
       if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
         msg="Deallocation of internal CplList memory failed.", &
-        CONTEXT, rcToReturn=rc)) return  ! bail out
+        CONTEXT, rcToReturn=rc)) return
     endif
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
-#define METHOD "WRFHYDRO_ESMF_ChDir"
 !BOP
 ! !IROUTINE: WRFHYDRO_ESMF_ChDir - Change working directory
 ! !INTERFACE:
@@ -3243,7 +3152,6 @@ contains
     if (present(rc)) rc = stat
 
   end subroutine
-#undef METHOD
 
   !-----------------------------------------------------------------------------
 
