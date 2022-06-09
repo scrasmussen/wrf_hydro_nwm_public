@@ -1,5 +1,3 @@
-#define FILENAME "WRFHydro_NUOPC_Gluecode"
-#define MODNAME "WRFHydro_NUOPC_Gluecode.F90"
 #include "WRFHydro_NUOPC_Macros.h"
 
 module wrfhydro_nuopc_gluecode
@@ -99,17 +97,16 @@ module wrfhydro_nuopc_gluecode
   !-----------------------------------------------------------------------------
 contains
 
-#undef METHOD
-#define METHOD "wrfhydro_nuopc_ini"
-
-  subroutine wrfhydro_nuopc_ini(did,vm,clock,forcingDir,rc)
+  subroutine wrfhydro_nuopc_ini(did,vm,clock,forcingDir,verbosity,rc)
     integer, intent(in)                     :: did
     type(ESMF_VM),intent(in)                :: vm
     type(ESMF_Clock),intent(in)             :: clock
     character(len=*)                        :: forcingDir
+    integer, intent(in)                     :: verbosity
     integer, intent(out)                    :: rc
 
     ! local variables
+    character(*), parameter     :: rname="wrfhydro_nuopc_ini"
     integer                     :: localPet
     integer                     :: stat
     integer, allocatable        :: deBlockList(:,:,:)
@@ -118,31 +115,25 @@ contains
     type(ESMF_Time)             :: startTime
     type(ESMF_TimeInterval)     :: timeStep
     real(ESMF_KIND_R8)          :: dt
-#ifdef DEBUG
     character(ESMF_MAXSTR)      :: logMsg
-#endif
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
     ! Set mpiCommunicator for WRFHYDRO
     call ESMF_VMGet(vm, localPet=localPet, &
       mpiCommunicator=HYDRO_COMM_WORLD, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     ! Set focing directory
     indir=forcingDir
 
     ! Get the models timestep
     call ESMF_ClockGet(clock,timestep=timestep,startTime=startTime,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call ESMF_TimeIntervalGet(timestep,s_r8=dt,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call WRFHYDRO_TimeToString(startTime,timestr=startTimeStr,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     call orchestrator%init()
 
@@ -159,8 +150,8 @@ contains
     nlst(did)%nsoil=4
     allocate(nlst(did)%zsoil8(4),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of model soil depths memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of model soil depths memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     nlst(did)%zsoil8(1:4)=(/-0.1,-0.4,-1.0,-2.0/)
     nlst(did)%geo_static_flnm = "geo_em.d01.nc"
     nlst(did)%geo_finegrid_flnm = "fulldom_hires_hydrofile.d01.nc"
@@ -170,42 +161,42 @@ contains
 
     if(nlst(did)%dt .le. 0) then
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Timestep less than 1 is not supported!", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+        msg=rname//": Timestep less than 1 is not supported!", &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      return
     endif
 
 !    ! Read information from hydro.namelist config file
      call init_namelist_rt_field(did)
 
-#if DEBUG
-    call WRFHYDRO_nlstLog(did,MODNAME,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
-#endif
+    if (btest(verbosity,16)) then
+      call WRFHYDRO_nlstLog(did,rname,rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+    endif
 
     if(nlst(did)%nsoil .gt. 4) then
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Maximum soil levels supported is 4.", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+        msg=rname//": Maximum soil levels supported is 4.", &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      return
     endif
 
-    call get_file_dimension(fileName=nlst(did)%geo_static_flnm,& 
+    call get_file_dimension(fileName=nlst(did)%geo_static_flnm,&
       ix=nx_global(1),jx=ny_global(1))
     call MPP_LAND_INIT(nx_global(1),ny_global(1))
 
-#ifdef DEBUG
-    write (logMsg,"(A,2(I0,A))") MODNAME//": Global Dimensions = (", &
-      nx_global(1),",",ny_global(1),")"
-    call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-#endif
+    if (btest(verbosity,16)) then
+      write (logMsg,"(A,2(I0,A))") rname//": Global Dimensions = (", &
+        nx_global(1),",",ny_global(1),")"
+      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
+    endif
 
     call log_map2d()
 
     call ESMF_VMBroadcast(vm, nx_global, count=1, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call ESMF_VMBroadcast(vm, ny_global, count=1, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     rt_domain(did)%ix = nx_global(1)
     rt_domain(did)%jx = ny_global(1)
@@ -214,20 +205,20 @@ contains
          nlst(did)%AGGFACTRT)
 
     call ESMF_VMBroadcast(vm, startx, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call ESMF_VMBroadcast(vm, starty, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call ESMF_VMBroadcast(vm, local_nx_size, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     allocate(deBlockList(2,2,numprocs))
     do i = 1, numprocs
       deBlockList(:,1,i) = (/startx(i),starty(i)/)
       deBlockList(:,2,i) = (/startx(i)+local_nx_size(i)-1, &
                              starty(i)+local_ny_size(i)-1/)
-!      write (logMsg,"(A,I0,A,4(I0,A))") MODNAME//": deBlockList ", i, " = (", &
+!      write (logMsg,"(A,I0,A,4(I0,A))") rname//": deBlockList ", i, " = (", &
 !        deBlockList(1,1,i),":",deBlockList(1,2,i),",", &
 !        deBlockList(2,1,i),":",deBlockList(2,2,i),")"
 !      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
@@ -235,11 +226,11 @@ contains
 
 !    allocate(connectionList(1),stat=stat)
 !    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-!      msg=METHOD//': Allocation of connection list memory failed.', &
-!      file=FILENAME, rcToReturn=rc)) return ! bail out
+!      msg=rname//': Allocation of connection list memory failed.', &
+!      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 !    call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
 !      tileIndexB=1, positionVector=(/nx_global(1), 0/), rc=rc)
-!    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+!    if (ESMF_STDERRORCHECK(rc)) return
 
 
     ! Create DistGrid based on WRFHDYRO Config NX,NY
@@ -251,33 +242,23 @@ contains
 !     delayout=delayout, &
 !     connectionList=connectionList, &
       rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     deallocate(deBlockList)
 
 !   deallocate(connectionList,stat=stat)
 !   if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-!     msg=METHOD//': Deallocation of connection list memory failed.', &
-!     file=FILENAME,rcToReturn=rc)) return ! bail out
+!     msg=rname//': Deallocation of connection list memory failed.', &
+!     line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     ! Get the Local Decomp Incides
-    call set_local_indices(rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call set_local_indices(verbosity, rc)
+    if(ESMF_STDERRORCHECK(rc)) return
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": Enter CPL_LAND_INIT", ESMF_LOGMSG_INFO)
-#endif
     ! Initialize the internal Land <-> Hydro Coupling
     call CPL_LAND_INIT(x_start, x_end, y_start, y_end)
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": Exit CPL_LAND_INIT", ESMF_LOGMSG_INFO)
-#endif
 
     ! Routing timestep set in HYDRO_ini
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": Enter HYDRO_ini", ESMF_LOGMSG_INFO)
-#endif
-
     if(sf_surface_physics .eq. 5) then
       ! clm4
       ! Use wrfinput vegetation type and soil type
@@ -286,11 +267,10 @@ contains
       ! Use wrfinput vegetation type and soil type
       call HYDRO_ini(ntime=1,did=did,ix0=nx_local,jx0=ny_local)
     endif
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": Exit HYDRO_ini", ESMF_LOGMSG_INFO)
-    call WRFHYDRO_domainLog(did,MODNAME,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
-#endif
+    if (btest(verbosity,16)) then
+      call WRFHYDRO_domainLog(did,rname,rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+    endif
 
     ! Override the clock configuration in hyro.namelist
     read (startTimeStr(1:4),"(I)")   nlst(did)%START_YEAR
@@ -306,9 +286,9 @@ contains
 
     if(nlst(did)%dt .le. 0) then
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Timestep less than 1 is not supported!", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+        msg=rname//": Timestep less than 1 is not supported!", &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      return
     endif
 
     ! Adjust the routing timestep and factor
@@ -342,16 +322,9 @@ contains
 
     num_nests = num_nests + 1
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "wrfhydro_nuopc_run"
 
   subroutine wrfhydro_nuopc_run(did,lsm_forcings,clock,importState,&
   exportState,rc)
@@ -363,40 +336,37 @@ contains
     integer, intent(out)                    :: rc
 
     ! local variables
+    character(*), parameter     :: rname="wrfhydro_nuopc_run"
     type(ESMF_TimeInterval)     :: timeStep
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
     if(.not. RT_DOMAIN(did)%initialized) then
       call ESMF_LogSetError(ESMF_FAILURE, &
         msg="WRHYDRO: Model has not been initialized!", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      return
     endif
 
     call ESMF_ClockGet(clock, timeStep=timeStep, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     call WRFHYDRO_ClockToString(clock,timestr=cpl_outdate,rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     nlst(did)%olddate(1:19) = cpl_outdate(1:19) ! Current time is the
 
     nlst(did)%dt = WRFHYDRO_TimeIntervalGetReal(timeInterval=timeStep,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     if(nlst(did)%dt .le. 0) then
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Timestep less than 1 is not supported!", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+        msg=rname//": Timestep less than 1 is not supported!", &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      return
     endif
 
     if((dt_factor0*nlst(did)%dtrt_ter) .ne. nlst(did)%dt) then   ! NUOPC driver time step changed.
-      call ESMF_LogWrite(METHOD//": Driver timestep changed.",ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(rname//": Driver timestep changed.",ESMF_LOGMSG_INFO)
       if(dtrt_ter0 .ge. nlst(did)%dt) then
         nlst(did)%dtrt_ter = nlst(did)%dt
         dt_factor0 = 1
@@ -409,7 +379,7 @@ contains
     endif
 
     if((dt_factor0*nlst(did)%dtrt_ch) .ne. nlst(did)%dt) then   ! NUOPD driver time step changed.
-      call ESMF_LogWrite(METHOD//": Driver timestep changed.",ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(rname//": Driver timestep changed.",ESMF_LOGMSG_INFO)
       if(dtrt_ch0 .ge. nlst(did)%dt) then
         nlst(did)%dtrt_ch = nlst(did)%dt
         dt_factor0 = 1
@@ -424,16 +394,16 @@ contains
     if(nlst(did)%SUBRTSWCRT .eq.0  .and. &
       nlst(did)%OVRTSWCRT .eq. 0 .and. &
       nlst(did)%GWBASESWCRT .eq. 0) then
-       call ESMF_LogWrite(METHOD//": SUBRTSWCRT,OVRTSWCRT,GWBASESWCRT are zero!", &
+       call ESMF_LogWrite(rname//": SUBRTSWCRT,OVRTSWCRT,GWBASESWCRT are zero!", &
             ESMF_LOGMSG_WARNING)
       !call ESMF_LogSetError(ESMF_FAILURE, &
-      !  msg=METHOD//": SUBRTSWCRT,OVRTSWCRT,GWBASESWCRT are zero!", &
-      !  file=FILENAME,rcToReturn=rc)
-      !return  ! bail out
+      !  msg=rname//": SUBRTSWCRT,OVRTSWCRT,GWBASESWCRT are zero!", &
+      !  line=__LINE__, file=__FILE__, rcToReturn=rc)
+      !return
     endif
 
     if((.not. RT_DOMAIN(did)%initialized) .and. (nlst(did)%rst_typ .eq. 1) ) then
-      call ESMF_LogWrite(METHOD//": Restart initial data from offline file.", &
+      call ESMF_LogWrite(rname//": Restart initial data from offline file.", &
         ESMF_LOGMSG_INFO)
     else
       if (.not. lsm_forcings) then
@@ -444,7 +414,7 @@ contains
           infxsrt=rt_domain(did)%infxsrt,soldrain=rt_domain(did)%soldrain)
       endif
     endif
-  
+
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)
 
@@ -455,16 +425,9 @@ contains
     !yw     config_flags%gwsoilcpl = nlst(did)%gwsoilcpl
     !end if
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "wrfhydro_nuopc_fin"
 
   subroutine wrfhydro_nuopc_fin(did,rc)
     ! ARGUMENTES
@@ -472,11 +435,8 @@ contains
     integer, intent(out)        :: rc
 
     ! LOCAL VARIABLES
+    character(*), parameter     :: rname="wrfhydro_nuopc_fin"
     integer                     :: stat
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
@@ -485,27 +445,22 @@ contains
 !    DCR - Turned off to let the model deallocate memory
 !    deallocate(nlst(did)%zsoil8)
 !    if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-!      msg=METHOD//': Deallocation of model soil depth memory failed.', &
-!      file=FILENAME,rcToReturn=rc)) return ! bail out
+!      msg=rname//': Deallocation of model soil depth memory failed.', &
+!      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     RT_DOMAIN(did)%initialized = .false.
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
-#undef METHOD
-#define METHOD "WRFHYDRO_GridCreate"
-
-  function WRFHYDRO_GridCreate(did,rc)
+  function WRFHYDRO_GridCreate(did,verbosity,rc)
     ! RETURN VALUE
     type(ESMF_Grid) :: WRFHYDRO_GridCreate
     ! ARGUMENTS
     integer, intent(in)                     :: did
+    integer, intent(in)                     :: verbosity
     integer, intent(out)                    :: rc
     ! LOCAL VARIABLES
+    character(*), parameter     :: rname="WRFHYDRO_GridCreate"
     integer                     :: stat
     real                        :: min_lat, max_lat, min_lon, max_lon
     real, allocatable           :: latitude(:,:), longitude(:,:)
@@ -518,14 +473,7 @@ contains
     integer(ESMF_KIND_I4), pointer :: gridmask(:,:)
     integer                     :: i,j, i1,j1
     character(len=16)           :: xlat_corner_name, xlon_corner_name
-#ifdef DEBUG
     character(ESMF_MAXSTR)      :: logMsg
-#endif
-
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
@@ -534,39 +482,39 @@ contains
       coordTypeKind=ESMF_TYPEKIND_COORD, &
 !      gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
       rc = rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     ! CENTERS
 
     ! Get Local Latitude (lat)
     allocate(latitude(nx_local,ny_local),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of latitude memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of latitude memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     call WRFHYDRO_ESMF_NetcdfReadIXJX("XLAT_M",nlst(did)%geo_static_flnm, &
       (/x_start,y_start/),latitude,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     ! Get Local Longitude (lon)
     allocate(longitude(nx_local,ny_local),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of longitude memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of longitude memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     call WRFHYDRO_ESMF_NetcdfReadIXJX("XLONG_M",nlst(did)%geo_static_flnm, &
       (/x_start,y_start/),longitude,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
-#ifdef DEBUG
-    ! Print Local Lat Lon Lower Left / Upper Right Centers
-    write(logMsg,"(A,4(F0.3,A))") MODNAME//": Center Coordinates = (", &
-      longitude(1,1),":",longitude(nx_local,ny_local),",", &
-      latitude(1,1),":",latitude(nx_local,ny_local),")"
-    call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-#endif
+    if (btest(verbosity,16)) then
+      ! Print Local Lat Lon Lower Left / Upper Right Centers
+      write(logMsg,"(A,4(F0.3,A))") rname//": Center Coordinates = (", &
+        longitude(1,1),":",longitude(nx_local,ny_local),",", &
+        latitude(1,1),":",latitude(nx_local,ny_local),")"
+      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
+    endif
 
     ! Add Center Coordinates to Grid
     call ESMF_GridAddCoord(WRFHYDRO_GridCreate, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     call ESMF_GridGetCoord(WRFHYDRO_GridCreate, coordDim=1, localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, &
@@ -586,28 +534,28 @@ contains
 
     deallocate(latitude,longitude,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=METHOD//': Deallocation of longitude and latitude memory failed.', &
-      file=FILENAME,rcToReturn=rc)) return ! bail out
+      msg=rname//': Deallocation of longitude and latitude memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     ! Get Local Mask
     allocate(mask(nx_local,ny_local),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of mask memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of mask memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     call WRFHYDRO_ESMF_NetcdfReadIXJX("LANDMASK",nlst(did)%geo_static_flnm, &
       (/x_start,y_start/),mask,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     ! Add Grid Mask
     call ESMF_GridAddItem(WRFHYDRO_GridCreate, itemFlag=ESMF_GRIDITEM_MASK, &
       staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    if (ESMF_STDERRORCHECK(rc)) return
     ! Get pointer to Grid Mask array
     call ESMF_GridGetItem(WRFHYDRO_GridCreate, itemflag=ESMF_GRIDITEM_MASK, &
       localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, &
       farrayPtr=gridmask, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    if (ESMF_STDERRORCHECK(rc)) return
 
     do j = lbnd(2),ubnd(2)
     do i = lbnd(1),ubnd(1)
@@ -618,8 +566,8 @@ contains
 
     deallocate(mask,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=METHOD//': Deallocation of mask memory failed.', &
-      file=FILENAME,rcToReturn=rc)) return ! bail out
+      msg=rname//': Deallocation of mask memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     ! CORNERS
     ! The original WPS implementation used the _CORNER names
@@ -642,32 +590,32 @@ contains
       ! Get Local Latitude (lat)
       allocate(latitude(nx_local+1,ny_local+1),stat=stat)
       if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-        msg=METHOD//': Allocation of corner latitude memory failed.', &
-        file=FILENAME, rcToReturn=rc)) return ! bail out
+        msg=rname//': Allocation of corner latitude memory failed.', &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)) return
       call WRFHYDRO_ESMF_NetcdfReadIXJX(trim(xlat_corner_name),nlst(did)%geo_static_flnm, &
         (/x_start,y_start/),latitude,rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return ! bail out
+      if(ESMF_STDERRORCHECK(rc)) return
 
       ! Get Local Longitude (lon)
       allocate(longitude(nx_local+1,ny_local+1),stat=stat)
       if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-       msg=METHOD//': Allocation of corner longitude memory failed.', &
-       file=FILENAME, rcToReturn=rc)) return ! bail out
+       msg=rname//': Allocation of corner longitude memory failed.', &
+       line=__LINE__, file=__FILE__, rcToReturn=rc)) return
       call WRFHYDRO_ESMF_NetcdfReadIXJX(trim(xlon_corner_name),nlst(did)%geo_static_flnm, &
         (/x_start,y_start/),longitude,rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return ! bail out
+      if(ESMF_STDERRORCHECK(rc)) return
 
-#ifdef DEBUG
-      ! Print Local Lat Lon Lower Left / Upper Right Corners
-      write(logMsg,"(A,4(F0.3,A))") MODNAME//": Corner Coordinates = (", &
-        longitude(1,1),":",longitude(nx_local+1,ny_local+1),",", &
-        latitude(1,1),":",latitude(nx_local+1,ny_local+1),")"
-      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-#endif
+      if (btest(verbosity,16)) then
+        ! Print Local Lat Lon Lower Left / Upper Right Corners
+        write(logMsg,"(A,4(F0.3,A))") rname//": Corner Coordinates = (", &
+          longitude(1,1),":",longitude(nx_local+1,ny_local+1),",", &
+          latitude(1,1),":",latitude(nx_local+1,ny_local+1),")"
+        call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
+      endif
 
       ! Add Corner Coordinates to Grid
       call ESMF_GridAddCoord(WRFHYDRO_GridCreate, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return ! bail out
+      if(ESMF_STDERRORCHECK(rc)) return
 
       call ESMF_GridGetCoord(WRFHYDRO_GridCreate, coordDim=1, localDE=0, &
         staggerloc=ESMF_STAGGERLOC_CORNER, &
@@ -687,35 +635,27 @@ contains
 
       deallocate(latitude,longitude,stat=stat)
       if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-        msg=METHOD//': Deallocation of corner longitude and latitude memory failed.', &
-        file=FILENAME,rcToReturn=rc)) return ! bail out
+        msg=rname//': Deallocation of corner longitude and latitude memory failed.', &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
       call add_area(WRFHYDRO_GridCreate, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
 
     else
-#ifdef DEBUG
       ! Warning no corners in domain file
-      call ESMF_LogWrite(MODNAME//": No Corner Coordinates.", ESMF_LOGMSG_WARNING)
-#endif
+      call ESMF_LogWrite(rname//": No Corner Coordinates.", ESMF_LOGMSG_WARNING)
     endif
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
   end function
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "add_area"
 
   subroutine add_area(grid,rc)
     type(ESMF_Grid), intent(inout)          :: grid
     integer, intent(out)                    :: rc
 
     ! Local Variables
+    character(*), parameter          :: rname="add_area"
     integer(ESMF_KIND_I4), PARAMETER :: R = 6376000 ! metres
     type(ESMF_Field)                 :: fieldArea
     type(ESMF_Array)                 :: areaArray
@@ -723,10 +663,6 @@ contains
     integer                          :: lbnd(2),ubnd(2)
     real(ESMF_KIND_R8), pointer      :: radianarea(:,:)
     real(ESMF_KIND_R8), pointer      :: gridarea(:,:)
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
@@ -756,22 +692,17 @@ contains
      enddo
      enddo
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "set_local_indices"
-
-  subroutine set_local_indices(rc)
+  subroutine set_local_indices(verbosity,rc)
     ! ARGUMENTS
+    integer, intent(in)                     :: verbosity
     integer, intent(out)                    :: rc
 
     ! LOCAL VARIABLES
+    character(*), parameter     :: rname="set_local_indices"
     integer                     :: stat
     type(ESMF_VM)               :: currentVM
     integer                     :: localPet
@@ -779,46 +710,40 @@ contains
     type(ESMF_DELayout)         :: delayout
     integer, allocatable        :: dimExtent(:,:)
     integer, allocatable        :: iIndexList(:), jIndexList(:)
-#ifdef DEBUG
     character(ESMF_MAXSTR)      :: logMsg
-#endif
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
     !! Get VM Info to see if this will give me the PET info I need
     call ESMF_VMGetCurrent(currentVM, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     call ESMF_VMGet(currentVM, localPet=localPet, petCount=petCount, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     !! Get the grid distribution for this pet
     allocate(dimExtent(2, 0:(petCount - 1)),stat=stat) ! (dimCount, deCount)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of indexCountPDe memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of indexCountPDe memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     call ESMF_DistGridGet(WRFHYDRO_DistGrid, delayout=delayout, &
       indexCountPDe=dimExtent, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     allocate(iIndexList(dimExtent(1, localPet)),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of iIndexList memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of iIndexList memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     call ESMF_DistGridGet(WRFHYDRO_DistGrid, localDe=0, dim=1, &
       indexList=iIndexList, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     allocate(jIndexList(dimExtent(2, localPet)),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of jIndexList memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
+      msg=rname//': Allocation of jIndexList memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     call ESMF_DistGridGet(WRFHYDRO_DistGrid, localDe=0, dim=2, &
       indexList=jIndexList, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     x_start = minVal(iIndexList)
     x_end   = maxVal(iIndexList)
@@ -828,33 +753,26 @@ contains
     nx_local = x_end - x_start + 1
     ny_local = y_end - y_start + 1
 
-#ifdef DEBUG
-    write (logMsg,"(A,6(I0,A))") MODNAME//": Local Indices = (", &
-      x_start,":",x_end,",",y_start,":",y_end,") Local Size = (", &
-      nx_local,"x",ny_local,")"
-    call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-#endif
+    if (btest(verbosity,16)) then
+      write (logMsg,"(A,6(I0,A))") rname//": Local Indices = (", &
+        x_start,":",x_end,",",y_start,":",y_end,") Local Size = (", &
+        nx_local,"x",ny_local,")"
+      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
+    endif
 
     deallocate(iIndexList,jIndexList,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=METHOD//': Deallocation of IndexList memory failed.', &
-      file=FILENAME,rcToReturn=rc)) return ! bail out
+      msg=rname//': Deallocation of IndexList memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     deallocate(dimExtent,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=METHOD//': Deallocation of indexCountPDeo memory failed.', &
-      file=FILENAME,rcToReturn=rc)) return ! bail out
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+      msg=rname//': Deallocation of indexCountPDeo memory failed.', &
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_get_timestep"
 
   function WRFHYDRO_get_timestep(did,rc)
     ! RETURN VALUE
@@ -862,85 +780,56 @@ contains
     ! ARGUMENTS
     integer, intent(in)         :: did
     integer, intent(out)        :: rc
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+    ! LOCAL VARIABLES
+    character(*), parameter     :: rname="WRFHYDRO_get_timestep"
 
     rc = ESMF_SUCCESS
 
     WRFHYDRO_get_timestep = nlst(did)%dt
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end function
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_set_timestep"
 
   subroutine WRFHYDRO_set_timestep(did,dt,rc)
     ! ARGUMENTS
     integer, intent(in)           :: did
     real                          :: dt
     integer, intent(out)          :: rc
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+    ! LOCAL VARIABLES
+    character(*), parameter       :: rname="WRFHYDRO_set_timestep"
 
     rc = ESMF_SUCCESS
 
     nlst(did)%dt = dt
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_get_hgrid"
 
   subroutine WRFHYDRO_get_hgrid(did,hgrid,rc)
     ! ARGUMENTS
     integer, intent(in)         :: did
     character, intent(out)      :: hgrid
     integer, intent(out)        :: rc
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+    ! LOCAL VARIABLES
+    character(*), parameter     :: rname="WRFHYDRO_get_hgrid"
 
     rc = ESMF_SUCCESS
 
     hgrid = nlst(did)%hgrid
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_get_restart"
 
   subroutine WRFHYDRO_get_restart(did,restart,rc)
     ! ARGUMENTS
     integer, intent(in)         :: did
     logical, intent(out)        :: restart
     integer, intent(out)        :: rc
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+    ! LOCAL VARIABLES
+    character(*), parameter     :: rname="WRFHYDRO_get_restart"
 
     rc = ESMF_SUCCESS
 
@@ -950,18 +839,11 @@ contains
       restart = .TRUE.
     endif
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
   ! Conversion Utilities
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_ClockToString"
 
   subroutine WRFHYDRO_ClockToString(clock, timestr, rc)
     ! ARGUMENTS
@@ -970,31 +852,21 @@ contains
     character (len=*), intent(out)  :: timestr
 
     ! LOCAL VARIABLES
+    character(*), parameter    :: rname="WRFHYDRO_ClockToString"
     type(ESMF_Time)            :: currTime
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     if(present(rc)) rc = ESMF_SUCCESS  ! Initialize
 
     ! Get the current time from the clock
     call ESMF_ClockGet(clock=clock,currTime=currTime,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     call WRFHYDRO_TimeToString(currTime,timestr,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+    if(ESMF_STDERRORCHECK(rc)) return
 
   end subroutine
 
 !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_TimeToString"
 
   subroutine WRFHYDRO_TimeToString(time, timestr, rc)
     ! ARGUMENTS
@@ -1003,12 +875,9 @@ contains
     character (len=*), intent(out)  :: timestr
 
     ! LOCAL VARIABLES
+    character(*), parameter    :: rname="WRFHYDRO_TimeToString"
     character (len=256)        :: tmpstr = ''
     integer                    :: strlen
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     if(present(rc)) rc = ESMF_SUCCESS  ! Initialize
 
@@ -1016,28 +885,21 @@ contains
 
     if (len(timestr) < 19) then
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Time string is too short!", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+        msg=rname//": Time string is too short!", &
+        line=__LINE__, file=__FILE__, rcToReturn=rc)
+      return
     endif
 
     CALL ESMF_TimeGet(time,timeString=tmpstr,rc=rc )
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
 
     strlen = min(len(timestr),len_trim(tmpstr))
     timestr(1:strlen) = tmpstr(1:strlen)
     timestr(11:11) = '_'
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_TimeIntervalGetReal"
 
   function WRFHYDRO_TimeIntervalGetReal(timeInterval,rc)
     ! RETURN VALUE:
@@ -1047,32 +909,22 @@ contains
     integer, intent(out), optional      :: rc
 
     ! LOCAL VARIABLES
+    character(*), parameter             :: rname="WRFHYDRO_TimeIntervalGetReal"
     real(ESMF_KIND_R8)                  :: s_r8
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     if(present(rc)) rc = ESMF_SUCCESS
 
     WRFHYDRO_TimeIntervalGetReal = -9999
 
     call ESMF_TimeIntervalGet(timeInterval,s_r8=s_r8,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    if(ESMF_STDERRORCHECK(rc)) return
     WRFHYDRO_TimeIntervalGetReal = s_r8
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
   end function
 
   !-----------------------------------------------------------------------------
   ! Log Utilities
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_nlstLog"
 
   subroutine WRFHYDRO_nlstLog(did,label,rc)
     ! ARGUMENTS
@@ -1081,19 +933,16 @@ contains
     integer,intent(out)                  :: rc
 
     ! LOCAL VARIABLES
+    character(*), parameter     :: rname="WRFHYDRO_nlstLog"
     integer                     :: layerIndex
     character(len=64)           :: l_label
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
     if (present(label)) then
       l_label = label
     else
-      l_label = METHOD
+      l_label = rname
     endif
 
     write (logMsg,"(A,I0)") ": Domain ID      = ",did
@@ -1160,16 +1009,9 @@ contains
       call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
     enddo
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "WRFHYDRO_domainLog"
 
   subroutine WRFHYDRO_domainLog(did,label,rc)
     ! ARGUMENTS
@@ -1178,18 +1020,15 @@ contains
     integer,intent(out)                  :: rc
 
     ! LOCAL VARIABLES
+    character(*), parameter     :: rname="WRFHYDRO_domainLog"
     character(len=64)           :: l_label
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
     rc = ESMF_SUCCESS
 
     if (present(label)) then
       l_label = label
     else
-      l_label = METHOD
+      l_label = rname
     endif
 
     write (logMsg,"(A,I0)") ": Domain ID      = ",did
@@ -1213,10 +1052,6 @@ contains
     call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
     write (logMsg,"(A,I0)") ": Num Basins     = ",rt_domain(did)%numbasns
     call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
-#endif
 
   end subroutine
 
