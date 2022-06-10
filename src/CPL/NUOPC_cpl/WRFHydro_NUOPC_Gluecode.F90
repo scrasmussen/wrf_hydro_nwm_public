@@ -169,11 +169,6 @@ contains
 !    ! Read information from hydro.namelist config file
      call init_namelist_rt_field(did)
 
-    if (btest(verbosity,16)) then
-      call WRFHYDRO_nlstLog(did,rname,rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return
-    endif
-
     if(nlst(did)%nsoil .gt. 4) then
       call ESMF_LogSetError(ESMF_FAILURE, &
         msg=rname//": Maximum soil levels supported is 4.", &
@@ -266,10 +261,6 @@ contains
     else
       ! Use wrfinput vegetation type and soil type
       call HYDRO_ini(ntime=1,did=did,ix0=nx_local,jx0=ny_local)
-    endif
-    if (btest(verbosity,16)) then
-      call WRFHYDRO_domainLog(did,rname,rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return
     endif
 
     ! Override the clock configuration in hyro.namelist
@@ -921,140 +912,5 @@ contains
     WRFHYDRO_TimeIntervalGetReal = s_r8
 
   end function
-
-  !-----------------------------------------------------------------------------
-  ! Log Utilities
-  !-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_nlstLog(did,label,rc)
-    ! ARGUMENTS
-    integer,intent(in)                   :: did
-    character(len=*),intent(in),optional :: label
-    integer,intent(out)                  :: rc
-
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="WRFHYDRO_nlstLog"
-    integer                     :: layerIndex
-    character(len=64)           :: l_label
-
-    rc = ESMF_SUCCESS
-
-    if (present(label)) then
-      l_label = label
-    else
-      l_label = rname
-    endif
-
-    write (logMsg,"(A,I0)") ": Domain ID      = ",did
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-    write (logMsg,"(A,5(I0,A))") ": Start Date     = ", &
-      nlst(did)%START_YEAR,"-",nlst(did)%START_MONTH,"-", &
-      nlst(did)%START_DAY,"_",nlst(did)%START_HOUR,":", &
-      nlst(did)%START_MIN
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,F0.3)") ": Timestep       = ",nlst(did)%dt
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,F0.3)") ": Output Step    = ",nlst(did)%out_dt
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,F0.3)") ": Restart Step   = ",nlst(did)%rst_dt
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,F0.3)") ": Ter Routing Step   = ",nlst(did)%dtrt_ter
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,F0.3)") ": Ch Routing Step   = ",nlst(did)%dtrt_ch
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-    write (logMsg,"(A,I0)") ": Grid ID        = ",nlst(did)%igrid
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,A)") ": Hydro Grid     = ",nlst(did)%hgrid
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,A)") ": Geo Grid File  = ",nlst(did)%geo_static_flnm
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,A)") ": Fine Grid File = ",nlst(did)%geo_finegrid_flnm
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,A)") ": GW Basin File  = ",nlst(did)%gwbasmskfil
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-    write (logMsg,"(A,I0)") ": Restart Type   = ",nlst(did)%rst_typ
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,A)") ": Restart file   = ",nlst(did)%restart_file
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Coupling       = ",nlst(did)%sys_cpl
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-    write (logMsg,"(A,I0)") ": Channel RT     = ",nlst(did)%CHANRTSWCRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Subsurface RT  = ",nlst(did)%SUBRTSWCRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Overland RT    = ",nlst(did)%OVRTSWCRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": GW Baseflow RT = ",nlst(did)%GWBASESWCRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Routing Option = ",nlst(did)%RT_OPTION
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Channel Option = ",nlst(did)%channel_option
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Aggr Factor    = ",nlst(did)%AGGFACTRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": GW Restart     = ",nlst(did)%GW_RESTART
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": SWC Restart    = ",nlst(did)%RSTRT_SWC
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-    write (logMsg,"(A,I0)") ": Soil Layers    = ",nlst(did)%nsoil
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    do layerIndex=1,nlst(did)%nsoil
-      write (logMsg,"(A,I0,A,F0.3)") ": Soil layer depth (", &
-        layerIndex,") = ",nlst(did)%ZSOIL8(layerIndex)
-      call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    enddo
-
-  end subroutine
-
-  !-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_domainLog(did,label,rc)
-    ! ARGUMENTS
-    integer,intent(in)                   :: did
-    character(len=*),intent(in),optional :: label
-    integer,intent(out)                  :: rc
-
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="WRFHYDRO_domainLog"
-    character(len=64)           :: l_label
-
-    rc = ESMF_SUCCESS
-
-    if (present(label)) then
-      l_label = label
-    else
-      l_label = rname
-    endif
-
-    write (logMsg,"(A,I0)") ": Domain ID      = ",did
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-    write (logMsg,"(A,L1)") ": Domain Init    = ",rt_domain(did)%initialized
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Domain IX      = ",rt_domain(did)%IX
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Domain JX      = ",rt_domain(did)%JX
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Domain IXRT    = ",rt_domain(did)%IXRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Domain JXRT    = ",rt_domain(did)%JXRT
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Domain Forc    = ",rt_domain(did)%FORC_TYP
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Max Links      = ",rt_domain(did)%NLINKS
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Num Lakes      = ",rt_domain(did)%NLAKES
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Num Basins     = ",rt_domain(did)%numbasns
-    call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-
-  end subroutine
-
-  !-----------------------------------------------------------------------------
 
 end module
