@@ -239,6 +239,7 @@ module WRFHydro_NUOPC
   use WRFHYDRO_NUOPC_Gluecode
   use WRFHYDRO_NUOPC_Fields
   use WRFHYDRO_NUOPC_Flags
+  use WRFHYDRO_ESMF_Logging
   use WRFHydro_ESMF_Extensions
 
   implicit none
@@ -804,6 +805,13 @@ module WRFHydro_NUOPC
     call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir, &
       verbosity=verbosity, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
+
+    if (btest(verbosity,16)) then
+      call WRFHYDRO_log_nlst(cname,is%wrap%did,rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+      call WRFHYDRO_log_rtdomain(cname,is%wrap%did,rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+    endif
 
     ! get hgrid for domain id
     call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
