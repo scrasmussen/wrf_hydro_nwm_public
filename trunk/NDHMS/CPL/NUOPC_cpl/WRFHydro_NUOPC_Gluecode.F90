@@ -49,6 +49,7 @@ module wrfhydro_nuopc_gluecode
     init_namelist_rt_field
   use orchestrator_base
   use wrfhydro_nuopc_fields
+  use wrfhydro_nuopc_time
   use wrfhydro_nuopc_flags
 
   implicit none
@@ -59,10 +60,8 @@ module wrfhydro_nuopc_gluecode
   public :: wrfhydro_nuopc_run
   public :: wrfhydro_nuopc_fin
   public :: WRFHYDRO_GridCreate
-  public :: WRFHYDRO_get_timestep
-  public :: WRFHYDRO_set_timestep
-  public :: WRFHYDRO_get_hgrid
-  public :: WRFHYDRO_get_restart
+  public :: WRFHYDRO_grid_get
+  public :: WRFHYDRO_isRestart
 
   ! PARAMETERS
   character(len=ESMF_MAXSTR) :: indir = 'WRFHYDRO_FORCING'
@@ -91,6 +90,12 @@ module wrfhydro_nuopc_gluecode
 
   type(ESMF_DistGrid)   :: WRFHYDRO_DistGrid ! One DistGrid created with ConfigFile dimensions
   character(len=512)  :: logMsg
+
+  interface WRFHYDRO_grid_get
+    module procedure WRFHYDRO_hgrid_get
+    module procedure WRFHYDRO_igrid_get
+  end interface
+
 
   !-----------------------------------------------------------------------------
   ! Model Glue Code
@@ -128,11 +133,11 @@ contains
     indir=forcingDir
 
     ! Get the models timestep
-    call ESMF_ClockGet(clock,timestep=timestep,startTime=startTime,rc=rc)
+    call ESMF_ClockGet(clock, timeStep=timeStep, startTime=startTime, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_TimeIntervalGet(timestep,s_r8=dt,rc=rc)
+    call ESMF_TimeIntervalGet(timeStep, s_r8=dt, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
-    call WRFHYDRO_TimeToString(startTime,timestr=startTimeStr,rc=rc)
+    call WRFHYDRO_time_toString(startTime, timestr=startTimeStr, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
     call orchestrator%init()
@@ -342,11 +347,11 @@ contains
     call ESMF_ClockGet(clock, timeStep=timeStep, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
-    call WRFHYDRO_ClockToString(clock,timestr=cpl_outdate,rc=rc)
+    call WRFHYDRO_time_toString(clock, timestr=cpl_outdate, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     nlst(did)%olddate(1:19) = cpl_outdate(1:19) ! Current time is the
 
-    nlst(did)%dt = WRFHYDRO_TimeIntervalGetReal(timeInterval=timeStep,rc=rc)
+    nlst(did)%dt = WRFHYDRO_interval_toReal(timeStep,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
     if(nlst(did)%dt .le. 0) then
@@ -443,9 +448,9 @@ contains
 
   end subroutine
 
-  function WRFHYDRO_GridCreate(did,verbosity,rc)
+  function WRFHYDRO_GridCreate(did,verbosity,rc) result(grid)
     ! RETURN VALUE
-    type(ESMF_Grid) :: WRFHYDRO_GridCreate
+    type(ESMF_Grid) :: grid
     ! ARGUMENTS
     integer, intent(in)                     :: did
     integer, intent(in)                     :: verbosity
@@ -468,7 +473,7 @@ contains
 
     rc = ESMF_SUCCESS
 
-    WRFHYDRO_GridCreate = ESMF_GridCreate(name='WRFHYDRO_Grid_'//trim(nlst(did)%hgrid), &
+    grid = ESMF_GridCreate(name='WRFHYDRO_Grid_'//trim(nlst(did)%hgrid), &
       distgrid=WRFHYDRO_DistGrid, coordSys = ESMF_COORDSYS_SPH_DEG, &
       coordTypeKind=ESMF_TYPEKIND_COORD, &
 !      gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
@@ -504,15 +509,15 @@ contains
     endif
 
     ! Add Center Coordinates to Grid
-    call ESMF_GridAddCoord(WRFHYDRO_GridCreate, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
-    call ESMF_GridGetCoord(WRFHYDRO_GridCreate, coordDim=1, localDE=0, &
+    call ESMF_GridGetCoord(grid, coordDim=1, localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, &
       computationalLBound=lbnd, computationalUBound=ubnd, &
       farrayPtr=coordXcenter, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
-    call ESMF_GridGetCoord(WRFHYDRO_GridCreate, coordDim=2, localDE=0, &
+    call ESMF_GridGetCoord(grid, coordDim=2, localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, farrayPtr=coordYcenter, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -538,11 +543,11 @@ contains
     if(ESMF_STDERRORCHECK(rc)) return
 
     ! Add Grid Mask
-    call ESMF_GridAddItem(WRFHYDRO_GridCreate, itemFlag=ESMF_GRIDITEM_MASK, &
+    call ESMF_GridAddItem(grid, itemFlag=ESMF_GRIDITEM_MASK, &
       staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     ! Get pointer to Grid Mask array
-    call ESMF_GridGetItem(WRFHYDRO_GridCreate, itemflag=ESMF_GRIDITEM_MASK, &
+    call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_MASK, &
       localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, &
       farrayPtr=gridmask, rc=rc)
@@ -605,15 +610,15 @@ contains
       endif
 
       ! Add Corner Coordinates to Grid
-      call ESMF_GridAddCoord(WRFHYDRO_GridCreate, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
+      call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
       if(ESMF_STDERRORCHECK(rc)) return
 
-      call ESMF_GridGetCoord(WRFHYDRO_GridCreate, coordDim=1, localDE=0, &
+      call ESMF_GridGetCoord(grid, coordDim=1, localDE=0, &
         staggerloc=ESMF_STAGGERLOC_CORNER, &
         computationalLBound=lbnd, computationalUBound=ubnd, &
         farrayPtr=coordXcorner, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
-      call ESMF_GridGetCoord(WRFHYDRO_GridCreate, coordDim=2, localDE=0, &
+      call ESMF_GridGetCoord(grid, coordDim=2, localDE=0, &
         staggerloc=ESMF_STAGGERLOC_CORNER, farrayPtr=coordYcorner, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
 
@@ -629,7 +634,7 @@ contains
         msg=rname//': Deallocation of corner longitude and latitude memory failed.', &
         line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
-      call add_area(WRFHYDRO_GridCreate, rc=rc)
+      call add_area()
       if (ESMF_STDERRORCHECK(rc)) return
 
     else
@@ -637,53 +642,51 @@ contains
       call ESMF_LogWrite(rname//": No Corner Coordinates.", ESMF_LOGMSG_WARNING)
     endif
 
+    contains
+
+    !---------------------------------------------------------------------------
+
+    subroutine add_area()
+      ! local variables
+      integer(ESMF_KIND_I4), PARAMETER :: R = 6376000 ! metres
+      type(ESMF_Field)                 :: fieldArea
+      type(ESMF_Array)                 :: areaArray
+      integer                          :: i,j
+      integer                          :: lbnd(2),ubnd(2)
+      real(ESMF_KIND_R8), pointer      :: radianarea(:,:)
+      real(ESMF_KIND_R8), pointer      :: gridarea(:,:)
+
+      fieldArea = ESMF_FieldCreate(grid=grid, typekind=ESMF_TYPEKIND_R8, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+
+      call ESMF_FieldRegridGetArea(fieldArea, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+
+      call ESMF_FieldGet(fieldArea, localDE=0, &
+        farrayPtr=radianarea, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+
+      call ESMF_GridAddItem(grid, itemFlag=ESMF_GRIDITEM_AREA, &
+        itemTypeKind=ESMF_TYPEKIND_R8, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+
+      call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_AREA, localDE=0, &
+        staggerloc=ESMF_STAGGERLOC_CENTER, &
+        computationalLBound=lbnd, computationalUBound=ubnd, &
+        farrayPtr=gridarea, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+
+      do j = lbnd(2),ubnd(2)
+      do i = lbnd(1),ubnd(1)
+        gridarea(i,j) = radianarea(i,j) * R * R
+      enddo
+      enddo
+
+    end subroutine
+
+    !---------------------------------------------------------------------------
+
   end function
-
-  !-----------------------------------------------------------------------------
-
-  subroutine add_area(grid,rc)
-    type(ESMF_Grid), intent(inout)          :: grid
-    integer, intent(out)                    :: rc
-
-    ! Local Variables
-    character(*), parameter          :: rname="add_area"
-    integer(ESMF_KIND_I4), PARAMETER :: R = 6376000 ! metres
-    type(ESMF_Field)                 :: fieldArea
-    type(ESMF_Array)                 :: areaArray
-    integer                          :: i,j
-    integer                          :: lbnd(2),ubnd(2)
-    real(ESMF_KIND_R8), pointer      :: radianarea(:,:)
-    real(ESMF_KIND_R8), pointer      :: gridarea(:,:)
-
-    rc = ESMF_SUCCESS
-
-    fieldArea = ESMF_FieldCreate(grid=grid, typekind=ESMF_TYPEKIND_R8, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-    call ESMF_FieldRegridGetArea(fieldArea, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-    call ESMF_FieldGet(fieldArea, localDE=0, &
-      farrayPtr=radianarea, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-    call ESMF_GridAddItem(grid, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
-      staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-    call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_AREA, localDE=0, &
-      staggerloc=ESMF_STAGGERLOC_CENTER, &
-      computationalLBound=lbnd, computationalUBound=ubnd, &
-      farrayPtr=gridarea, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-     do j = lbnd(2),ubnd(2)
-     do i = lbnd(1),ubnd(1)
-       gridarea(i,j) = radianarea(i,j) * R * R
-     enddo
-     enddo
-
-  end subroutine
 
   !-----------------------------------------------------------------------------
 
@@ -765,152 +768,41 @@ contains
 
   !-----------------------------------------------------------------------------
 
-  function WRFHYDRO_get_timestep(did,rc)
-    ! RETURN VALUE
-    real :: WRFHYDRO_get_timestep
-    ! ARGUMENTS
-    integer, intent(in)         :: did
-    integer, intent(out)        :: rc
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="WRFHYDRO_get_timestep"
-
+  subroutine WRFHYDRO_hgrid_get(did,grid,rc)
+    ! arguments
+    integer, intent(in)    :: did
+    character, intent(out) :: grid
+    integer,   intent(out) :: rc
     rc = ESMF_SUCCESS
-
-    WRFHYDRO_get_timestep = nlst(did)%dt
-
-  end function
-
-  !-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_set_timestep(did,dt,rc)
-    ! ARGUMENTS
-    integer, intent(in)           :: did
-    real                          :: dt
-    integer, intent(out)          :: rc
-    ! LOCAL VARIABLES
-    character(*), parameter       :: rname="WRFHYDRO_set_timestep"
-
-    rc = ESMF_SUCCESS
-
-    nlst(did)%dt = dt
-
+    grid = nlst(did)%hgrid
   end subroutine
 
   !-----------------------------------------------------------------------------
 
-  subroutine WRFHYDRO_get_hgrid(did,hgrid,rc)
-    ! ARGUMENTS
-    integer, intent(in)         :: did
-    character, intent(out)      :: hgrid
-    integer, intent(out)        :: rc
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="WRFHYDRO_get_hgrid"
-
+  subroutine WRFHYDRO_igrid_get(did,grid,rc)
+    ! arguments
+    integer, intent(in)  :: did
+    integer, intent(out) :: grid
+    integer, intent(out) :: rc
     rc = ESMF_SUCCESS
-
-    hgrid = nlst(did)%hgrid
-
+    grid = nlst(did)%igrid
   end subroutine
 
   !-----------------------------------------------------------------------------
 
-  subroutine WRFHYDRO_get_restart(did,restart,rc)
-    ! ARGUMENTS
-    integer, intent(in)         :: did
-    logical, intent(out)        :: restart
-    integer, intent(out)        :: rc
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="WRFHYDRO_get_restart"
+  function WRFHYDRO_isRestart(did) result(restart)
+    ! return value
+    logical :: restart
+    ! arguments
+    integer, intent(in) :: did
 
-    rc = ESMF_SUCCESS
-
-    if (nlst(did)%rst_typ .eq. 0) then
+    if (nlst(did)%rst_typ .le. 0) then
       restart = .FALSE.
     else
       restart = .TRUE.
     endif
-
-  end subroutine
-
-  !-----------------------------------------------------------------------------
-  ! Conversion Utilities
-  !-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_ClockToString(clock, timestr, rc)
-    ! ARGUMENTS
-    type(ESMF_Clock)                :: clock
-    integer, intent(out),optional   :: rc
-    character (len=*), intent(out)  :: timestr
-
-    ! LOCAL VARIABLES
-    character(*), parameter    :: rname="WRFHYDRO_ClockToString"
-    type(ESMF_Time)            :: currTime
-
-    if(present(rc)) rc = ESMF_SUCCESS  ! Initialize
-
-    ! Get the current time from the clock
-    call ESMF_ClockGet(clock=clock,currTime=currTime,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    call WRFHYDRO_TimeToString(currTime,timestr,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-  end subroutine
-
-!-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_TimeToString(time, timestr, rc)
-    ! ARGUMENTS
-    type(ESMF_Time)                 :: time
-    integer, intent(out),optional   :: rc
-    character (len=*), intent(out)  :: timestr
-
-    ! LOCAL VARIABLES
-    character(*), parameter    :: rname="WRFHYDRO_TimeToString"
-    character (len=256)        :: tmpstr = ''
-    integer                    :: strlen
-
-    if(present(rc)) rc = ESMF_SUCCESS  ! Initialize
-
-    timestr = '' ! clear string
-
-    if (len(timestr) < 19) then
-      call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=rname//": Time string is too short!", &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)
-      return
-    endif
-
-    CALL ESMF_TimeGet(time,timeString=tmpstr,rc=rc )
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    strlen = min(len(timestr),len_trim(tmpstr))
-    timestr(1:strlen) = tmpstr(1:strlen)
-    timestr(11:11) = '_'
-
-  end subroutine
-
-  !-----------------------------------------------------------------------------
-
-  function WRFHYDRO_TimeIntervalGetReal(timeInterval,rc)
-    ! RETURN VALUE:
-    real                                :: WRFHYDRO_TimeIntervalGetReal
-    ! ARGUMENTS
-    type(ESMF_TimeInterval),intent(in)  :: timeInterval
-    integer, intent(out), optional      :: rc
-
-    ! LOCAL VARIABLES
-    character(*), parameter             :: rname="WRFHYDRO_TimeIntervalGetReal"
-    real(ESMF_KIND_R8)                  :: s_r8
-
-    if(present(rc)) rc = ESMF_SUCCESS
-
-    WRFHYDRO_TimeIntervalGetReal = -9999
-
-    call ESMF_TimeIntervalGet(timeInterval,s_r8=s_r8,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    WRFHYDRO_TimeIntervalGetReal = s_r8
-
   end function
+
+  !-----------------------------------------------------------------------------
 
 end module
