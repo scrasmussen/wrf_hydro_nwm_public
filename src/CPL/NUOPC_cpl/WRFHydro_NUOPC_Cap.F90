@@ -238,6 +238,7 @@ module WRFHydro_NUOPC
     model_label_Finalize    => label_Finalize
   use WRFHYDRO_NUOPC_Gluecode
   use WRFHYDRO_NUOPC_Fields
+  use WRFHYDRO_NUOPC_Time
   use WRFHYDRO_NUOPC_Flags
   use WRFHYDRO_ESMF_Logging
   use WRFHydro_ESMF_Extensions
@@ -814,7 +815,7 @@ module WRFHydro_NUOPC
     endif
 
     ! get hgrid for domain id
-    call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
+    call WRFHYDRO_grid_get(is%wrap%did,is%wrap%hgrid,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
     ! add namespace
@@ -978,7 +979,6 @@ module WRFHydro_NUOPC
     logical                                :: importUpdated
     logical                                :: exportUpdated
     character(len=32)                      :: initTypeStr
-    logical                                :: mdlRestart
     integer                                :: stat
 
     rc = ESMF_SUCCESS
@@ -1073,9 +1073,7 @@ module WRFHydro_NUOPC
         call state_copy_frhyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
         if (ESMF_STDERRORCHECK(rc)) return
       endif
-      call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      if (mdlRestart) then
+      if (WRFHYDRO_isRestart(is%wrap%did)) then
         call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
         if (ESMF_STDERRORCHECK(rc)) return
       else
@@ -1125,9 +1123,7 @@ module WRFHydro_NUOPC
         call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
         if (ESMF_STDERRORCHECK(rc)) return
       endif
-      call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      if (mdlRestart) then
+      if (WRFHYDRO_isRestart(is%wrap%did)) then
         call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
         if (ESMF_STDERRORCHECK(rc)) return
       else
@@ -1226,13 +1222,11 @@ module WRFHydro_NUOPC
       call ESMF_TimeIntervalSet(timestep, &
         s=is%wrap%timeStepInt, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
-      call WRFHYDRO_set_timestep(is%wrap%did,real(is%wrap%timeStepInt),rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+      call WRFHYDRO_timestep_set(is%wrap%did,real(is%wrap%timeStepInt))
       call ESMF_ClockSet(modelClock, timeStep=timeStep, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
     else
-      call WRFHYDRO_set_timestep(is%wrap%did,real(dt),rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+      call WRFHYDRO_timestep_set(is%wrap%did,real(dt))
     endif
 
     call NUOPC_CompSetClock(gcomp, modelClock, timeStep, rc=rc)

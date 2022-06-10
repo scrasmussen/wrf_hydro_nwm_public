@@ -109,6 +109,7 @@ CAP_MK        := wrfhydro.mk
 CAP_OBJS      := WRFHydro_NUOPC_Cap.o
 CAP_OBJS      += WRFHydro_NUOPC_Gluecode.o
 CAP_OBJS      += WRFHydro_NUOPC_Fields.o
+CAP_OBJS      += WRFHydro_NUOPC_Time.o
 CAP_OBJS      += WRFHydro_NUOPC_Flags.o
 CAP_OBJS      += WRFHydro_ESMF_Logging.o
 CAP_OBJS      += WRFHydro_ESMF_Extensions.o
@@ -116,6 +117,7 @@ CAP_OBJS      += WRFHydro_ESMF_Extensions.o
 CAP_MODS      := wrfhydro_nuopc.mod
 CAP_MODS      += wrfhydro_nuopc_gluecode.mod
 CAP_MODS      += wrfhydro_nuopc_fields.mod
+CAP_MODS      += wrfhydro_nuopc_time.mod
 CAP_MODS      += wrfhydro_nuopc_flags.mod
 CAP_MODS      += wrfhydro_esmf_logging.mod
 CAP_MODS      += wrfhydro_esmf_extensions.mod
@@ -150,11 +152,13 @@ nuopcinstall: $(CAP_LIB) $(CAP_MODS) $(CAP_VERS) \
 
 WRFHydro_NUOPC_Cap.o: WRFHydro_NUOPC_Macros.h \
  WRFHydro_NUOPC_Gluecode.o WRFHydro_NUOPC_Fields.o \
- WRFHydro_NUOPC_Flags.o WRFHydro_ESMF_Logging.o \
- WRFHydro_ESMF_Extensions.o
+ WRFHydro_NUOPC_Time.o WRFHydro_NUOPC_Flags.o \
+ WRFHydro_ESMF_Logging.o WRFHydro_ESMF_Extensions.o
 WRFHydro_NUOPC_Gluecode.o: WRFHydro_NUOPC_Macros.h \
- WRFHydro_NUOPC_Fields.o WRFHydro_NUOPC_Flags.o \
- WRFHydro_ESMF_Logging.o WRFHydro_ESMF_Extensions.o \
+ WRFHydro_NUOPC_Fields.o WRFHydro_NUOPC_Time.o \
+ WRFHydro_NUOPC_Flags.o WRFHydro_ESMF_Logging.o \
+ WRFHydro_ESMF_Extensions.o $(MODEL_MODS)
+WRFHydro_NUOPC_Time.o: WRFHydro_NUOPC_Macros.h \
  $(MODEL_MODS)
 WRFHydro_NUOPC_Fields.o: WRFHydro_NUOPC_Macros.h \
  WRFHydro_NUOPC_Flags.o WRFHydro_ESMF_Logging.o \
@@ -163,6 +167,7 @@ WRFHydro_NUOPC_Fields.o: WRFHydro_NUOPC_Macros.h \
 wrfhydro_nuopc.mod: WRFHydro_NUOPC_Cap.o
 wrfhydro_nuopc_gluecode.mod: WRFHydro_NUOPC_Gluecode.o
 wrfhydro_nuopc_fields.mod: WRFHydro_NUOPC_Fields.o
+wrfhydro_nuopc_time.mod: WRFHydro_NUOPC_Time.o
 wrfhydro_nuopc_flags.mod: WRFHydro_NUOPC_Flags.o
 wrfhydro_esmf_logging.mod: WRFHydro_ESMF_Logging.o
 wrfhydro_esmf_extensions.mod: WRFHydro_ESMF_Extensions.o
