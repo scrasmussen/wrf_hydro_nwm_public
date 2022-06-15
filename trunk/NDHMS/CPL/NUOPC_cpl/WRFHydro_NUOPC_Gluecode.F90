@@ -50,6 +50,7 @@ module wrfhydro_nuopc_gluecode
   use orchestrator_base
   use wrfhydro_nuopc_fields
   use wrfhydro_nuopc_time
+  use wrfhydro_nuopc_domain
   use wrfhydro_nuopc_flags
 
   implicit none
@@ -59,22 +60,10 @@ module wrfhydro_nuopc_gluecode
   public :: wrfhydro_nuopc_ini
   public :: wrfhydro_nuopc_run
   public :: wrfhydro_nuopc_fin
-  public :: WRFHYDRO_GridCreate
-  public :: WRFHYDRO_grid_get
   public :: WRFHYDRO_isRestart
 
   ! PARAMETERS
   character(len=ESMF_MAXSTR) :: indir = 'WRFHYDRO_FORCING'
-  integer                    :: num_nests = UNINITIALIZED
-  integer                    :: num_tiles
-  integer                    :: nx_global(1)
-  integer                    :: ny_global(1)
-  integer                    :: x_start
-  integer                    :: x_end
-  integer                    :: y_start
-  integer                    :: y_end
-  integer                    :: nx_local
-  integer                    :: ny_local
   integer                    :: sf_surface_physics = UNINITIALIZED
 
   ! added to consider the adaptive time step from driver.
@@ -88,34 +77,26 @@ module wrfhydro_nuopc_gluecode
   ! added to track the driver clock
   character(len=19)     :: startTimeStr = "0000-00-00_00:00:00"
 
-  type(ESMF_DistGrid)   :: WRFHYDRO_DistGrid ! One DistGrid created with ConfigFile dimensions
-  character(len=512)  :: logMsg
-
-  interface WRFHYDRO_grid_get
-    module procedure WRFHYDRO_hgrid_get
-    module procedure WRFHYDRO_igrid_get
-  end interface
-
-
   !-----------------------------------------------------------------------------
   ! Model Glue Code
   !-----------------------------------------------------------------------------
 contains
 
-  subroutine wrfhydro_nuopc_ini(did,vm,clock,forcingDir,verbosity,rc)
+  subroutine wrfhydro_nuopc_ini(did,vm,clock,forcingDir,domain,rc)
     integer, intent(in)                     :: did
     type(ESMF_VM),intent(in)                :: vm
     type(ESMF_Clock),intent(in)             :: clock
     character(len=*)                        :: forcingDir
-    integer, intent(in)                     :: verbosity
+    type(cap_domain_type),intent(inout)     :: domain
     integer, intent(out)                    :: rc
 
     ! local variables
     character(*), parameter     :: rname="wrfhydro_nuopc_ini"
+    integer                     :: nx_global(1)
+    integer                     :: ny_global(1)
     integer                     :: localPet
+    integer                     :: petCount
     integer                     :: stat
-    integer, allocatable        :: deBlockList(:,:,:)
-    type(ESMF_DistGridConnection), allocatable :: connectionList(:)
     integer                     :: i
     type(ESMF_Time)             :: startTime
     type(ESMF_TimeInterval)     :: timeStep
@@ -125,7 +106,7 @@ contains
     rc = ESMF_SUCCESS
 
     ! Set mpiCommunicator for WRFHYDRO
-    call ESMF_VMGet(vm, localPet=localPet, &
+    call ESMF_VMGet(vm, localPet=localPet, petCount=petCount, &
       mpiCommunicator=HYDRO_COMM_WORLD, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
@@ -185,12 +166,6 @@ contains
       ix=nx_global(1),jx=ny_global(1))
     call MPP_LAND_INIT(nx_global(1),ny_global(1))
 
-    if (btest(verbosity,16)) then
-      write (logMsg,"(A,2(I0,A))") rname//": Global Dimensions = (", &
-        nx_global(1),",",ny_global(1),")"
-      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-    endif
-
     call log_map2d()
 
     call ESMF_VMBroadcast(vm, nx_global, count=1, rootPet=IO_id, rc=rc)
@@ -213,50 +188,11 @@ contains
     call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
-    allocate(deBlockList(2,2,numprocs))
-    do i = 1, numprocs
-      deBlockList(:,1,i) = (/startx(i),starty(i)/)
-      deBlockList(:,2,i) = (/startx(i)+local_nx_size(i)-1, &
-                             starty(i)+local_ny_size(i)-1/)
-!      write (logMsg,"(A,I0,A,4(I0,A))") rname//": deBlockList ", i, " = (", &
-!        deBlockList(1,1,i),":",deBlockList(1,2,i),",", &
-!        deBlockList(2,1,i),":",deBlockList(2,2,i),")"
-!      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-    enddo
-
-!    allocate(connectionList(1),stat=stat)
-!    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-!      msg=rname//': Allocation of connection list memory failed.', &
-!      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-!    call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
-!      tileIndexB=1, positionVector=(/nx_global(1), 0/), rc=rc)
-!    if (ESMF_STDERRORCHECK(rc)) return
-
-
-    ! Create DistGrid based on WRFHDYRO Config NX,NY
-    WRFHYDRO_distgrid = ESMF_DistGridCreate( &
-      minIndex=(/1,1/), maxIndex=(/nx_global(1),ny_global(1)/), &
-!     indexflag = ESMF_INDEX_DELOCAL, &
-     deBlockList=deBlockList, &
-!     deLabelList=deLabelList, &
-!     delayout=delayout, &
-!     connectionList=connectionList, &
-      rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    deallocate(deBlockList)
-
-!   deallocate(connectionList,stat=stat)
-!   if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-!     msg=rname//': Deallocation of connection list memory failed.', &
-!     line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-    ! Get the Local Decomp Incides
-    call set_local_indices(verbosity, rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
     ! Initialize the internal Land <-> Hydro Coupling
-    call CPL_LAND_INIT(x_start, x_end, y_start, y_end)
+    call CPL_LAND_INIT(startx(my_id+1), &
+      startx(my_id+1)+local_nx_size(my_id+1)-1, &
+      starty(my_id+1), &
+      starty(my_id+1)+local_ny_size(my_id+1)-1)
 
     ! Routing timestep set in HYDRO_ini
     if(sf_surface_physics .eq. 5) then
@@ -265,7 +201,9 @@ contains
       call HYDRO_ini(ntime=1,did=did,ix0=1,jx0=1)
     else
       ! Use wrfinput vegetation type and soil type
-      call HYDRO_ini(ntime=1,did=did,ix0=nx_local,jx0=ny_local)
+      call HYDRO_ini(ntime=1, did=did, &
+        ix0=local_nx_size(my_id+1), &
+        jx0=local_ny_size(my_id+1))
     endif
 
     ! Override the clock configuration in hyro.namelist
@@ -315,8 +253,6 @@ contains
     dtrt_ch0 = nlst(did)%dtrt_ch
 
     RT_DOMAIN(did)%initialized = .true.
-
-    num_nests = num_nests + 1
 
   end subroutine
 
@@ -446,346 +382,6 @@ contains
 
     RT_DOMAIN(did)%initialized = .false.
 
-  end subroutine
-
-  function WRFHYDRO_GridCreate(did,verbosity,rc) result(grid)
-    ! RETURN VALUE
-    type(ESMF_Grid) :: grid
-    ! ARGUMENTS
-    integer, intent(in)                     :: did
-    integer, intent(in)                     :: verbosity
-    integer, intent(out)                    :: rc
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="WRFHYDRO_GridCreate"
-    integer                     :: stat
-    real                        :: min_lat, max_lat, min_lon, max_lon
-    real, allocatable           :: latitude(:,:), longitude(:,:)
-    integer, allocatable        :: mask(:,:)
-    integer                     :: lbnd(2),ubnd(2)
-    real(ESMF_KIND_COORD), pointer :: coordXcenter(:,:)
-    real(ESMF_KIND_COORD), pointer :: coordYcenter(:,:)
-    real(ESMF_KIND_COORD), pointer :: coordXcorner(:,:)
-    real(ESMF_KIND_COORD), pointer :: coordYcorner(:,:)
-    integer(ESMF_KIND_I4), pointer :: gridmask(:,:)
-    integer                     :: i,j, i1,j1
-    character(len=16)           :: xlat_corner_name, xlon_corner_name
-    character(ESMF_MAXSTR)      :: logMsg
-
-    rc = ESMF_SUCCESS
-
-    grid = ESMF_GridCreate(name='WRFHYDRO_Grid_'//trim(nlst(did)%hgrid), &
-      distgrid=WRFHYDRO_DistGrid, coordSys = ESMF_COORDSYS_SPH_DEG, &
-      coordTypeKind=ESMF_TYPEKIND_COORD, &
-!      gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
-      rc = rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    ! CENTERS
-
-    ! Get Local Latitude (lat)
-    allocate(latitude(nx_local,ny_local),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of latitude memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    call WRFHYDRO_ESMF_NetcdfReadIXJX("XLAT_M",nlst(did)%geo_static_flnm, &
-      (/x_start,y_start/),latitude,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    ! Get Local Longitude (lon)
-    allocate(longitude(nx_local,ny_local),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of longitude memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    call WRFHYDRO_ESMF_NetcdfReadIXJX("XLONG_M",nlst(did)%geo_static_flnm, &
-      (/x_start,y_start/),longitude,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    if (btest(verbosity,16)) then
-      ! Print Local Lat Lon Lower Left / Upper Right Centers
-      write(logMsg,"(A,4(F0.3,A))") rname//": Center Coordinates = (", &
-        longitude(1,1),":",longitude(nx_local,ny_local),",", &
-        latitude(1,1),":",latitude(nx_local,ny_local),")"
-      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-    endif
-
-    ! Add Center Coordinates to Grid
-    call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    call ESMF_GridGetCoord(grid, coordDim=1, localDE=0, &
-      staggerloc=ESMF_STAGGERLOC_CENTER, &
-      computationalLBound=lbnd, computationalUBound=ubnd, &
-      farrayPtr=coordXcenter, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-    call ESMF_GridGetCoord(grid, coordDim=2, localDE=0, &
-      staggerloc=ESMF_STAGGERLOC_CENTER, farrayPtr=coordYcenter, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-    do j = lbnd(2),ubnd(2)
-    do i = lbnd(1),ubnd(1)
-      coordXcenter(i,j) = longitude(i,j)
-      coordYcenter(i,j) = latitude(i,j)
-    enddo
-    enddo
-
-    deallocate(latitude,longitude,stat=stat)
-    if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=rname//': Deallocation of longitude and latitude memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-    ! Get Local Mask
-    allocate(mask(nx_local,ny_local),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of mask memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    call WRFHYDRO_ESMF_NetcdfReadIXJX("LANDMASK",nlst(did)%geo_static_flnm, &
-      (/x_start,y_start/),mask,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    ! Add Grid Mask
-    call ESMF_GridAddItem(grid, itemFlag=ESMF_GRIDITEM_MASK, &
-      staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-    ! Get pointer to Grid Mask array
-    call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_MASK, &
-      localDE=0, &
-      staggerloc=ESMF_STAGGERLOC_CENTER, &
-      farrayPtr=gridmask, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-
-    do j = lbnd(2),ubnd(2)
-    do i = lbnd(1),ubnd(1)
-      gridmask(i,j) = mask(i,j)
-      gridmask(i,j) = mask(i,j)
-    enddo
-    enddo
-
-    deallocate(mask,stat=stat)
-    if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=rname//': Deallocation of mask memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-    ! CORNERS
-    ! The original WPS implementation used the _CORNER names
-    ! but it was then changes to the _C names.  Support both
-    ! options.
-    if (WRFHYDRO_ESMF_NetcdfIsPresent("XLAT_CORNER",nlst(did)%geo_static_flnm) .AND. &
-         WRFHYDRO_ESMF_NetcdfIsPresent("XLONG_CORNER",nlst(did)%geo_static_flnm)) then
-       xlat_corner_name = "XLAT_CORNER"
-       xlon_corner_name = "XLONG_CORNER"
-    else if (WRFHYDRO_ESMF_NetcdfIsPresent("XLAT_C",nlst(did)%geo_static_flnm) .AND. &
-         WRFHYDRO_ESMF_NetcdfIsPresent("XLONG_C",nlst(did)%geo_static_flnm)) then
-       xlat_corner_name = "XLAT_C"
-       xlon_corner_name = "XLONG_C"
-    else
-       xlat_corner_name = ""
-       xlon_corner_name = ""
-    endif
-
-    if (trim(xlat_corner_name) /= "") then
-      ! Get Local Latitude (lat)
-      allocate(latitude(nx_local+1,ny_local+1),stat=stat)
-      if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-        msg=rname//': Allocation of corner latitude memory failed.', &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-      call WRFHYDRO_ESMF_NetcdfReadIXJX(trim(xlat_corner_name),nlst(did)%geo_static_flnm, &
-        (/x_start,y_start/),latitude,rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return
-
-      ! Get Local Longitude (lon)
-      allocate(longitude(nx_local+1,ny_local+1),stat=stat)
-      if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-       msg=rname//': Allocation of corner longitude memory failed.', &
-       line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-      call WRFHYDRO_ESMF_NetcdfReadIXJX(trim(xlon_corner_name),nlst(did)%geo_static_flnm, &
-        (/x_start,y_start/),longitude,rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return
-
-      if (btest(verbosity,16)) then
-        ! Print Local Lat Lon Lower Left / Upper Right Corners
-        write(logMsg,"(A,4(F0.3,A))") rname//": Corner Coordinates = (", &
-          longitude(1,1),":",longitude(nx_local+1,ny_local+1),",", &
-          latitude(1,1),":",latitude(nx_local+1,ny_local+1),")"
-        call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-      endif
-
-      ! Add Corner Coordinates to Grid
-      call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return
-
-      call ESMF_GridGetCoord(grid, coordDim=1, localDE=0, &
-        staggerloc=ESMF_STAGGERLOC_CORNER, &
-        computationalLBound=lbnd, computationalUBound=ubnd, &
-        farrayPtr=coordXcorner, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      call ESMF_GridGetCoord(grid, coordDim=2, localDE=0, &
-        staggerloc=ESMF_STAGGERLOC_CORNER, farrayPtr=coordYcorner, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-
-      do j = lbnd(2),ubnd(2)
-      do i = lbnd(1),ubnd(1)
-        coordXcorner(i,j) = longitude(i,j)
-        coordYcorner(i,j) = latitude(i,j)
-      enddo
-      enddo
-
-      deallocate(latitude,longitude,stat=stat)
-      if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-        msg=rname//': Deallocation of corner longitude and latitude memory failed.', &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-      call add_area()
-      if (ESMF_STDERRORCHECK(rc)) return
-
-    else
-      ! Warning no corners in domain file
-      call ESMF_LogWrite(rname//": No Corner Coordinates.", ESMF_LOGMSG_WARNING)
-    endif
-
-    contains
-
-    !---------------------------------------------------------------------------
-
-    subroutine add_area()
-      ! local variables
-      integer(ESMF_KIND_I4), PARAMETER :: R = 6376000 ! metres
-      type(ESMF_Field)                 :: fieldArea
-      type(ESMF_Array)                 :: areaArray
-      integer                          :: i,j
-      integer                          :: lbnd(2),ubnd(2)
-      real(ESMF_KIND_R8), pointer      :: radianarea(:,:)
-      real(ESMF_KIND_R8), pointer      :: gridarea(:,:)
-
-      fieldArea = ESMF_FieldCreate(grid=grid, typekind=ESMF_TYPEKIND_R8, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-
-      call ESMF_FieldRegridGetArea(fieldArea, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-
-      call ESMF_FieldGet(fieldArea, localDE=0, &
-        farrayPtr=radianarea, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-
-      call ESMF_GridAddItem(grid, itemFlag=ESMF_GRIDITEM_AREA, &
-        itemTypeKind=ESMF_TYPEKIND_R8, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-
-      call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_AREA, localDE=0, &
-        staggerloc=ESMF_STAGGERLOC_CENTER, &
-        computationalLBound=lbnd, computationalUBound=ubnd, &
-        farrayPtr=gridarea, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-
-      do j = lbnd(2),ubnd(2)
-      do i = lbnd(1),ubnd(1)
-        gridarea(i,j) = radianarea(i,j) * R * R
-      enddo
-      enddo
-
-    end subroutine
-
-    !---------------------------------------------------------------------------
-
-  end function
-
-  !-----------------------------------------------------------------------------
-
-  subroutine set_local_indices(verbosity,rc)
-    ! ARGUMENTS
-    integer, intent(in)                     :: verbosity
-    integer, intent(out)                    :: rc
-
-    ! LOCAL VARIABLES
-    character(*), parameter     :: rname="set_local_indices"
-    integer                     :: stat
-    type(ESMF_VM)               :: currentVM
-    integer                     :: localPet
-    integer                     :: petCount
-    type(ESMF_DELayout)         :: delayout
-    integer, allocatable        :: dimExtent(:,:)
-    integer, allocatable        :: iIndexList(:), jIndexList(:)
-    character(ESMF_MAXSTR)      :: logMsg
-
-    rc = ESMF_SUCCESS
-
-    !! Get VM Info to see if this will give me the PET info I need
-    call ESMF_VMGetCurrent(currentVM, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMGet(currentVM, localPet=localPet, petCount=petCount, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    !! Get the grid distribution for this pet
-    allocate(dimExtent(2, 0:(petCount - 1)),stat=stat) ! (dimCount, deCount)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of indexCountPDe memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    call ESMF_DistGridGet(WRFHYDRO_DistGrid, delayout=delayout, &
-      indexCountPDe=dimExtent, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    allocate(iIndexList(dimExtent(1, localPet)),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of iIndexList memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    call ESMF_DistGridGet(WRFHYDRO_DistGrid, localDe=0, dim=1, &
-      indexList=iIndexList, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    allocate(jIndexList(dimExtent(2, localPet)),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of jIndexList memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    call ESMF_DistGridGet(WRFHYDRO_DistGrid, localDe=0, dim=2, &
-      indexList=jIndexList, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    x_start = minVal(iIndexList)
-    x_end   = maxVal(iIndexList)
-    y_start = minVal(jIndexList)
-    y_end   = maxVal(jIndexList)
-
-    nx_local = x_end - x_start + 1
-    ny_local = y_end - y_start + 1
-
-    if (btest(verbosity,16)) then
-      write (logMsg,"(A,6(I0,A))") rname//": Local Indices = (", &
-        x_start,":",x_end,",",y_start,":",y_end,") Local Size = (", &
-        nx_local,"x",ny_local,")"
-      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-    endif
-
-    deallocate(iIndexList,jIndexList,stat=stat)
-    if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=rname//': Deallocation of IndexList memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-    deallocate(dimExtent,stat=stat)
-    if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg=rname//': Deallocation of indexCountPDeo memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-
-  end subroutine
-
-  !-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_hgrid_get(did,grid,rc)
-    ! arguments
-    integer, intent(in)    :: did
-    character, intent(out) :: grid
-    integer,   intent(out) :: rc
-    rc = ESMF_SUCCESS
-    grid = nlst(did)%hgrid
-  end subroutine
-
-  !-----------------------------------------------------------------------------
-
-  subroutine WRFHYDRO_igrid_get(did,grid,rc)
-    ! arguments
-    integer, intent(in)  :: did
-    integer, intent(out) :: grid
-    integer, intent(out) :: rc
-    rc = ESMF_SUCCESS
-    grid = nlst(did)%igrid
   end subroutine
 
   !-----------------------------------------------------------------------------
