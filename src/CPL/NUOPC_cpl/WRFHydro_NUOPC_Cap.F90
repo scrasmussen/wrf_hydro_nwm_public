@@ -239,6 +239,7 @@ module WRFHydro_NUOPC
   use WRFHYDRO_NUOPC_Gluecode
   use WRFHYDRO_NUOPC_Fields
   use WRFHYDRO_NUOPC_Time
+  use WRFHYDRO_NUOPC_Domain
   use WRFHYDRO_NUOPC_Flags
   use WRFHYDRO_ESMF_Logging
   use WRFHydro_ESMF_Extensions
@@ -259,6 +260,7 @@ module WRFHydro_NUOPC
     integer                  :: timeStepInt      = 0
     character(len=128)       :: forcingDir       = 'WRFHYDRO_FORCING'
     integer                  :: did              = 1
+    type(cap_domain_type)    :: domain
     logical                  :: nestToNest       = .FALSE.
     type(memory_flag)        :: memr_import      = MEMORY_POINTER
     type(memory_flag)        :: memr_export      = MEMORY_POINTER
@@ -271,7 +273,6 @@ module WRFHydro_NUOPC
     character(len=128)       :: dirInput         = "./HYD_INPUT"
     logical                  :: writeRestart     = .FALSE.
     logical                  :: multiInstance    = .FALSE.
-    character                :: hgrid            = '0'
     integer                  :: nnests           = 1
     type (ESMF_Clock)        :: clock(1)
     type (ESMF_TimeInterval) :: stepTimer(1)
@@ -804,7 +805,10 @@ module WRFHydro_NUOPC
     if(ESMF_STDERRORCHECK(rc)) return
 
     call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir, &
-      verbosity=verbosity, rc=rc)
+      is%wrap%domain, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+
+    call WRFHYDRO_DomainInit(is%wrap%did,is%wrap%domain,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
     if (btest(verbosity,16)) then
@@ -812,11 +816,9 @@ module WRFHydro_NUOPC
       if(ESMF_STDERRORCHECK(rc)) return
       call WRFHYDRO_log_rtdomain(cname,is%wrap%did,rc=rc)
       if(ESMF_STDERRORCHECK(rc)) return
+      call WRFHYDRO_DomainLog(cname,is%wrap%domain,rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
     endif
-
-    ! get hgrid for domain id
-    call WRFHYDRO_grid_get(is%wrap%did,is%wrap%hgrid,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
 
     ! add namespace
     if(.NOT.is%wrap%nestToNest) then
@@ -825,12 +827,12 @@ module WRFHydro_NUOPC
     else
       write (nStr,"(I0)") is%wrap%did
       call NUOPC_AddNestedState(importState, &
-        CplSet=trim(is%wrap%hgrid), &
+        CplSet=trim(is%wrap%domain%label), &
         nestedStateName="NestedStateImp_N"//trim(nStr), &
         nestedState=is%wrap%NStateImp(1), rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_AddNestedState(exportState, &
-        CplSet=trim(is%wrap%hgrid), &
+        CplSet=trim(is%wrap%domain%label), &
         nestedStateName="NestedStateExp_N"//trim(nStr), &
         nestedState=is%wrap%NStateExp(1), rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
@@ -866,7 +868,6 @@ module WRFHydro_NUOPC
     integer                    :: verbosity, diagnostic
     character(len=64)          :: value
     type(type_InternalState)   :: is
-    type(ESMF_Grid)            :: WRFHYDRO_Grid
     type(ESMF_Field)           :: field
     logical                    :: importConnected, exportConnected
     integer                    :: fIndex
@@ -899,21 +900,15 @@ module WRFHydro_NUOPC
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
-    write (nStr,"(I0)") is%wrap%did
-
-    ! call gluecode to create grid
-    WRFHYDRO_Grid = WRFHYDRO_GridCreate(is%wrap%did, verbosity, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
     if (btest(verbosity,16)) then
-      call WRFHYDRO_ESMF_LogGrid(WRFHYDRO_Grid, &
-        trim(cname)//"_"//rname//"_D"//trim(nStr),rc=rc)
+      call WRFHYDRO_ESMF_LogGrid(is%wrap%domain%grid, &
+        trim(cname)//"_"//rname//"_D"//trim(is%wrap%domain%label),rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
     endif
 
     ! Write grid to NetCDF file.
     if (btest(diagnostic,16)) then
-      call WRFHYDRO_ESMF_GridWrite(WRFHYDRO_Grid, &
+      call WRFHYDRO_ESMF_GridWrite(is%wrap%domain%grid, &
         trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
         rname//'_grid_D'//trim(nStr)//".nc", rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
@@ -922,7 +917,7 @@ module WRFHydro_NUOPC
     call field_realize(fieldList=cap_fld_list, &
       importState=is%wrap%NStateImp(1), &
       exportState=is%wrap%NStateExp(1), &
-      grid=WRFHYDRO_grid, did=is%wrap%did, &
+      grid=is%wrap%domain%grid, did=is%wrap%did, &
       realizeAllImport=is%wrap%realizeAllImport, &
       realizeAllExport=is%wrap%realizeAllExport, &
       memr_import=is%wrap%memr_import, &
