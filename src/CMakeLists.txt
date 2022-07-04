@@ -110,14 +110,13 @@ if (HYDRO_LSM MATCHES "NoahMP")
 
 	add_custom_command(TARGET wrfhydro.exe POST_BUILD
 		COMMAND mkdir -p ${CMAKE_BINARY_DIR}/Run
-		COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/*
 		COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP.exe
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/NoahMP/* ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND ln -s wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/NoahMP/namelist.hrldas ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND ln -sf wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
 		COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
 	)
 
@@ -165,14 +164,13 @@ elseif(HYDRO_LSM MATCHES "Noah")
 
         add_custom_command(TARGET wrfhydro.exe POST_BUILD
 		COMMAND mkdir -p ${CMAKE_BINARY_DIR}/Run
-		COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/*
 		COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro_Noah.exe
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/Noah/* ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/Noah/Run/*.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND ln -s wrf_hydro_Noah.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/Noah/namelist.hrldas ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp -u ${PROJECT_SOURCE_DIR}/src/Land_models/Noah/Run/*.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND ln -sf wrf_hydro_Noah.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
 		COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
         )
 
