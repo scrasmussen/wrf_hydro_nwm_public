@@ -221,5 +221,15 @@ include_directories(AFTER ${MPI_INCLUDE_PATH})
 include_directories(AFTER ${NETCDF_INCLUDES})
 include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
 
-
 add_subdirectory("src")
+
+#add make commands for testing model
+add_custom_target(test-model
+  COMMAND ${CMAKE_COMMAND}
+  -P ${CMAKE_MODULE_PATH}/test-model.cmake)
+add_custom_target(test-model-parallel
+  COMMAND ${CMAKE_COMMAND}
+  -D TEST_PARALLEL_MODEL:BOOL=ON
+  -P ${CMAKE_MODULE_PATH}/test-model.cmake)
+add_dependencies(test-model wrfhydro.exe)
+add_dependencies(test-model-parallel wrfhydro.exe)
