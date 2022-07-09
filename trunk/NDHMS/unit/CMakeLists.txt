@@ -10,6 +10,7 @@ add_pfunit_ctest (unit_test_example2
   LINK_LIBRARIES hydro_utils
   )
 
+add_subdirectory(IO)
 add_subdirectory(OrchestratorLayer)
 # add_subdirectory(nudging)
 add_subdirectory(utils)
