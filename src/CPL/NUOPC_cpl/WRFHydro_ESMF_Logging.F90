@@ -15,8 +15,7 @@ module wrfhydro_esmf_logging
   use module_rt_data, only: &
     rt_domain
   use config_base, only: &
-    nlst
-  use wrfhydro_nuopc_flags
+    nlst, noah_lsm
 
   implicit none
 
@@ -24,6 +23,7 @@ module wrfhydro_esmf_logging
 
   public :: WRFHYDRO_log_nlst
   public :: WRFHYDRO_log_rtdomain
+  public :: WRFHYDRO_log_noahlsm
 
 contains
 
@@ -180,4 +180,169 @@ contains
 
   !-----------------------------------------------------------------------------
 
+  subroutine WRFHYDRO_log_noahlsm(cname,rc)
+    ! arguments
+    character(len=*),intent(in) :: cname
+    integer,intent(out)         :: rc
+    ! local variables
+    integer                     :: i
+    character(ESMF_MAXSTR+256)  :: logMsg
+
+    rc = ESMF_SUCCESS
+
+    write (logMsg, "(A,I0,A)") trim(cname)//': Settings noah_lsm'
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  indir                             = ',noah_lsm%indir
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  nsoil                             = ',noah_lsm%nsoil
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  crocus_opt                        = ',noah_lsm%crocus_opt
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  act_lev                           = ',noah_lsm%act_lev
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  forcing_timestep                  = ',noah_lsm%forcing_timestep
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  noah_timestep                     = ',noah_lsm%noah_timestep
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  start_year                        = ',noah_lsm%start_year
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  start_month                       = ',noah_lsm%start_month
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  start_day                         = ',noah_lsm%start_day
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  start_hour                        = ',noah_lsm%start_hour
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  start_min                         = ',noah_lsm%start_min
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  outdir                            = ',noah_lsm%outdir
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  restart_filename_requested        = ',noah_lsm%restart_filename_requested
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  restart_frequency_hours           = ',noah_lsm%restart_frequency_hours
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  output_timestep                   = ',noah_lsm%output_timestep
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  dynamic_veg_option                = ',noah_lsm%dynamic_veg_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  canopy_stomatal_resistance_option = ',noah_lsm%canopy_stomatal_resistance_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  btr_option                        = ',noah_lsm%btr_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  runoff_option                     = ',noah_lsm%runoff_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  surface_drag_option               = ',noah_lsm%surface_drag_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  supercooled_water_option          = ',noah_lsm%supercooled_water_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  frozen_soil_option                = ',noah_lsm%frozen_soil_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  radiative_transfer_option         = ',noah_lsm%radiative_transfer_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  snow_albedo_option                = ',noah_lsm%snow_albedo_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  pcp_partition_option              = ',noah_lsm%pcp_partition_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  tbot_option                       = ',noah_lsm%tbot_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  temp_time_scheme_option           = ',noah_lsm%temp_time_scheme_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  glacier_option                    = ',noah_lsm%glacier_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  surface_resistance_option         = ',noah_lsm%surface_resistance_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  soil_data_option                  = ',noah_lsm%soil_data_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  pedotransfer_option               = ',noah_lsm%pedotransfer_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  crop_option                       = ',noah_lsm%crop_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  imperv_option                     = ',noah_lsm%imperv_option
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  split_output_count                = ',noah_lsm%split_output_count
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  khour                             = ',noah_lsm%khour
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  kday                              = ',noah_lsm%kday
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,F0.3))") trim(cname)//': ', &
+      '  zlvl                              = ',noah_lsm%zlvl
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  hrldas_setup_file                 = ',noah_lsm%hrldas_setup_file
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  mmf_runoff_file                   = ',noah_lsm%mmf_runoff_file
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  external_veg_filename_template    = ',noah_lsm%external_veg_filename_template
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  external_lai_filename_template    = ',noah_lsm%external_lai_filename_template
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  xstart                            = ',noah_lsm%xstart
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  ystart                            = ',noah_lsm%ystart
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  xend                              = ',noah_lsm%xend
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  yend                              = ',noah_lsm%yend
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    do i=1,noah_lsm%nsoil
+      write (logMsg, "(A,(A,I2,A,F0.3))") trim(cname)//': ', &
+        '  soil_thick_input(',i,')              = ',noah_lsm%soil_thick_input(i)
+      call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    enddo
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  rst_bi_out                        = ',noah_lsm%rst_bi_out
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,I0))") trim(cname)//': ', &
+      '  rst_bi_in                         = ',noah_lsm%rst_bi_in
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+    write (logMsg, "(A,(A,A))") trim(cname)//': ', &
+      '  spatial_filename                  = ',noah_lsm%spatial_filename
+    call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+
+  end subroutine WRFHYDRO_log_noahlsm
+
+  !------------------------------------
 end module

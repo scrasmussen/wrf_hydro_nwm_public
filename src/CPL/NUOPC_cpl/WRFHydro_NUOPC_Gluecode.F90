@@ -15,7 +15,6 @@ module wrfhydro_nuopc_gluecode
   use NUOPC
   use WRFHydro_ESMF_Extensions
   use module_mpp_land, only: &
-    HYDRO_COMM_WORLD, &
     numprocs, &
     global_nx, &
     global_ny, &
@@ -38,8 +37,7 @@ module wrfhydro_nuopc_gluecode
   use module_HYDRO_io, only: &
     get_file_dimension
   use module_CPL_LAND, only: &
-    CPL_LAND_INIT, &
-    cpl_outdate
+    CPL_LAND_INIT
   use module_rt_data, only: &
     rt_domain
   use module_lsm_forcing, only: &
@@ -66,193 +64,131 @@ module wrfhydro_nuopc_gluecode
   character(len=ESMF_MAXSTR) :: indir = 'WRFHYDRO_FORCING'
   integer                    :: sf_surface_physics = UNINITIALIZED
 
-  ! added to consider the adaptive time step from driver.
-  real                  :: dt0 = UNINITIALIZED
-  real                  :: dtrt_ter0 = UNINITIALIZED
-  real                  :: dtrt_ch0 = UNINITIALIZED
-  integer               :: dt_factor0 = UNINITIALIZED
-  integer               :: dt_factor = UNINITIALIZED
-  ! added for check soil moisture and soiltype
-  integer               :: checkSOIL_flag = UNINITIALIZED
-  ! added to track the driver clock
-  character(len=19)     :: startTimeStr = "0000-00-00_00:00:00"
-
   !-----------------------------------------------------------------------------
   ! Model Glue Code
   !-----------------------------------------------------------------------------
 contains
 
-  subroutine wrfhydro_nuopc_ini(did,vm,clock,forcingDir,domain,rc)
+  subroutine wrfhydro_nuopc_ini(did,vm,forcingDir,domain,rc)
     integer, intent(in)                     :: did
     type(ESMF_VM),intent(in)                :: vm
-    type(ESMF_Clock),intent(in)             :: clock
     character(len=*)                        :: forcingDir
     type(cap_domain_type),intent(inout)     :: domain
     integer, intent(out)                    :: rc
 
     ! local variables
     character(*), parameter     :: rname="wrfhydro_nuopc_ini"
+    character(len=19)           :: olddate
+    integer                     :: khour
     integer                     :: nx_global(1)
     integer                     :: ny_global(1)
-    integer                     :: localPet
-    integer                     :: petCount
     integer                     :: stat
     integer                     :: i
-    type(ESMF_Time)             :: startTime
-    type(ESMF_TimeInterval)     :: timeStep
-    real(ESMF_KIND_R8)          :: dt
     character(ESMF_MAXSTR)      :: logMsg
 
     rc = ESMF_SUCCESS
 
-    ! Set mpiCommunicator for WRFHYDRO
-    call ESMF_VMGet(vm, localPet=localPet, petCount=petCount, &
-      mpiCommunicator=HYDRO_COMM_WORLD, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
     ! Set focing directory
     indir=forcingDir
 
-    ! Get the models timestep
-    call ESMF_ClockGet(clock, timeStep=timeStep, startTime=startTime, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_TimeIntervalGet(timeStep, s_r8=dt, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call WRFHYDRO_time_toString(startTime, timestr=startTimeStr, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
+    if(.not. rt_domain(did)%initialized) then
 
-    call orchestrator%init()
+      ! override system coupling option
+      nlst(did)%sys_cpl = 2
 
-    ! Set default namelist values
-    read (startTimeStr(1:4),"(I)")   nlst(did)%START_YEAR
-    read (startTimeStr(6:7),"(I)")   nlst(did)%START_MONTH
-    read (startTimeStr(9:10),"(I)")  nlst(did)%START_DAY
-    read (startTimeStr(12:13),"(I)") nlst(did)%START_HOUR
-    read (startTimeStr(15:16),"(I)") nlst(did)%START_MIN
-    nlst(did)%startdate(1:19) = startTimeStr(1:19)
-    nlst(did)%olddate(1:19)   = startTimeStr(1:19)
-    nlst(did)%dt = dt
-    cpl_outdate = startTimeStr(1:19)
-    nlst(did)%nsoil=4
-    allocate(nlst(did)%zsoil8(4),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=rname//': Allocation of model soil depths memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-    nlst(did)%zsoil8(1:4)=(/-0.1,-0.4,-1.0,-2.0/)
-    nlst(did)%geo_static_flnm = "geo_em.d01.nc"
-    nlst(did)%geo_finegrid_flnm = "fulldom_hires_hydrofile.d01.nc"
-    nlst(did)%sys_cpl = 2
-    nlst(did)%IGRID = did
-    write(nlst(did)%hgrid,'(I1)') did
+      ! Set time (NUOPC driver will reset start time and run duration)
+      write(olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
+        noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, &
+        noah_lsm%start_hour, noah_lsm%start_min, 0
+      khour = noah_lsm%khour
+      if ((khour < 0) .and. (noah_lsm%kday < 0)) then
+        call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=rname//" Namelist error: Either KHOUR or KDAY must be defined.", &
+          line=__LINE__, file=__FILE__, rcToReturn=rc)
+        return
+      else if (( noah_lsm%khour < 0 ) .and. (noah_lsm%kday > 0)) then
+        khour = noah_lsm%kday * 24
+      endif
+      nlst(did)%olddate(1:19) = olddate(1:19)
+      nlst(did)%startdate(1:19) = olddate(1:19)
+      nlst(did)%khour = khour
+      nlst(did)%dt = real(noah_lsm%noah_timestep)
+      if(nlst(did)%dt .le. 0) then
+        call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=rname//": Timestep less than 1 is not supported!", &
+          line=__LINE__, file=__FILE__, rcToReturn=rc)
+        return
+      endif
 
-    if(nlst(did)%dt .le. 0) then
+      ! Set soil thickness in nlst
+      if (noah_lsm%nsoil < 0) then
+        call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=rname//" Namelist error. NSOIL must be set in the namelist.", &
+          line=__LINE__, file=__FILE__, rcToReturn=rc)
+        return
+      endif
+      nlst(did)%nsoil = noah_lsm%nsoil
+      allocate(nlst(did)%zsoil8(noah_lsm%nsoil))
+      nlst(did)%zsoil8(1) = -1 * noah_lsm%soil_thick_input(1)
+      do i=2, noah_lsm%nsoil
+        nlst(did)%zsoil8(i) = nlst(did)%zsoil8(i-1)-noah_lsm%soil_thick_input(i)
+      end do
+
+      ! read nlst data from hydro.namelist config file
+      call init_namelist_rt_field(did)
+
+      ! get lsm grid dimensions
+      call get_file_dimension(fileName=nlst(did)%geo_static_flnm, &
+        ix=nx_global(1), jx=ny_global(1))
+      call MPP_LAND_INIT(nx_global(1),ny_global(1))
+
+      call log_map2d()
+
+      call ESMF_VMBroadcast(vm, nx_global, count=1, rootPet=IO_id, rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+      call ESMF_VMBroadcast(vm, ny_global, count=1, rootPet=IO_id, rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+
+      rt_domain(did)%ix = nx_global(1)
+      rt_domain(did)%jx = ny_global(1)
+
+      ! Initialize decomposition
+      call MPP_LAND_PAR_INI(1, rt_domain(did)%ix, rt_domain(did)%jx, &
+        nlst(did)%AGGFACTRT)
+      call ESMF_VMBroadcast(vm, startx, count=numprocs, rootPet=IO_id, rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+      call ESMF_VMBroadcast(vm, starty, count=numprocs, rootPet=IO_id, rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+      call ESMF_VMBroadcast(vm, local_nx_size, count=numprocs, rootPet=IO_id, rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+      call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
+      if(ESMF_STDERRORCHECK(rc)) return
+
+      ! Initialize the internal Land <-> Hydro Coupling
+      call CPL_LAND_INIT(startx(my_id+1), &
+        startx(my_id+1)+local_nx_size(my_id+1)-1, &
+        starty(my_id+1), &
+        starty(my_id+1)+local_ny_size(my_id+1)-1)
+
+      ! Routing timestep set in HYDRO_ini
+      if(sf_surface_physics .eq. 5) then
+        ! clm4
+        ! Use wrfinput vegetation type and soil type
+        call HYDRO_ini(ntime=1,did=did,ix0=1,jx0=1)
+      else
+        ! Use wrfinput vegetation type and soil type
+        call HYDRO_ini(ntime=1, did=did, &
+          ix0=local_nx_size(my_id+1), &
+          jx0=local_ny_size(my_id+1))
+      endif
+
+      rt_domain(did)%initialized = .true.
+    else
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=rname//": Timestep less than 1 is not supported!", &
+        msg=rname//" ERROR rt_domain has already been initialized.", &
         line=__LINE__, file=__FILE__, rcToReturn=rc)
       return
     endif
-
-!    ! Read information from hydro.namelist config file
-     call init_namelist_rt_field(did)
-
-    if(nlst(did)%nsoil .gt. 4) then
-      call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=rname//": Maximum soil levels supported is 4.", &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)
-      return
-    endif
-
-    call get_file_dimension(fileName=nlst(did)%geo_static_flnm,&
-      ix=nx_global(1),jx=ny_global(1))
-    call MPP_LAND_INIT(nx_global(1),ny_global(1))
-
-    call log_map2d()
-
-    call ESMF_VMBroadcast(vm, nx_global, count=1, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, ny_global, count=1, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    rt_domain(did)%ix = nx_global(1)
-    rt_domain(did)%jx = ny_global(1)
-
-    call MPP_LAND_PAR_INI(1,rt_domain(did)%ix,rt_domain(did)%jx,&
-         nlst(did)%AGGFACTRT)
-
-    call ESMF_VMBroadcast(vm, startx, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, starty, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, local_nx_size, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    ! Initialize the internal Land <-> Hydro Coupling
-    call CPL_LAND_INIT(startx(my_id+1), &
-      startx(my_id+1)+local_nx_size(my_id+1)-1, &
-      starty(my_id+1), &
-      starty(my_id+1)+local_ny_size(my_id+1)-1)
-
-    ! Routing timestep set in HYDRO_ini
-    if(sf_surface_physics .eq. 5) then
-      ! clm4
-      ! Use wrfinput vegetation type and soil type
-      call HYDRO_ini(ntime=1,did=did,ix0=1,jx0=1)
-    else
-      ! Use wrfinput vegetation type and soil type
-      call HYDRO_ini(ntime=1, did=did, &
-        ix0=local_nx_size(my_id+1), &
-        jx0=local_ny_size(my_id+1))
-    endif
-
-    ! Override the clock configuration in hyro.namelist
-    read (startTimeStr(1:4),"(I)")   nlst(did)%START_YEAR
-    read (startTimeStr(6:7),"(I)")   nlst(did)%START_MONTH
-    read (startTimeStr(9:10),"(I)")  nlst(did)%START_DAY
-    read (startTimeStr(12:13),"(I)") nlst(did)%START_HOUR
-    read (startTimeStr(15:16),"(I)") nlst(did)%START_MIN
-    nlst(did)%startdate(1:19) = startTimeStr(1:19)
-    nlst(did)%olddate(1:19)   = startTimeStr(1:19)
-    nlst(did)%dt = dt
-    nlst(did)%nsoil=4
-    cpl_outdate = startTimeStr(1:19)
-
-    if(nlst(did)%dt .le. 0) then
-      call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=rname//": Timestep less than 1 is not supported!", &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)
-      return
-    endif
-
-    ! Adjust the routing timestep and factor
-    ! At this point the coupling driver timestep is unknown
-    ! and uses WRFHYDRO Config as best guess
-    if(nlst(did)%dtrt_ter .ge. nlst(did)%dt) then
-       nlst(did)%dtrt_ter = nlst(did)%dt
-       dt_factor0 = 1
-    else
-       dt_factor = nlst(did)%dt/nlst(did)%dtrt_ter
-       if (dt_factor*nlst(did)%dtrt_ter .lt. nlst(did)%dt) &
-         nlst(did)%dtrt_ter = nlst(did)%dt/dt_factor
-       dt_factor0 = dt_factor
-    endif
-
-    if(nlst(did)%dtrt_ch .ge. nlst(did)%dt) then
-      nlst(did)%dtrt_ch = nlst(did)%dt
-      dt_factor0 = 1
-    else
-      dt_factor = nlst(did)%dt/nlst(did)%dtrt_ch
-      if(dt_factor*nlst(did)%dtrt_ch .lt. nlst(did)%dt) &
-        nlst(did)%dtrt_ch = nlst(did)%dt/dt_factor
-      dt_factor0 = dt_factor
-    endif
-
-    dt0 = nlst(did)%dt
-    dtrt_ter0 = nlst(did)%dtrt_ter
-    dtrt_ch0 = nlst(did)%dtrt_ch
-
-    RT_DOMAIN(did)%initialized = .true.
 
   end subroutine
 
@@ -278,49 +214,6 @@ contains
         msg="WRHYDRO: Model has not been initialized!", &
         line=__LINE__, file=__FILE__, rcToReturn=rc)
       return
-    endif
-
-    call ESMF_ClockGet(clock, timeStep=timeStep, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    call WRFHYDRO_time_toString(clock, timestr=cpl_outdate, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
-    nlst(did)%olddate(1:19) = cpl_outdate(1:19) ! Current time is the
-
-    nlst(did)%dt = WRFHYDRO_interval_toReal(timeStep,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    if(nlst(did)%dt .le. 0) then
-      call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=rname//": Timestep less than 1 is not supported!", &
-        line=__LINE__, file=__FILE__, rcToReturn=rc)
-      return
-    endif
-
-    if((dt_factor0*nlst(did)%dtrt_ter) .ne. nlst(did)%dt) then   ! NUOPC driver time step changed.
-      call ESMF_LogWrite(rname//": Driver timestep changed.",ESMF_LOGMSG_INFO)
-      if(dtrt_ter0 .ge. nlst(did)%dt) then
-        nlst(did)%dtrt_ter = nlst(did)%dt
-        dt_factor0 = 1
-      else
-        dt_factor = nlst(did)%dt / dtrt_ter0
-        if(dt_factor*dtrt_ter0 .lt. nlst(did)%dt) &
-          nlst(did)%dtrt_ter = nlst(did)%dt / dt_factor
-        dt_factor0 = dt_factor
-      endif
-    endif
-
-    if((dt_factor0*nlst(did)%dtrt_ch) .ne. nlst(did)%dt) then   ! NUOPD driver time step changed.
-      call ESMF_LogWrite(rname//": Driver timestep changed.",ESMF_LOGMSG_INFO)
-      if(dtrt_ch0 .ge. nlst(did)%dt) then
-        nlst(did)%dtrt_ch = nlst(did)%dt
-        dt_factor0 = 1
-      else
-        dt_factor = nlst(did)%dt / dtrt_ch0
-        if(dt_factor*dtrt_ch0 .lt. nlst(did)%dt) &
-          nlst(did)%dtrt_ch = nlst(did)%dt / dt_factor
-        dt_factor0 = dt_factor
-      endif
     endif
 
     if(nlst(did)%SUBRTSWCRT .eq.0  .and. &
