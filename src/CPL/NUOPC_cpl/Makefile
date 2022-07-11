@@ -48,6 +48,15 @@ ESMF_F90COMPILEOPTS += -g -traceback
 ESMF_CXXCOMPILEOPTS += -g -traceback
 endif
 
+# #################################
+# Compile with NoahMP
+# #################################
+
+ifeq (${HYDRO_LSM},NoahMP)
+override ESMF_F90COMPILECPPFLAGS += -DNOAHMP
+override ESMF_CXXCOMPILECPPFLAGS += -DNOAHMP
+endif
+
 # ###########################
 # Determine Installation Path
 # ###########################
@@ -76,25 +85,39 @@ endif
 MODEL_DIR    := $(abspath $(MODEL_RDIR)/src)
 MODEL_MKDIR  := $(abspath $(MODEL_DIR))
 MODEL_LIBDIR := $(abspath $(MODEL_DIR)/lib)
+MODEL_SRCDIR := $(abspath $(MODEL_DIR)/Data_Rec)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/OrchestratorLayer)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/utils)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/HYDRO_drv)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Routing)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/IO)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/MPP)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Debug_Utilities)
 MODEL_MODDIR := $(abspath $(MODEL_DIR)/mod)
-MODEL_MPPDIR := $(abspath $(MODEL_DIR)/MPP)
-MODEL_RTGDIR := $(abspath $(MODEL_DIR)/Routing)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/MPP)
+ifeq (${HYDRO_LSM},NoahMP)
+MODEL_NMPDIR := $(abspath $(MODEL_DIR)/Land_models/NoahMP)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/HRLDAS_forcing)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/IO_code)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/data_structures)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/hydro)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys/surfex)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/run)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/Utility_routines)
+MODEL_NMPDIR += $(abspath $(MODEL_DIR)/CPL/NoahMP_cpl)
+MODEL_SRCDIR += $(MODEL_NMPDIR)
+MODEL_MODDIR += $(MODEL_NMPDIR)
+endif
 
 MODEL_MK     := $(abspath $(MODEL_MKDIR)/Makefile.comm)
 MODEL_MKINC  := $(abspath $(MODEL_DIR)/macros)
 MODEL_LIB    := $(abspath $(MODEL_LIBDIR)/libHYDRO.a)
 
-MODEL_MODS   := $(abspath $(MODEL_MPPDIR)/module_mpp_land.mod)
-MODEL_MODS   += $(abspath $(MODEL_MPPDIR)/module_cpl_land.mod)
-MODEL_MODS   += $(abspath $(MODEL_MODDIR)/module_hydro_drv.mod)
-MODEL_MODS   += $(abspath $(MODEL_MODDIR)/module_rt_data.mod)
-MODEL_MODS   += $(abspath $(MODEL_MODDIR)/module_namelist.mod)
-MODEL_MODS   += $(abspath $(MODEL_MODDIR)/module_hydro_io.mod)
-MODEL_MODS   += $(abspath $(MODEL_MODDIR)/module_lsm_forcing.mod)
-MODEL_MODS   += $(abspath $(MODEL_RTGDIR)/Overland/overland_data.mod)
-MODEL_MODS   += $(abspath $(MODEL_RTGDIR)/Overland/overland_control.mod)
+MODEL_OBJS := $(foreach dir,$(MODEL_SRCDIR),$(wildcard $(dir)/*.o))
+MODEL_MODS := $(foreach dir,$(MODEL_MODDIR),$(wildcard $(dir)/*.mod))
 
-MODEL_FILES  := $(MODEL_LIB) $(MODEL_MODS)
+MODEL_FILES := $(MODEL_OBJS) $(MODEL_MODS)
 
 # #############
 # Cap Variables
@@ -131,14 +154,12 @@ CAP_FILES     := $(CAP_OBJS) $(CAP_MODS) $(CAP_LIB) $(CAP_VERS) $(CAP_MK)
 # ###############################
 
 include $(MODEL_MKINC)
-override ESMF_F90COMPILEPATHS    += -I$(MODEL_MODDIR)
-override ESMF_F90COMPILEPATHS    += -I$(MODEL_MPPDIR)
-override ESMF_F90COMPILECPPFLAGS += $(HYDRO_D)
+override ESMF_F90COMPILEPATHS += $(foreach dir,$(MODEL_MODDIR),-I$(dir))
 
 # #######################
 # Primary Makefile Target
 # #######################
-.PHONY: nuopc nuopcinstall nuopcdistclean nuopcclean install_mk
+.PHONY: build_model nuopc nuopcinstall nuopcdistclean nuopcclean install_mk
 
 nuopc: $(CAP_FILES)
 
@@ -156,19 +177,23 @@ WRFHydro_NUOPC_Cap.o: WRFHydro_NUOPC_Macros.h \
  WRFHydro_NUOPC_Gluecode.o WRFHydro_NUOPC_Fields.o \
  WRFHydro_NUOPC_Time.o WRFHydro_NUOPC_Domain.o \
  WRFHydro_NUOPC_Flags.o WRFHydro_ESMF_Logging.o \
- WRFHydro_ESMF_Extensions.o
+ WRFHydro_ESMF_Extensions.o build_model
 WRFHydro_NUOPC_Gluecode.o: WRFHydro_NUOPC_Macros.h \
  WRFHydro_NUOPC_Fields.o WRFHydro_NUOPC_Time.o \
  WRFHydro_NUOPC_Domain.o WRFHydro_NUOPC_Flags.o \
  WRFHydro_ESMF_Logging.o WRFHydro_ESMF_Extensions.o \
- $(MODEL_MODS)
-WRFHydro_NUOPC_Time.o: WRFHydro_NUOPC_Macros.h \
- $(MODEL_MODS)
-WRFHydro_NUOPC_Domain.o: WRFHydro_NUOPC_Macros.h \
- $(MODEL_MODS)
+ build_model
 WRFHydro_NUOPC_Fields.o: WRFHydro_NUOPC_Macros.h \
  WRFHydro_NUOPC_Flags.o WRFHydro_ESMF_Logging.o \
- WRFHydro_ESMF_Extensions.o $(MODEL_MODS)
+ WRFHydro_ESMF_Extensions.o build_model
+WRFHydro_NUOPC_Flags.o: WRFHydro_NUOPC_Macros.h \
+ build_model
+WRFHydro_NUOPC_Time.o: WRFHydro_NUOPC_Macros.h \
+ build_model
+WRFHydro_NUOPC_Domain.o: WRFHydro_NUOPC_Macros.h \
+ build_model
+WRFHydro_ESMF_Logging.o: WRFHydro_NUOPC_Macros.h \
+ build_model
 
 wrfhydro_nuopc.mod: WRFHydro_NUOPC_Cap.o
 wrfhydro_nuopc_gluecode.mod: WRFHydro_NUOPC_Gluecode.o
@@ -182,19 +207,30 @@ wrfhydro_esmf_extensions.mod: WRFHydro_ESMF_Extensions.o
 # ###############
 # Build Model
 # ###############
+export WRF_HYDRO = 1
 
 build_model:
 	@echo $(HR)
 	@echo "Building Model..."
 	@echo ""
 	$(call checkdir, $(MODEL_DIR))
+ifeq (${HYDRO_LSM},NoahMP)
+	cd $(MODEL_DIR) && ./compile_offline_NoahMP.sh
+else
 	mkdir -p $(MODEL_LIBDIR)
 	mkdir -p $(MODEL_MODDIR)
 	make -C $(MODEL_DIR) -f $(MODEL_MK)
+endif
 
-$(MODEL_MODS): build_model
+
+$(MODEL_FILES): build_model
 
 $(MODEL_LIB): build_model
+	@echo $(HR)
+	@echo "Amending static library $@..."
+	@echo
+	$(call checkfile, $(MODEL_LIB))
+	ar q $(MODEL_LIB) $(MODEL_OBJS)
 
 # ##############
 # Build Settings

@@ -14,7 +14,7 @@ module wrfhydro_nuopc_time
   use ESMF
   use NUOPC
   use config_base, only: &
-    nlst
+    nlst, noah_lsm
 
   implicit none
 
@@ -24,6 +24,8 @@ module wrfhydro_nuopc_time
   public :: WRFHYDRO_timestep_set
   public :: WRFHYDRO_time_toString
   public :: WRFHYDRO_interval_toReal
+  public :: NLST_IsAtTime
+  public :: LSM_IsAtTime
 
   interface WRFHYDRO_time_toString
     module procedure WRFHYDRO_esmfclock_toString
@@ -142,7 +144,51 @@ contains
     call ESMF_TimeIntervalGet(interval, s_r8=s_r8, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
     s_r = real(s_r8)
+  end function
 
+  !-----------------------------------------------------------------------------
+
+  function NLST_IsAtTime(time, did, rc) result(check)
+    ! return value
+    logical :: check
+    ! arguments
+    type(ESMF_Time), intent(in) :: time
+    integer, intent(in)         :: did
+    integer, intent(out)        :: rc
+    ! local variables
+    type(ESMF_Time) :: htime
+
+    call ESMF_TimeSet(time=htime, &
+      yy=int(nlst(did)%START_YEAR, ESMF_KIND_I4), &
+      mm=nlst(did)%START_MONTH, &
+      dd=nlst(did)%START_DAY, &
+      h=int(nlst(did)%START_HOUR, ESMF_KIND_I4), &
+      m=int(nlst(did)%START_MIN, ESMF_KIND_I4), &
+      rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    check = (htime .eq. time)
+  end function
+
+  !-----------------------------------------------------------------------------
+
+  function LSM_IsAtTime(time, rc) result(check)
+    ! return value
+    logical :: check
+    ! arguments
+    type(ESMF_Time), intent(in) :: time
+    integer, intent(out)        :: rc
+    ! local variables
+    type(ESMF_Time) :: htime
+
+    call ESMF_TimeSet(time=htime, &
+      yy=int(noah_lsm%start_year, ESMF_KIND_I4), &
+      mm=noah_lsm%start_month, &
+      dd=noah_lsm%start_day, &
+      h=int(noah_lsm%start_hour, ESMF_KIND_I4), &
+      m=int(noah_lsm%start_min, ESMF_KIND_I4), &
+      rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    check = (htime .eq. time)
   end function
 
   !-----------------------------------------------------------------------------
