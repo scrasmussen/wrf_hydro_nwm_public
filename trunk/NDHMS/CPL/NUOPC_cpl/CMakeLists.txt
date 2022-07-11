@@ -41,6 +41,30 @@ list(APPEND wrfhydro_nuopc_linklibs
   hydro_orchestrator
   hydro_netcdf_layer
 )
+
+if (WRF_HYDRO_NUOPC_LSM STREQUAL "1")
+  if(HYDRO_LSM MATCHES "NoahMP")
+    list(APPEND wrfhydro_nuopc_defs NOAHMP)
+    list(APPEND wrfhydro_nuopc_deps hydro_noahmp_cpl)
+    list(APPEND wrfhydro_nuopc_linklibs
+      noahmp_util
+      noahmp_phys
+      noahmp_data
+      hydro_noahmp_cpl
+    )
+  elseif(HYDRO_LSM MATCHES "Noah")
+    list(APPEND wrfhydro_nuopc_defs NOAH)
+    list(APPEND wrfhydro_nuopc_deps hydro_noah_cpl)
+    list(APPEND wrfhydro_nuopc_linklibs
+      noah_util
+      noah
+      hydro_noah_cpl
+    )
+  else()
+    message ("Unknown land surface model:" ${HYDRO_LSM} )
+  endif (HYDRO_LSM MATCHES "NoahMP")
+endif (WRF_HYDRO_NUOPC_LSM STREQUAL "1")
+
 if (WRF_HYDRO_NUDGING STREQUAL "1")
   list(APPEND wrfhydro_nuopc_linklibs
     hydro_nudging
@@ -51,9 +75,12 @@ endif (WRF_HYDRO_NUDGING STREQUAL "1")
 ### New Library: wrfhydro_nuopc
 add_library(wrfhydro_nuopc STATIC ${wrfhydro_nuopc_files})
 add_dependencies(wrfhydro_nuopc ${wrfhydro_nuopc_deps})
-target_link_libraries(wrfhydro_nuopc PUBLIC ${wrfhydro_nuopc_linklibs})
-target_link_libraries(wrfhydro_nuopc PUBLIC esmf)
-target_link_libraries(wrfhydro_nuopc PUBLIC ${NETCDF_LIBRARIES})
+target_link_libraries(wrfhydro_nuopc PUBLIC
+  esmf
+  ${NETCDF_LIBRARIES}
+  ${wrfhydro_nuopc_linklibs}
+)
+target_compile_definitions(wrfhydro_nuopc PRIVATE "${wrfhydro_nuopc_defs}")
 
 ### Library Installation
 install(TARGETS wrfhydro_nuopc ${wrfhydro_nuopc_linklibs}

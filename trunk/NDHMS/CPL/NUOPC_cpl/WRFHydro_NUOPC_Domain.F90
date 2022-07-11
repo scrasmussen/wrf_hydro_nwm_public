@@ -27,7 +27,6 @@ module wrfhydro_nuopc_domain
   use config_base, only: &
     nlst
   use orchestrator_base
-  use wrfhydro_nuopc_flags
 
   implicit none
 
@@ -158,7 +157,7 @@ contains
     deallocate(dimExtent,stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
       msg='Deallocation of dimExtent memory failed.', &
-      line=__LINE__, file=__FILE__, rcToReturn=rc)) return 
+      line=__LINE__, file=__FILE__, rcToReturn=rc)) return
 
     ! store the global extents
     domain%gbl_exts(1)   = global_nx

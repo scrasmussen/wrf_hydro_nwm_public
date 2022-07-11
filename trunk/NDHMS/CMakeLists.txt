@@ -240,10 +240,6 @@ if (WRF_HYDRO_NUDGING STREQUAL "1")
 	add_dependencies(hydro_driver hydro_nudging)
 endif (WRF_HYDRO_NUDGING STREQUAL "1")
 
-if (WRF_HYDRO_NUOPC STREQUAL "1")
-        add_subdirectory("CPL/NUOPC_cpl")
-endif (WRF_HYDRO_NUOPC STREQUAL "1")
-
 # add module dependencies
 add_dependencies(hydro_debug_utils hydro_mpp)
 add_dependencies(hydro_utils hydro_mpp)
@@ -402,3 +398,7 @@ else()
 	message ("Unknown land surface model:" ${HYDRO_LSM} )
 endif (HYDRO_LSM MATCHES "NoahMP")
 
+#build NUOPC cap
+if (WRF_HYDRO_NUOPC STREQUAL "1")
+        add_subdirectory("CPL/NUOPC_cpl")
+endif (WRF_HYDRO_NUOPC STREQUAL "1")
