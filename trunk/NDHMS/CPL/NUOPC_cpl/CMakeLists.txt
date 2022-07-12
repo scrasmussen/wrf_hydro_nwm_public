@@ -49,6 +49,7 @@ if (WRF_HYDRO_NUOPC_LSM STREQUAL "1")
     list(APPEND wrfhydro_nuopc_linklibs
       noahmp_util
       noahmp_phys
+      crocus_surfex
       noahmp_data
       hydro_noahmp_cpl
     )
