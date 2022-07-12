@@ -96,28 +96,23 @@ MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Debug_Utilities)
 MODEL_MODDIR := $(abspath $(MODEL_DIR)/mod)
 MODEL_MODDIR += $(abspath $(MODEL_DIR)/MPP)
 ifeq (${HYDRO_LSM},NoahMP)
-MODEL_NMPDIR := $(abspath $(MODEL_DIR)/Land_models/NoahMP)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/HRLDAS_forcing)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/IO_code)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/data_structures)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/hydro)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys/surfex)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/run)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/Utility_routines)
-MODEL_NMPDIR += $(abspath $(MODEL_DIR)/CPL/NoahMP_cpl)
-MODEL_SRCDIR += $(MODEL_NMPDIR)
-MODEL_MODDIR += $(MODEL_NMPDIR)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/IO_code)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/data_structures)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys/surfex)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/Utility_routines)
+MODEL_SRCDIR += $(abspath $(MODEL_DIR)/CPL/NoahMP_cpl)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/IO_code)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/data_structures)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/phys/surfex)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/Land_models/NoahMP/Utility_routines)
+MODEL_MODDIR += $(abspath $(MODEL_DIR)/CPL/NoahMP_cpl)
 endif
 
 MODEL_MK     := $(abspath $(MODEL_MKDIR)/Makefile.comm)
 MODEL_MKINC  := $(abspath $(MODEL_DIR)/macros)
 MODEL_LIB    := $(abspath $(MODEL_LIBDIR)/libHYDRO.a)
-
-MODEL_OBJS := $(foreach dir,$(MODEL_SRCDIR),$(wildcard $(dir)/*.o))
-MODEL_MODS := $(foreach dir,$(MODEL_MODDIR),$(wildcard $(dir)/*.mod))
-
-MODEL_FILES := $(MODEL_OBJS) $(MODEL_MODS)
 
 # #############
 # Cap Variables
@@ -222,15 +217,12 @@ else
 	make -C $(MODEL_DIR) -f $(MODEL_MK)
 endif
 
-
-$(MODEL_FILES): build_model
-
 $(MODEL_LIB): build_model
 	@echo $(HR)
 	@echo "Amending static library $@..."
 	@echo
 	$(call checkfile, $(MODEL_LIB))
-	ar q $(MODEL_LIB) $(MODEL_OBJS)
+	$(foreach dir,$(MODEL_SRCDIR),$(shell ar cru $(MODEL_LIB) $(dir)/*.o))
 
 # ##############
 # Build Settings
@@ -270,7 +262,7 @@ $(CAP_LIB): $(MODEL_LIB) $(CAP_OBJS)
 	@echo
 	$(call checkfile, $(MODEL_LIB))
 	cp $(MODEL_LIB) $@
-	ar cr $@ $(CAP_OBJS)
+	ar cru $@ $(CAP_OBJS)
 
 $(CAP_VERS):
 	@echo $(HR)
@@ -355,7 +347,7 @@ define checkdir
 	exit 1; fi;
 endef # blank line in checkdir is required
 
-check: check_esmf check_model check_cap
+check: check_esmf check_cap
 
 # ##################
 # Check ESMF Version
@@ -370,16 +362,6 @@ check_esmf:
 	echo "Please use ESMF version 7+"; \
 	exit 1; fi;
 	@echo "ESMF Version=$(ESMF_VERSION_STRING)"
-
-# ###########
-# Check Model
-# ###########
-
-check_model:
-	@echo $(HR)
-	@echo "Checking for Model files..."
-	@echo
-	$(foreach FILENAME, $(MODEL_FILES), $(call checkfile, $(FILENAME)))
 
 # #########
 # Check Cap

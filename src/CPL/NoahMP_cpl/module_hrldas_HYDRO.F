@@ -59,7 +59,7 @@ module module_HRLDAS_HYDRO
 
 CONTAINS
 
-    subroutine hrldas_cpl_HYDRO(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,ii,jj,kk)
+    subroutine hrldas_cpl_HYDRO(STC,SMC,SH2OX,WTRFLX,infxsrt,sfcheadrt,soldrain,ii,jj,kk)
 
 !---lpr added 2015-07-30---------
 #ifdef WRF_HYDRO_RAPID
@@ -72,7 +72,7 @@ CONTAINS
 
        integer ii,jj,kk
        integer k, gwsoilcpl
-       real,dimension(ii,jj,kk) :: STC,SMC,SH2OX
+       real,dimension(ii,jj,kk) :: STC,SMC,SH2OX,WTRFLX
        real,dimension(ii,jj) ::infxsrt,sfcheadrt, soldrain, qsgw
 
 !lpr add 2014-06-24
@@ -172,6 +172,8 @@ CONTAINS
         end if
 
            if(nlst(did)%GWBASESWCRT == 3) gw2d(did)%qsgw = qsgw
+
+        RT_DOMAIN(did)%wtrflx = WTRFLX
 
 #ifdef MPP_LAND
         if(my_id .eq. IO_id) then

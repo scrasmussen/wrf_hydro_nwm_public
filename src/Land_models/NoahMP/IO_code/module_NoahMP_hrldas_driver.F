@@ -344,6 +344,12 @@ module module_NoahMP_hrldas_driver
   REAL,       ALLOCATABLE, DIMENSION(:,:,:)   ::  PSNOWHISTXY
 
 !------------------------------------------------------------------------
+! PARFLOW
+!------------------------------------------------------------------------
+
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  WTRFLX    ! total water flux [mm/s]
+
+!------------------------------------------------------------------------
 ! 2D variables not used in WRF - should be removed?
 !------------------------------------------------------------------------
 
@@ -960,6 +966,8 @@ module module_NoahMP_hrldas_driver
      ALLOCATE ( PSNOWHISTXY    (XSTART:XEND,1:act_lev,YSTART:YEND) )
    end if ! crocus_opt /= 0
 
+   ALLOCATE ( WTRFLX    (XSTART:XEND,1:NSOIL,YSTART:YEND) ) ! total water flux [mm/s] for PARFLOW
+
 #ifdef WRF_HYDRO
    allocate( greenfrac   (XSTART:XEND,YSTART:YEND))
    greenfrac = 0
@@ -991,6 +999,7 @@ module module_NoahMP_hrldas_driver
      GLACT      = undefined_real
      VIS_ICEALB = undefined_real
   end if
+  WTRFlX     = undefined_real
   ISLTYP     = undefined_int
   VEGFRA     = undefined_real
   GVFMAX     = undefined_real
@@ -1144,6 +1153,8 @@ module module_NoahMP_hrldas_driver
   SOILICE     = undefined_real
   SNOWT_AVG   = undefined_real
 #endif
+
+
 
   XLAND          = 1.0   ! water = 2.0, land = 1.0
   XICE           = 0.0   ! fraction of grid that is seaice
@@ -1676,7 +1687,8 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
 !      if(forc_typ .eq. 8) then
 !          call read_forc_ldasout(olddate,hgrid, indir, dtbl,ix,jx,infxsrt,soldrain)
-!          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+!          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),WTRFLX(:,1:NSOIL,:), &
+!            infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
 !          return
 !      endif
 #endif
@@ -1684,7 +1696,8 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
       if(forc_typ .eq. 8) then
           call read_forc_ldasout(olddate,hgrid, noah_lsm%indir, dtbl,ix,jx,infxsrt,soldrain)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),WTRFLX(:,1:NSOIL,:), &
+            infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1699,7 +1712,8 @@ end subroutine land_driver_ini
           call getNameList('igrid', igrid_hydro)  !! get hydro namelist info :: case sensitive
           write(hgrid_hydro,'(I1)') igrid_hydro
           call read_channel_only(olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),WTRFLX(:,1:NSOIL,:), &
+            infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1855,6 +1869,7 @@ end subroutine land_driver_ini
             PSNOWHISTXY,    PSNOWALBXY,     PSNOWAGEXY,      act_lev,         &
           PSNOWHEIGHTXY, PSNOWTOTSWEXY, PSNOWTHRUFALXY,     GLACINFO,         &
                   GLACT,      FLOW_ICE,      FLOW_SNOW,   crocus_opt,         &
+                 WTRFLX,                                                      & ! OUT for PARFLOW
 #ifdef SPATIAL_SOIL
                  BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,             &
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
@@ -1911,7 +1926,8 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
-     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),WTRFLX(:,1:NSOIL,:), &
+       infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
 #endif
 
 ! Output for history

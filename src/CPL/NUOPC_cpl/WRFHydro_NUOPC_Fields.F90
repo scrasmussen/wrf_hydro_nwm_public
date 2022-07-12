@@ -35,7 +35,7 @@ module wrfhydro_nuopc_fields
     logical                     :: rl_export = .FALSE. ! realize export
   end type cap_fld_type
 
-  type(cap_fld_type),target,dimension(20) :: cap_fld_list = (/          &
+  type(cap_fld_type),target,dimension(21) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
@@ -72,6 +72,8 @@ module wrfhydro_nuopc_fields
                  "1     ",.FALSE.,.FALSE.,16.0d0),                      &
     cap_fld_type("surface_water_depth                     ","sfchead ", &
                  "mm    ",.FALSE.,.TRUE. ,0.00d0),                      &
+    cap_fld_type("total_water_flux                        ","wtrflx  ", &
+                 "mm s-1",.FALSE.,.TRUE. ,0.00d0),                      &
     cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
                  "mm    ",.TRUE. ,.FALSE.,0.00d0),                      &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
@@ -743,6 +745,12 @@ module wrfhydro_nuopc_fields
             farray=rt_domain(did)%overland%control%surface_water_head_lsm, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if(ESMF_STDERRORCHECK(rc)) return
+        case ('wtrflx')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%wtrflx(:,:,:), gridToFieldMap=(/1,2/), &
+            ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if(ESMF_STDERRORCHECK(rc)) return
         case ('infxsrt')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%infxsrt, &
@@ -1041,6 +1049,8 @@ module wrfhydro_nuopc_fields
           case ('sfchead')
             rt_domain(did)%overland%control%surface_water_head_lsm = &
               farrayPtr2d
+          case ('wtrflx')
+            rt_domain(did)%wtrflx = farrayPtr3d
           case ('infxsrt')
             rt_domain(did)%infxsrt = farrayPtr2d
           case ('soldrain')
@@ -1152,6 +1162,8 @@ module wrfhydro_nuopc_fields
             farrayPtr2d = rt_domain(did)%vegtyp
           case ('sfchead')
             farrayPtr2d = rt_domain(did)%overland%control%surface_water_head_lsm
+          case ('wtrflx')
+            farrayPtr3d = rt_domain(did)%wtrflx
           case ('infxsrt')
             farrayPtr2d = rt_domain(did)%infxsrt
           case ('soldrain')
@@ -1244,6 +1256,8 @@ module wrfhydro_nuopc_fields
           case ('sfchead')
             missng = any(rt_domain(did)%overland%control%surface_water_head_lsm &
               .eq.chkVal)
+          case ('wtrflx')
+            missng = any(rt_domain(did)%wtrflx.eq.chkVal)
           case ('infxsrt')
             missng = any(rt_domain(did)%infxsrt.eq.chkVal)
           case ('soldrain')
@@ -1362,6 +1376,9 @@ module wrfhydro_nuopc_fields
             where (rt_domain(did)%overland%control%surface_water_head_lsm &
               .eq.chkVal) &
               rt_domain(did)%overland%control%surface_water_head_lsm = filVal
+          case ('wtrflx')
+            where (rt_domain(did)%wtrflx.eq.chkVal) &
+              rt_domain(did)%wtrflx = filVal
           case ('infxsrt')
             where (rt_domain(did)%infxsrt.eq.chkVal) &
               rt_domain(did)%infxsrt = filVal

@@ -423,7 +423,8 @@ contains
 		   SHG     , SHC     , SHB     , EVG     , EVB     , GHV     , & ! OUT :
 		   GHB     , IRG     , IRC     , IRB     , TR      , EVC     , & ! OUT :
 		   CHLEAF  , CHUC    , CHV2    , CHB2    , FPICE   , PAHV    , &
-                   PAHG    , PAHB    , PAH     , LAISUN  , LAISHA  , RB        & ! OUT
+                   PAHG    , PAHB    , PAH     , LAISUN  , LAISHA  , RB,       & ! OUT
+                   QINSUR, ETRANI                                              & ! OUT :
 #ifdef WRF_HYDRO
                    ,SFCHEADRT                                                  & ! IN/OUT :
 #endif
@@ -551,6 +552,8 @@ contains
   REAL                           , INTENT(OUT)   :: RB        ! leaf boundary layer resistance (s/m)
   REAL                           , INTENT(OUT)   :: LAISUN    ! sunlit leaf area index (m2/m2)
   REAL                           , INTENT(OUT)   :: LAISHA    ! shaded leaf area index (m2/m2)
+  REAL,                            INTENT(OUT)   :: QINSUR !water input on soil surface [m/s]
+  REAL, DIMENSION(       1:NSOIL), INTENT(OUT)   :: ETRANI !transpiration rate (mm/s) [+]
 
 !jref:start; output
   REAL                           , INTENT(OUT)     :: T2MV   !2-m air temperature over vegetated part [k]
@@ -811,7 +814,8 @@ contains
                  SMCWTD ,DEEPRECH,RECH                          , & !inout
                  CMC    ,ECAN   ,ETRAN  ,FWET   ,RUNSRF ,RUNSUB , & !out
                  QIN    ,QDIS   ,PONDING1       ,PONDING2,&
-                 QSNBOT                             &
+                 QSNBOT,                            &
+                 QINSUR ,ETRANI                     & !out
 #ifdef WRF_HYDRO
                         ,sfcheadrt                     &
 #endif
@@ -5657,7 +5661,8 @@ ENDIF   ! CROPTYPE == 0
                     SMCWTD ,DEEPRECH,RECH                          , & !inout
                     CMC    ,ECAN   ,ETRAN  ,FWET   ,RUNSRF ,RUNSUB , & !out
                     QIN    ,QDIS   ,PONDING1       ,PONDING2,        &
-                    QSNBOT                                           &
+                    QSNBOT,                                          &
+                    QINSUR ,ETRANI                                   & !out
 #ifdef WRF_HYDRO
                         ,sfcheadrt                     &
 #endif
@@ -5741,6 +5746,9 @@ ENDIF   ! CROPTYPE == 0
   REAL,                            INTENT(OUT)   :: PONDING1
   REAL,                            INTENT(OUT)   :: PONDING2
   REAL,                            INTENT(OUT)   :: QSNBOT  !melting water out of snow bottom [mm/s]
+  REAL,                            INTENT(OUT)   :: QINSUR  !water input on soil surface [m/s]
+  REAL, DIMENSION(       1:NSOIL), INTENT(OUT)   :: ETRANI  !transpiration rate (mm/s) [+]
+
   REAL                              , INTENT(IN)   :: LATHEAV !latent heat vap./sublimation (j/kg)
   REAL                              , INTENT(IN)   :: LATHEAG !latent heat vap./sublimation (j/kg)
   LOGICAL                           , INTENT(IN)   :: FROZEN_GROUND ! used to define latent heat pathway
@@ -5749,12 +5757,10 @@ ENDIF   ! CROPTYPE == 0
 
 ! local
   INTEGER                                        :: IZ
-  REAL                                           :: QINSUR  !water input on soil surface [m/s]
   REAL                                           :: QSEVA   !soil surface evap rate [mm/s]
   REAL                                           :: QSDEW   !soil surface dew rate [mm/s]
   REAL                                           :: QSNFRO  !snow surface frost rate[mm/s]
   REAL                                           :: QSNSUB  !snow surface sublimation rate [mm/s]
-  REAL, DIMENSION(       1:NSOIL)                :: ETRANI  !transpiration rate (mm/s) [+]
   REAL, DIMENSION(       1:NSOIL)                :: WCND   !hydraulic conductivity (m/s)
   REAL                                           :: QDRAIN  !soil-bottom free drainage [mm/s]
   REAL                                           :: SNOFLOW !glacier flow [mm/s]

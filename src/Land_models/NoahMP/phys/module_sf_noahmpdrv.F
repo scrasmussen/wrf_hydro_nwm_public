@@ -67,6 +67,8 @@ CONTAINS
               GLACINFO ,GLACT,                                              & ! IN/OUT for crocus
               FLOW_ICE, FLOW_SNOW,                                          & ! OUT    for crocus
               crocus_opt,                                                   & ! IN     for crocus
+              WTRFLX,                                                       & ! OUT for PARFLOW
+
 #ifdef SPATIAL_SOIL
                  BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,             &
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
@@ -361,6 +363,8 @@ CONTAINS
     REAL                                :: SNDPTH       ! snow depth (m)
     REAL                                :: EMISSI       ! net surface emissivity
     REAL                                :: QSFC1D       ! bulk surface specific humidity
+    REAL                                :: QINSUR       ! water input on soil surface [m/s]
+    REAL,   DIMENSION( 1:NSOIL)         :: ETRANI       ! transpiration rate (mm/s) [+]
 
 ! INOUT (with no Noah LSM equivalent)
 
@@ -523,6 +527,8 @@ CONTAINS
     INTEGER,                INTENT(IN)                  :: crocus_opt
     REAL, DIMENSION(:,:),   INTENT(INOUT), allocatable  :: VIS_ICEALB
 
+    REAL, DIMENSION( ims:ime, 1:nsoil, jms:jme ), INTENT(OUT) :: WTRFLX ! total water flux [mm/s] PARFLOW
+
     INTEGER                                             :: GLACINFOH,GLACR ! glacier info
     CHARACTER(LEN=11)                                   :: HSNOWRES
     CHARACTER(LEN=3)                                    :: HIMPLICIT_WIND
@@ -594,6 +600,7 @@ CONTAINS
     REAL         :: SNDPTHH
     REAL         :: SNEQVOH
     CHARACTER(3) :: HSNOWMETAMO, HSNOWRAD
+    REAL, PARAMETER:: LVH2O = 2.501000E+6 ! Latent heat for evapo for water
 
     REAL,   DIMENSION( 1:NSOIL)    :: liq_frac
 
@@ -1317,7 +1324,8 @@ CONTAINS
             SHG     , SHC     , SHB     , EVG     , EVB     , GHV     , & ! OUT :
 	    GHB     , IRG     , IRC     , IRB     , TR      , EVC     , & ! OUT :
 	    CHLEAF  , CHUC    , CHV2    , CHB2    , FPICE   , PAHV    , &
-            PAHG    , PAHB    , PAH     , LAISUN  , LAISHA  , RB        &
+            PAHG    , PAHB    , PAH     , LAISUN  , LAISHA  , RB      , &
+            QINSUR  , ETRANI                                            & ! OUT :
 #ifdef WRF_HYDRO
             , sfcheadrt(i,j)                               &
 #endif
@@ -1355,6 +1363,11 @@ CONTAINS
             INFXSRT(i,j) = RUNSF*dt        !mm , surface runoff
 
 #endif
+! OUTPUT for PARFLOW
+            WTRFLX(i,1,j)   = (QINSUR*1000) - ((ESOIL + ETRANI(1))/LVH2O)
+            do k=2, NSOIL
+              WTRFLX(i,k,j) = (ETRANI(k)/LVH2O)
+            enddo
 
 
 ! INPUT/OUTPUT
