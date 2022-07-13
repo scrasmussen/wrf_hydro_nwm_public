@@ -1,0 +1,40 @@
+module io_parallel_test_1
+  use mpi
+  use pfunit
+  implicit none
+contains
+
+  @before
+  subroutine run_mpi_init()
+    integer :: ierr
+    logical :: flag
+    call MPI_Initialized(flag, ierr)
+    if (flag .eqv. .false.) &
+         call MPI_Init(ierr)
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  end subroutine run_mpi_init
+
+  @Test
+  subroutine test_create_file_parallel()
+    use io_manager_base, only : IOManager_
+    use netcdf
+    character(len=:), allocatable :: path
+    integer :: cmode
+    type(IOManager_) :: io_manager
+    logical, parameter :: parallel = .true.
+    integer :: ncid
+    integer :: res
+    path = "parallel.nc"
+    cmode = NF90_NETCDF4
+    io_manager = IOManager_(parallel)
+    res = io_manager%netcdf_layer%create_file(path, cmode, ncid = ncid)
+    @assertEqual(res, 0)
+  end subroutine test_create_file_parallel
+
+  @after
+  subroutine run_mpi_finalize()
+    integer :: ierr
+    call MPI_Finalize(ierr)
+    print *, "MPI Finalized"
+  end subroutine run_mpi_finalize
+end module io_parallel_test_1

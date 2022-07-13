@@ -1,0 +1,25 @@
+module io_serial_test_1
+  use mpi
+  use pfunit
+  implicit none
+contains
+
+   @Test
+   subroutine test_create_file_serial()
+     use io_manager_base, only : IOManager_
+     use netcdf
+     character(len=:), allocatable :: path
+     integer :: cmode
+     type(IOManager_) :: io_manager
+     logical, parameter :: parallel = .false.
+
+     integer :: ncid
+     integer :: res
+     path = "serial.nc"
+     cmode = NF90_NETCDF4
+     io_manager = IOManager_(parallel)
+     res = io_manager%netcdf_layer%create_file(path, cmode, ncid = ncid)
+     @assertEqual(res, 0)
+   end subroutine test_create_file_serial
+
+end module io_serial_test_1
