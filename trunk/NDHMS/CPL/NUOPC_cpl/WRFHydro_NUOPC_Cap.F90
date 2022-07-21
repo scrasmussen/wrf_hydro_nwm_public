@@ -255,15 +255,6 @@ module WRFHydro_NUOPC
   use module_CPL_LAND, only: &
     cpl_outdate
   use orchestrator_base
-  use module_mpp_land, only: &
-    IO_id, &
-    numprocs, &
-    global_nx, &
-    global_ny, &
-    startx, &
-    starty, &
-    local_nx_size, &
-    local_ny_size
 #ifdef NOAHMP
   use module_noahmp_hrldas_driver, only: &
     noahmp_ini => land_driver_ini, &
@@ -839,16 +830,7 @@ module WRFHydro_NUOPC
     if(ESMF_STDERRORCHECK(rc)) return
 #endif
 
-    call ESMF_VMBroadcast(vm, startx, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, starty, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, local_nx_size, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-    call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return
-
-    call WRFHYDRO_DomainInit(is%wrap%did,is%wrap%domain,rc=rc)
+    call WRFHYDRO_DomainInit(is%wrap%did,vm,is%wrap%domain,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
     if (btest(verbosity,16)) then
