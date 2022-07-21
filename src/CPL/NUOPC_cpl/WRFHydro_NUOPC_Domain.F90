@@ -56,18 +56,32 @@ module wrfhydro_nuopc_domain
 
 contains
 
-  subroutine WRFHYDRO_DomainInit(did,domain,rc)
+  subroutine WRFHYDRO_DomainInit(did,vm,domain,rc)
     ! arguments
     integer, intent(in)                :: did
+    type(ESMF_VM), intent(in)          :: vm
     type(cap_domain_type), intent(out) :: domain
     integer, intent(out)               :: rc
 
     rc = ESMF_SUCCESS
 
+    call ESMF_VMBroadcast(vm, startx, count=numprocs, rootPet=IO_id, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    call ESMF_VMBroadcast(vm, starty, count=numprocs, rootPet=IO_id, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    call ESMF_VMBroadcast(vm, local_nx_size, count=numprocs, rootPet=IO_id, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+
     domain%id    = did
     domain%label = nlst(domain%id)%hgrid
-    domain%lcl_crds_ctr(2,2) = UNINITIALIZED
-    domain%lcl_crds_edg(2,2) = UNINITIALIZED
+    domain%lcl_bnds     = UNINITIALIZED
+    domain%lcl_exts     = UNINITIALIZED
+    domain%lcl_crds_ctr = UNINITIALIZED
+    domain%lcl_crds_edg = UNINITIALIZED
+    domain%gbl_exts     = UNINITIALIZED
+
     call WRFHYDRO_DistGridCreate(domain, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return
     call WRFHYDRO_GridCreate(domain, rc=rc)
@@ -149,6 +163,7 @@ contains
       domain%lcl_bnds(2,1) = minVal(jIndexList)
       domain%lcl_bnds(2,2) = maxVal(jIndexList)
       domain%lcl_exts(2)   = size(jIndexList)
+
       deallocate(jIndexList,stat=stat)
       if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
         msg='Deallocation of jIndexList memory failed.', &
@@ -210,13 +225,12 @@ contains
       staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_GridGetItem(domain%grid, itemflag=ESMF_GRIDITEM_MASK, &
-      localDE=0, &
-      staggerloc=ESMF_STAGGERLOC_CENTER, &
+      localDE=0, staggerloc=ESMF_STAGGERLOC_CENTER, &
+      computationalLBound=lbnd, computationalUBound=ubnd, &
       farrayPtr=gridmask, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     do j = lbnd(2),ubnd(2)
     do i = lbnd(1),ubnd(1)
-      gridmask(i,j) = mask(i,j)
       gridmask(i,j) = mask(i,j)
     enddo
     enddo
