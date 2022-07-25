@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@main
         with:
           repository: scrasmussen/wrf_hydro_nwm_ci_data
+          token: ${{ secrets.GH_TOKEN }}
           # path: ${HOME}
       - name: Change to WRF-Hydro CI Data Repo Directory
         run: |
