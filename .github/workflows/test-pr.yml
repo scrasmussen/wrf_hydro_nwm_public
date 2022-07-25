@@ -36,11 +36,9 @@ jobs:
           path: wrf_hydro_nwm_ci_data
           # token: $${{ secrets.GITHUB_TOKEN }}
           # path: ${HOME}
-      - name: Change to WRF-Hydro CI Data Repo Directory
-        run: |
-          cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
       - name: Add plot to CI Data Repo
         run: |
+          cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
           export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
           mkdir $CI_OUTPUT_DIR
           cd $CI_OUTPUT_DIR
