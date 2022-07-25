@@ -45,6 +45,7 @@ jobs:
           mkdir $CI_OUTPUT_DIR
           cd $CI_OUTPUT_DIR
           cp $HOME/foo.png .
+          export CI_HOME=$(pwd)
           pwd
           git remote -v
       - name: Commit changes
@@ -52,7 +53,7 @@ jobs:
         with:
           author_name: GitHub Actions
           author_email: github-actions@github.com
-          cwd: "${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data/$CI_OUTPUT_DIR"
+          cwd: "${CI_HOME}"
           add: "foo.png"
           # git config user.name github-actions
           # git config user.email
