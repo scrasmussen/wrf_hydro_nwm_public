@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@main
         with:
           repository: scrasmussen/wrf_hydro_nwm_ci_data
-          token: $${{ secrets.GITHUB_TOKEN }}
+          # token: $${{ secrets.GITHUB_TOKEN }}
           # path: ${HOME}
       - name: Change to WRF-Hydro CI Data Repo Directory
         run: |
@@ -44,11 +44,18 @@ jobs:
           mkdir $CI_OUTPUT_DIR
           cd $CI_OUTPUT_DIR
           cp $HOME/foo.png .
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add foo.png
-          git commit foo.png -m "Test foo image"
-          git push
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: GitHub Actions
+          author_email: github-actions@github.com
+          cwd: '${GITHUB_WORKSPACE}/$CI_OUTPUT_DIR'
+          add: 'foo.png'
+          # git config user.name github-actions
+          # git config user.email
+          # git add foo.png
+          # git commit foo.png -m "Test foo image"
+          # git push
       - name: Push Plot to PR
         uses: thollander/actions-comment-pull-request@v1
         with:
