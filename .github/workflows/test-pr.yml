@@ -28,6 +28,7 @@ jobs:
 
       - name: Clone WRF-Hydro CI Data Repo
         uses: actions/checkout@main
+        with:
           repository: scrasmussen/wrf_hydro_nwm_ci_data
           path: ${{ HOME }}
       - name: Change to WRF-Hydro CI Data Repo Directory
