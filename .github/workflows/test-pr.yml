@@ -43,6 +43,8 @@ jobs:
           mkdir $CI_OUTPUT_DIR
           cd $CI_OUTPUT_DIR
           cp $HOME/foo.png .
+          git config user.name github-actions
+          git config user.email github-actions@github.com
           git add foo.png
           git commit foo.png -m "Test foo image"
           git push
