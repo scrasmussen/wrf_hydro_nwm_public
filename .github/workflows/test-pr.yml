@@ -39,7 +39,8 @@ jobs:
       - name: Add plot to CI Data Repo
         run: |
           cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
-          export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
+          # export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
+          export CI_OUTPUT_DIR=test
           mkdir $CI_OUTPUT_DIR
           cd $CI_OUTPUT_DIR
           cp $HOME/foo.png .
@@ -51,7 +52,8 @@ jobs:
         with:
           author_name: GitHub Actions
           author_email: github-actions@github.com
-          cwd: "${CI_HOME}"
+          cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data/test
+          # cwd: ${CI_HOME}
           add: "foo.png"
           # git config user.name github-actions
           # git config user.email
