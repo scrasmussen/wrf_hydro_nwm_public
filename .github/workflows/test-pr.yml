@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@main
         with:
           repository: scrasmussen/wrf_hydro_nwm_ci_data
-          path: ${{ HOME }}
+          path: ${HOME}
       - name: Change to WRF-Hydro CI Data Repo Directory
         run: |
           cd ${HOME}
