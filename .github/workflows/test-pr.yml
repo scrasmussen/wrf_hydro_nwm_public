@@ -26,18 +26,19 @@ jobs:
           python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
           cp foo.png ${HOME}
 
-      - name: Change to home directory
-        run: cd ${HOME}
+      # - name: Change to home directory
+      #   run: cd ${HOME}
 
       - name: Clone WRF-Hydro CI Data Repo
         uses: actions/checkout@main
         with:
           repository: scrasmussen/wrf_hydro_nwm_ci_data
+          path: wrf_hydro_nwm_ci_data
           # token: $${{ secrets.GITHUB_TOKEN }}
           # path: ${HOME}
       - name: Change to WRF-Hydro CI Data Repo Directory
         run: |
-          cd ${GITHUB_WORKSPACE}
+          cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
       - name: Add plot to CI Data Repo
         run: |
           export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
@@ -51,19 +52,19 @@ jobs:
         with:
           author_name: GitHub Actions
           author_email: github-actions@github.com
-          cwd: '${GITHUB_WORKSPACE}/$CI_OUTPUT_DIR'
+          cwd: "${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data/$CI_OUTPUT_DIR""
           add: 'foo.png'
           # git config user.name github-actions
           # git config user.email
           # git add foo.png
           # git commit foo.png -m "Test foo image"
           # git push
-      - name: Push Plot to PR
-        uses: thollander/actions-comment-pull-request@v1
-        with:
-          message: |
-            "foo comparison and the upload is at foo.png"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Push Plot to PR
+      #   uses: thollander/actions-comment-pull-request@v1
+      #   with:
+      #     message: |
+      #       "foo comparison and the upload is at foo.png"
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
   # Model_Testing:
