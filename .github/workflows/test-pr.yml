@@ -22,12 +22,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install matplotlib
       - name: Create Python Plot
-        run: python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
+        run: |
+          python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
+          cp foo.png ${HOME}
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: upload-artifact
-          path: foo.png
+      - name: Clone WRF-Hydro CI Data Repo
+        uses: actions/checkout@v2
+          repository: ${{ scrasmussen.wrf_hydro_nwm_ci_data }}
+          path: ${{ HOME }}
+      - name: Change to WRF-Hydro CI Data Repo Directory
+        run: |
+          cd ${HOME}
+          pwd
+          cd wrf_hydro_nwm_ci_data
+      - name: Add plot to CI Data Repo
+        run: |
+          export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
+          mkdir $CI_OUTPUT_DIR
+          cd $CI_OUTPUT_DIR
+          cp $HOME/foo.png .
+          git add foo.png
+          git commit foo.png -m "Test foo image"
+          git push
       - name: Push Plot to PR
         uses: thollander/actions-comment-pull-request@v1
         with:
