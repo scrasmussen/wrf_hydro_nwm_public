@@ -15,11 +15,19 @@ jobs:
   Python_Plotting:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout candidate (pull request / push)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-        uses: actions/checkout@v3
+      - name: Clone WRF-Hydro CI Data Repo
+        uses: actions/checkout@main
         with:
-          path: candidate
+          repository: scrasmussen/wrf_hydro_nwm_ci_data
+          path: wrf_hydro_nwm_ci_data
+          push: origin foobarTest --set-upstream --force
+          # token: $${{ secrets.GITHUB_TOKEN }}
+          # path: ${HOME}
+      # - name: Checkout candidate (pull request / push)
+      #   if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+      #   uses: actions/checkout@v3
+      #   with:
+      #     path: candidate
       - name: Find Path
         run: pwd
       - name: Install Dependencies
