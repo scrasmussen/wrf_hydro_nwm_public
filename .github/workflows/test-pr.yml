@@ -15,6 +15,11 @@ jobs:
   Python_Plotting:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout candidate (pull request / push)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        uses: actions/checkout@v3
+        with:
+          path: candidate
       - name: Find Path
         run: pwd
       - name: Install Dependencies
@@ -24,14 +29,15 @@ jobs:
       - name: Create Python Plot
         run: |
           python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
+          cp foo.png ${GITHUB_WORKSPACE}/candidate
           # cp foo.png ${GITHUB_WORKSPACE}
-
 
       - name: Commit changes
         uses: EndBug/add-and-commit@v9
         with:
           author_name: GitHub Actions
           author_email: github-actions@github.com
+          cwd: ${GITHUB_WORKSPACE}/candidate
           # cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
           # cwd: ${CI_HOME}
           add: "foo.png"
