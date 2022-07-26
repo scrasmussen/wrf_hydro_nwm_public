@@ -55,6 +55,7 @@ jobs:
           cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
           # cwd: ${CI_HOME}
           add: "test/foo.png"
+          pathspec_error_handling: exitImmediately
           # git config user.name github-actions
           # git config user.email
           # git add foo.png
