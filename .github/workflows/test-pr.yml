@@ -24,43 +24,56 @@ jobs:
       - name: Create Python Plot
         run: |
           python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
-          cp foo.png ${HOME}
+          cp foo.png ${GITHUB_WORKSPACE}
 
-      # - name: Change to home directory
-      #   run: cd ${HOME}
 
-      - name: Clone WRF-Hydro CI Data Repo
-        uses: actions/checkout@main
-        with:
-          repository: scrasmussen/wrf_hydro_nwm_ci_data
-          path: wrf_hydro_nwm_ci_data
-          # token: $${{ secrets.GITHUB_TOKEN }}
-          # path: ${HOME}
-      - name: Add plot to CI Data Repo
-        run: |
-          cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
-          # export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
-          export CI_OUTPUT_DIR=test
-          mkdir $CI_OUTPUT_DIR
-          cd $CI_OUTPUT_DIR
-          cp $HOME/foo.png .
-          export CI_HOME=$(pwd)
-          pwd
-          git remote -v
       - name: Commit changes
         uses: EndBug/add-and-commit@v9
         with:
           author_name: GitHub Actions
           author_email: github-actions@github.com
-          cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
+          # cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
           # cwd: ${CI_HOME}
-          add: "test/foo.png"
+          add: "foo.png"
           pathspec_error_handling: exitImmediately
-          # git config user.name github-actions
-          # git config user.email
-          # git add foo.png
-          # git commit foo.png -m "Test foo image"
-          # git push
+          committer_name: Github Action
+
+      # - name: Change to home directory
+      #   run: cd ${HOME}
+
+      # - name: Clone WRF-Hydro CI Data Repo
+      #   uses: actions/checkout@main
+      #   with:
+      #     repository: scrasmussen/wrf_hydro_nwm_ci_data
+      #     path: wrf_hydro_nwm_ci_data
+      #     # token: $${{ secrets.GITHUB_TOKEN }}
+      #     # path: ${HOME}
+      # - name: Add plot to CI Data Repo
+      #   run: |
+      #     cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
+      #     # export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
+      #     export CI_OUTPUT_DIR=test
+      #     mkdir $CI_OUTPUT_DIR
+      #     cd $CI_OUTPUT_DIR
+      #     cp $HOME/foo.png .
+      #     export CI_HOME=$(pwd)
+      #     pwd
+      #     git remote -v
+      # - name: Commit changes
+      #   uses: EndBug/add-and-commit@v9
+      #   with:
+      #     author_name: GitHub Actions
+      #     author_email: github-actions@github.com
+      #     cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
+      #     # cwd: ${CI_HOME}
+      #     add: "test/foo.png"
+      #     pathspec_error_handling: exitImmediately
+      #     committer_name: Github Action
+      #     # git config user.name github-actions
+      #     # git config user.email
+      #     # git add foo.png
+      #     # git commit foo.png -m "Test foo image"
+      #     # git push
       # - name: Push Plot to PR
       #   uses: thollander/actions-comment-pull-request@v1
       #   with:
