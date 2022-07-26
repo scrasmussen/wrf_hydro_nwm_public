@@ -24,7 +24,7 @@ jobs:
       - name: Create Python Plot
         run: |
           python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
-          cp foo.png ${GITHUB_WORKSPACE}
+          # cp foo.png ${GITHUB_WORKSPACE}
 
 
       - name: Commit changes
