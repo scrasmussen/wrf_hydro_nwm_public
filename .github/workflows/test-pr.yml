@@ -20,7 +20,6 @@ jobs:
         with:
           repository: scrasmussen/wrf_hydro_nwm_ci_data
           path: wrf_hydro_nwm_ci_data
-          push: origin foobarTest --set-upstream --force
           # token: $${{ secrets.GITHUB_TOKEN }}
           # path: ${HOME}
       # - name: Checkout candidate (pull request / push)
@@ -46,6 +45,7 @@ jobs:
           author_name: GitHub Actions
           author_email: github-actions@github.com
           cwd: ${GITHUB_WORKSPACE}/candidate
+          push: origin foobarTest --set-upstream --force
           # cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
           # cwd: ${CI_HOME}
           add: "foo.png"
