@@ -1,8 +1,6 @@
 name: WRF-Hydro CI
 
 on:
-  push:
-    branches: [ master, v5.2.x ]
   pull_request:
     branches: [ master, v5.2.x ]
 
@@ -14,61 +12,144 @@ on:
         required: true
 
 jobs:
-  Model_Testing:
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration: [nwm_ana, nwm_long_range, gridded, reach]
+  Python_Plotting:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout candidate (pull request / push)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-        uses: actions/checkout@v2
+      - name: Clone WRF-Hydro CI Data Repo
+        uses: actions/checkout@main
         with:
-          path: candidate
-          
-      - name: Checkout candidate (manual)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        env: 
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-        run: gh repo clone ${{ github.repository }} candidate && cd candidate && gh pr checkout -R ${{ github.repository }} ${{ github.event.inputs.pr }}
-
-      - name: Checkout reference (pull request)
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.base.ref }}
-          path: reference
-          
-      - name: Checkout reference (push)
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.before }}
-          path: reference
-          
-      - name: Checkout reference (manual)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        env: 
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-        run: gh repo clone ${{ github.repository }} reference && cd reference && git checkout origin/$(gh pr view ${{ github.event.inputs.pr }} --json baseRefName --jq '.baseRefName')
-      
-      - name: Run testing container
+          repository: scrasmussen/wrf_hydro_nwm_ci_data
+          path: wrf_hydro_nwm_ci_data
+          # token: $${{ secrets.GITHUB_TOKEN }}
+          # path: ${HOME}
+      # - name: Checkout candidate (pull request / push)
+      #   if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+      #   uses: actions/checkout@v3
+      #   with:
+      #     path: candidate
+      - name: Find Path
+        run: pwd
+      - name: Install Dependencies
         run: |
-          docker run -e TRAVIS=1 -t --name test_container \
-           -v $GITHUB_WORKSPACE/candidate:/home/docker/candidate \
-           -v $GITHUB_WORKSPACE/reference:/home/docker/reference \
-           wrfhydro/dev:modeltesting --config ${{ matrix.configuration }} --domain_tag dev
-      
-      - name: Copy test results from container
-        if: ${{ always() }}
-        run: docker cp test_container:/home/docker/test_out $GITHUB_WORKSPACE/test_report
-        
-      - name: Archive test results to GitHub
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+          python -m pip install --upgrade pip
+          pip install matplotlib
+      - name: Create Python Plot
+        run: |
+          python3 -c "import matplotlib.pyplot as plt; plt.plot([2,3,5,7,11,13,17]); plt.savefig('foo.png')"
+          cp foo.png ${GITHUB_WORKSPACE}/candidate
+          # cp foo.png ${GITHUB_WORKSPACE}
+
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
         with:
-          name: test-reports
-          path: ${{ github.workspace }}/test_report/**.html
-        
+          author_name: GitHub Actions
+          author_email: github-actions@github.com
+          cwd: ${GITHUB_WORKSPACE}/candidate
+          push: origin foobarTest --set-upstream --force
+          # cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
+          # cwd: ${CI_HOME}
+          add: "foo.png"
+          pathspec_error_handling: exitImmediately
+          committer_name: Github Action
+
+      # - name: Change to home directory
+      #   run: cd ${HOME}
+
+      # - name: Clone WRF-Hydro CI Data Repo
+      #   uses: actions/checkout@main
+      #   with:
+      #     repository: scrasmussen/wrf_hydro_nwm_ci_data
+      #     path: wrf_hydro_nwm_ci_data
+      #     # token: $${{ secrets.GITHUB_TOKEN }}
+      #     # path: ${HOME}
+      # - name: Add plot to CI Data Repo
+      #   run: |
+      #     cd ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
+      #     # export CI_OUTPUT_DIR=$(date +"%y%m%d%H%M%S")
+      #     export CI_OUTPUT_DIR=test
+      #     mkdir $CI_OUTPUT_DIR
+      #     cd $CI_OUTPUT_DIR
+      #     cp $HOME/foo.png .
+      #     export CI_HOME=$(pwd)
+      #     pwd
+      #     git remote -v
+      # - name: Commit changes
+      #   uses: EndBug/add-and-commit@v9
+      #   with:
+      #     author_name: GitHub Actions
+      #     author_email: github-actions@github.com
+      #     cwd: ${GITHUB_WORKSPACE}/wrf_hydro_nwm_ci_data
+      #     # cwd: ${CI_HOME}
+      #     add: "test/foo.png"
+      #     pathspec_error_handling: exitImmediately
+      #     committer_name: Github Action
+      #     # git config user.name github-actions
+      #     # git config user.email
+      #     # git add foo.png
+      #     # git commit foo.png -m "Test foo image"
+      #     # git push
+      # - name: Push Plot to PR
+      #   uses: thollander/actions-comment-pull-request@v1
+      #   with:
+      #     message: |
+      #       "foo comparison and the upload is at foo.png"
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  # Model_Testing:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       configuration: [nwm_ana, nwm_long_range, gridded, reach]
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Checkout candidate (pull request / push)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: candidate
+
+  #     - name: Checkout candidate (manual)
+  #       if: ${{ github.event_name == 'workflow_dispatch' }}
+  #       env:
+  #         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  #       run: gh repo clone ${{ github.repository }} candidate && cd candidate && gh pr checkout -R ${{ github.repository }} ${{ github.event.inputs.pr }}
+
+  #     - name: Checkout reference (pull request)
+  #       if: ${{ github.event_name == 'pull_request' }}
+  #       uses: actions/checkout@v2
+  #       with:
+  #         ref: ${{ github.event.pull_request.base.ref }}
+  #         path: reference
+
+  #     - name: Checkout reference (push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: actions/checkout@v2
+  #       with:
+  #         ref: ${{ github.event.before }}
+  #         path: reference
+
+  #     - name: Checkout reference (manual)
+  #       if: ${{ github.event_name == 'workflow_dispatch' }}
+  #       env:
+  #         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  #       run: gh repo clone ${{ github.repository }} reference && cd reference && git checkout origin/$(gh pr view ${{ github.event.inputs.pr }} --json baseRefName --jq '.baseRefName')
+
+  #     - name: Run testing container
+  #       run: |
+  #         docker run -e TRAVIS=1 -t --name test_container \
+  #          -v $GITHUB_WORKSPACE/candidate:/home/docker/candidate \
+  #          -v $GITHUB_WORKSPACE/reference:/home/docker/reference \
+  #          wrfhydro/dev:modeltesting --config ${{ matrix.configuration }} --domain_tag dev
+
+  #     - name: Copy test results from container
+  #       if: ${{ always() }}
+  #       run: docker cp test_container:/home/docker/test_out $GITHUB_WORKSPACE/test_report
+
+  #     - name: Archive test results to GitHub
+  #       if: ${{ always() }}
+  #       uses: actions/upload-artifact@v2
+  #       with:
+  #         name: test-reports
+  #         path: ${{ github.workspace }}/test_report/**.html
