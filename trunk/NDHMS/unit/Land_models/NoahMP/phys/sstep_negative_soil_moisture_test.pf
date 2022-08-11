@@ -1,0 +1,199 @@
+module sstep_negative_soil_moisture_test
+  use funit
+  use module_sf_noahmplsm, only : sstep, noahmp_parameters
+  implicit none
+contains
+
+  @test
+  subroutine run_sstep_with_negative_soil_moisture_0()
+    logical :: res
+    integer, parameter :: NSOIL = 4, NSNOW = 3
+    type (noahmp_parameters) :: parameters
+    real :: DT
+    REAL, DIMENSION(       1:NSOIL) :: ZSOIL
+    REAL, DIMENSION(-NSNOW+1:NSOIL) :: DZSNSO ! snow/soil layer thickness [m]
+    REAL, DIMENSION(       1:NSOIL) :: SICE
+    INTEGER                         :: ILOC   !grid index
+    INTEGER                         :: JLOC   !grid index
+    REAL                            :: ZWT
+    REAL, DIMENSION(1:NSOIL) :: SH2O
+    REAL, DIMENSION(1:NSOIL) :: SMC
+    REAL, DIMENSION(1:NSOIL) :: AI
+    REAL, DIMENSION(1:NSOIL) :: BI
+    REAL, DIMENSION(1:NSOIL) :: CI
+    REAL, DIMENSION(1:NSOIL) :: RHSTT
+    REAL                     :: SMCWTD
+    REAL                     :: QDRAIN
+    REAL                     :: DEEPRECH
+    REAL                     :: WPLUS
+    REAL                     :: WMINUS
+
+    ! set input arguments for SSTEP
+    parameters%SMCMAX = (/ 0.433999985, 0.433999985, 0.433999985, 0.433999985 /)
+    DT =    1200.00000
+    ZSOIL =  (/  -0.1000000014901161,    -0.4000000059604645,      -1.00000000,      -2.00000000 /)
+    DZSNSO = (/ 0.0,        0.0,       0.0,      0.1000000014901161,      0.3000000119209290,    &
+         0.6000000238418579, 1.00000000 /)
+    SICE = (/ 0.0, 0.0, 0.0, 0.0 /)
+    ILOC = 1
+    JLOC = 1
+    ZWT = 2.5
+    SMC = (/ 0.2892858684062958, 0.2906554937362671, 0.3010393381118774, 0.3403549790382385 /)
+    AI = (/ 0.0000000000000000, -0.0000087158423412, -0.0000019995063667, -0.0000008549602626/)
+    BI = (/ 0.0000261475288426,  0.0000127148550746,  0.0000034244401377,  0.0000008549602626/)
+    CI = (/ -0.0000261475288426, -0.0000039990127334, -0.0000014249337710,  0.0000000000000000 /)
+    RHSTT = (/ -0.0000003420009591,  0.0000000228281625,  0.0000000030195422, -0.0000000044297597 /)
+    SMCWTD = 9.96920997E+36
+    QDRAIN = 2.51850505E-08
+    DEEPRECH =  0.00000000
+    WPLUS = 0.0 ! out var
+    WMINUS = 0.0 ! out var
+    SH2O = (/  0.289285868, 0.290655494, 0.301039338, 0.3403549790382385 /)
+
+    call SSTEP (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+                SICE   ,ILOC   ,JLOC   ,ZWT            ,                 & !in
+                SH2O   ,SMC    ,AI     ,BI     ,CI     , & !inout
+                RHSTT  ,SMCWTD ,QDRAIN ,DEEPRECH,                                 & !inout
+                WPLUS , WMINUS        )                                   !out
+    res = .true.
+    if (any(SH2O < 0.0)) then
+       res = .false.
+    else if (WMINUS .ne. 0.0) then
+       res = .false.
+    end if
+
+    @assertTrue(res, message='run_sstep_with_negative_soil_moisture_0 returned False')
+  end subroutine run_sstep_with_negative_soil_moisture_0
+
+  @test
+  subroutine run_sstep_with_negative_soil_moisture_1()
+    logical :: res
+    integer, parameter :: NSOIL = 4, NSNOW = 3
+    type (noahmp_parameters) :: parameters
+    real :: DT
+    REAL, DIMENSION(       1:NSOIL) :: ZSOIL
+    REAL, DIMENSION(-NSNOW+1:NSOIL) :: DZSNSO ! snow/soil layer thickness [m]
+    REAL, DIMENSION(       1:NSOIL) :: SICE
+    INTEGER                         :: ILOC   !grid index
+    INTEGER                         :: JLOC   !grid index
+    REAL                            :: ZWT
+    REAL, DIMENSION(1:NSOIL) :: SH2O
+    REAL, DIMENSION(1:NSOIL) :: SMC
+    REAL, DIMENSION(1:NSOIL) :: AI
+    REAL, DIMENSION(1:NSOIL) :: BI
+    REAL, DIMENSION(1:NSOIL) :: CI
+    REAL, DIMENSION(1:NSOIL) :: RHSTT
+    REAL                     :: SMCWTD
+    REAL                     :: QDRAIN
+    REAL                     :: DEEPRECH
+    REAL                     :: WPLUS
+    REAL                     :: WMINUS
+
+    ! set input arguments for SSTEP
+    parameters%SMCMAX = (/ 0.433999985, 0.433999985, 0.433999985, 0.433999985 /)
+    DT =    1200.00000
+    ZSOIL =  (/  -0.1000000014901161,    -0.4000000059604645,      -1.00000000,      -2.00000000 /)
+    DZSNSO = (/ 0.0,        0.0,       0.0,      0.1000000014901161,      0.3000000119209290,    &
+         0.6000000238418579, 1.00000000 /)
+    SICE = (/ 0.0, 0.0, 0.0, 0.0 /)
+    ILOC = 1
+    JLOC = 1
+    ZWT = 2.5
+    SMC = (/ 0.2892858684062958, 0.2906554937362671, 0.3010393381118774, 0.3403549790382385 /)
+    AI = (/ 0.0000000000000000, -0.0000087158423412, -0.0000019995063667, -0.0000008549602626/)
+    BI = (/ 0.0000261475288426,  0.0000127148550746,  0.0000034244401377,  0.0000008549602626/)
+    CI = (/ -0.0000261475288426, -0.0000039990127334, -0.0000014249337710,  0.0000000000000000 /)
+    RHSTT = (/ -0.0000003420009591,  0.0000000228281625,  0.0000000030195422, -0.0000000044297597 /)
+    SMCWTD = 9.96920997E+36
+    QDRAIN = 2.51850505E-08
+    DEEPRECH =  0.00000000
+    WPLUS = 0.0 ! out var
+    WMINUS = 0.0 ! out var
+    SH2O = (/ -0.01, -0.01,  -0.01, 0.3403549790382385 /)
+
+    print *, "PRE-SH2O  =", SH2O
+    call SSTEP (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+                SICE   ,ILOC   ,JLOC   ,ZWT            ,                 & !in
+                SH2O   ,SMC    ,AI     ,BI     ,CI     , & !inout
+                RHSTT  ,SMCWTD ,QDRAIN ,DEEPRECH,                                 & !inout
+                WPLUS , WMINUS        )                                   !out
+    print *, "POST-SH2O =", SH2O
+    print *, "WMINUS = ", WMINUS
+    res = .true.
+    if (any(SH2O < 0.0)) then
+       res = .false.
+    else if (WMINUS .ne. 0.0) then
+       res = .false.
+    end if
+
+    @assertTrue(res, message='run_sstep_with_negative_soil_moisture_1 returned False')
+  end subroutine run_sstep_with_negative_soil_moisture_1
+
+
+  @test
+  subroutine run_sstep_with_negative_soil_moisture_2()
+    logical :: res
+    integer, parameter :: NSOIL = 4, NSNOW = 3
+    type (noahmp_parameters) :: parameters
+    real :: DT
+    REAL, DIMENSION(       1:NSOIL) :: ZSOIL
+    REAL, DIMENSION(-NSNOW+1:NSOIL) :: DZSNSO ! snow/soil layer thickness [m]
+    REAL, DIMENSION(       1:NSOIL) :: SICE
+    INTEGER                         :: ILOC   !grid index
+    INTEGER                         :: JLOC   !grid index
+    REAL                            :: ZWT
+    REAL, DIMENSION(1:NSOIL) :: SH2O
+    REAL, DIMENSION(1:NSOIL) :: SMC
+    REAL, DIMENSION(1:NSOIL) :: AI
+    REAL, DIMENSION(1:NSOIL) :: BI
+    REAL, DIMENSION(1:NSOIL) :: CI
+    REAL, DIMENSION(1:NSOIL) :: RHSTT
+    REAL                     :: SMCWTD
+    REAL                     :: QDRAIN
+    REAL                     :: DEEPRECH
+    REAL                     :: WPLUS
+    REAL                     :: WMINUS
+
+    ! set input arguments for SSTEP
+    parameters%SMCMAX = (/ 0.433999985, 0.433999985, 0.433999985, 0.433999985 /)
+    DT =    1200.00000
+    ZSOIL =  (/  -0.1000000014901161,    -0.4000000059604645,      -1.00000000,      -2.00000000 /)
+    DZSNSO = (/ 0.0,        0.0,       0.0,      0.1000000014901161,      0.3000000119209290,    &
+         0.6000000238418579, 1.00000000 /)
+    SICE = (/ 0.0, 0.0, 0.0, 0.0 /)
+    ILOC = 1
+    JLOC = 1
+    ZWT = 2.5
+    SMC = (/ 0.2892858684062958, 0.2906554937362671, 0.3010393381118774, 0.3403549790382385 /)
+    AI = (/ 0.0000000000000000, -0.0000087158423412, -0.0000019995063667, -0.0000008549602626/)
+    BI = (/ 0.0000261475288426,  0.0000127148550746,  0.0000034244401377,  0.0000008549602626/)
+    CI = (/ -0.0000261475288426, -0.0000039990127334, -0.0000014249337710,  0.0000000000000000 /)
+    RHSTT = (/ -0.0000003420009591,  0.0000000228281625,  0.0000000030195422, -0.0000000044297597 /)
+    SMCWTD = 9.96920997E+36
+    QDRAIN = 2.51850505E-08
+    DEEPRECH =  0.00000000
+    WPLUS = 0.0 ! out var
+    WMINUS = 0.0 ! out var
+    SH2O = (/ -0.01, -0.01,  -0.01, -.01 /)
+
+    print *, "PRE-SH2O  =", SH2O
+    call SSTEP (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+                SICE   ,ILOC   ,JLOC   ,ZWT            ,                 & !in
+                SH2O   ,SMC    ,AI     ,BI     ,CI     , & !inout
+                RHSTT  ,SMCWTD ,QDRAIN ,DEEPRECH,                                 & !inout
+                WPLUS , WMINUS        )                                   !out
+    print *, "POST-SH2O =", SH2O
+    print *, "WMINUS = ", WMINUS
+
+    res = .true.
+    if (any(SH2O < 0.0)) then
+       res = .false.
+    else if (WMINUS == 0.0) then
+       res = .false.
+    end if
+
+    @assertTrue(res, message='run_sstep_with_negative_soil_moisture_2 returned False')
+  end subroutine run_sstep_with_negative_soil_moisture_2
+
+
+end module sstep_negative_soil_moisture_test
