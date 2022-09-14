@@ -1,0 +1,3 @@
+[submodule "trunk/NDHMS/Land_models/NoahMP"]
+	path = trunk/NDHMS/Land_models/NoahMP
+	url = git@github.com:cenlinhe/NoahMP_refactor.git
