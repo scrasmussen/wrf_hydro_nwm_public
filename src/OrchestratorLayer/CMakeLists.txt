@@ -8,9 +8,12 @@ add_library(hydro_orchestrator STATIC
 add_dependencies(hydro_orchestrator
         hydro_netcdf_layer
         hydro_utils
+        noahmp
+        noahmp_hrldas_driver
 )
 
 target_link_libraries(hydro_orchestrator PRIVATE
         hydro_netcdf_layer
         hydro_utils
+        noahmp_hrldas_driver
 )

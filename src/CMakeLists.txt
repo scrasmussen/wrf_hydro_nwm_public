@@ -92,13 +92,15 @@ add_dependencies(hydro_data_rec
 )
 
 if (HYDRO_LSM MATCHES "NoahMP")
-        message("-- Building NoahMP LSM")
-        add_subdirectory("Land_models/NoahMP")
+	message ("-- Building NoahMP LSM")
+	# add_subdirectory("Land_models/NoahMP")
+	add_subdirectory("Land_models")
 
-        add_subdirectory("CPL/NoahMP_cpl")
-        add_dependencies(hydro_noahmp_cpl hydro_routing)
-        add_dependencies(hydro_noahmp_cpl hydro_mpp )
-        add_dependencies(hydro_noahmp_cpl hydro_driver )
+	add_subdirectory("CPL/NoahMP_cpl")
+	add_dependencies(hydro_noahmp_cpl hydro_routing)
+	add_dependencies(hydro_noahmp_cpl hydro_mpp )
+	add_dependencies(hydro_noahmp_cpl hydro_driver )
+
 
         add_executable(wrfhydro
                 Land_models/NoahMP/IO_code/main_hrldas_driver.F
@@ -122,8 +124,9 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 hydro_routing_reservoirs
                 hydro_driver
                 noahmp_util
-                noahmp_phys
-                noahmp_data
+                # noahmp_phys
+                # noahmp_data
+                noahmp # rebasing: maybe just the top two needed?
                 hydro_noahmp_cpl
                 ${NETCDF_LIBRARIES}
                 # hydro_routing_groundwater
