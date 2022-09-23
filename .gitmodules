@@ -1,0 +1,4 @@
+[submodule "src/Land_models/NoahMP"]
+	branch = noahmp_refactor_hrldas
+	path = src/Land_models/NoahMP
+	url = git@github.com:cenlinhe/NoahMP_refactor.git
