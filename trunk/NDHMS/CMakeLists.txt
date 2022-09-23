@@ -286,7 +286,7 @@ add_dependencies(hydro_data_rec hydro_routing_reservoirs)
 
 if (HYDRO_LSM MATCHES "NoahMP")
 	message ("-- Building NoahMP LSM")
-	add_subdirectory("Land_models/NoahMP")
+	add_subdirectory("Land_models/NoahMP/hrldas")
 
 	add_subdirectory("CPL/NoahMP_cpl")
 	add_dependencies(hydro_noahmp_cpl hydro_routing)
@@ -401,4 +401,3 @@ elseif(HYDRO_LSM MATCHES "Noah")
 else()
 	message ("Unknown land surface model:" ${HYDRO_LSM} )
 endif (HYDRO_LSM MATCHES "NoahMP")
-

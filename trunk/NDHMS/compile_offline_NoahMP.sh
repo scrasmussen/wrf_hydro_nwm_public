@@ -26,7 +26,7 @@ if [[ ! -z $env_file ]]; then
 
     echo "configure: Sourcing $env_file for the compile options."
     source $env_file
-    
+
 else
     echo "configure: Using the compile options in the calling environment."
 fi
@@ -56,7 +56,7 @@ if [[ $? -eq 0 ]]; then
     echo
     echo '*****************************************************************'
     echo "Make was successful"
-else 
+else
     echo
     echo '*****************************************************************'
     echo "Make NOT successful"
@@ -70,14 +70,14 @@ if [ "$NWM_META" != "1" ]; then
     # If it is not an nwm version, copy the stock namelists and tables.
     cp ../template/NoahMP/namelist.hrldas .
     cp ../template/HYDRO/hydro.namelist .
-    cp ../Land_models/NoahMP/run/*TBL .
+    cp ../Land_models/NoahMP/hrldas/run/*TBL .
     cp ../template/HYDRO/HYDRO.TBL .
     cp ../template/HYDRO/CHANPARM.TBL .
 else
     # If it's an nwm version (nwm release branch), grab the nwm versions from elsewhere.
     echo 'NWM version: not populating with generic templates'
 fi
-    
+
 
 echo
 echo '*****************************************************************'
