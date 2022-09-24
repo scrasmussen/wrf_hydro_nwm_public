@@ -178,15 +178,17 @@ add_dependencies(
 add_dependencies(
   noahmp_refactor_wrf
   noahmp_refactor_noahmp
+  noahmp_refactor_hrldas
   )
 
 
 add_library(noahmp_refactor INTERFACE)
 target_link_libraries(noahmp_refactor
   INTERFACE
-  noahmp_refactor_hrldas
+  noahmp_refactor_wrf
   noahmp_refactor_noahmp
-  noahmp_refactor_wrf)
+  noahmp_refactor_hrldas
+  )
 
 
 # add_library(noahmp_refactor
