@@ -65,7 +65,8 @@ add_dependencies(hydro_data_rec hydro_routing_reservoirs)
 
 if (HYDRO_LSM MATCHES "NoahMP")
 	message ("-- Building NoahMP LSM")
-	add_subdirectory("Land_models/NoahMP")
+	# add_subdirectory("Land_models/NoahMP")
+	add_subdirectory("Land_models")
 
 	add_subdirectory("CPL/NoahMP_cpl")
 	add_dependencies(hydro_noahmp_cpl hydro_routing)
@@ -74,9 +75,12 @@ if (HYDRO_LSM MATCHES "NoahMP")
 
 
 	add_executable(wrfhydro.exe
-		Land_models/NoahMP/IO_code/main_hrldas_driver.F
-		Land_models/NoahMP/IO_code/module_hrldas_netcdf_io.F
-		Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.F
+		# Land_models/NoahMP_WRF_H/IO_code/main_hrldas_driver.F
+		# Land_models/NoahMP_WRF_H/IO_code/module_hrldas_netcdf_io.F
+		# Land_models/NoahMP_WRF_H/IO_code/module_NoahMP_hrldas_driver.F
+		Land_models/NoahMP/hrldas/IO_code/main_hrldas_driver.F
+		Land_models/NoahMP/hrldas/IO_code/module_hrldas_netcdf_io.F
+		Land_models/NoahMP/hrldas/IO_code/module_NoahMP_hrldas_driver.F
 	)
 
 	target_include_directories(wrfhydro.exe BEFORE PUBLIC ${PROJECT_BINARY_DIR}/mods)
@@ -97,9 +101,10 @@ if (HYDRO_LSM MATCHES "NoahMP")
 	target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_rfc)
 	target_link_libraries(wrfhydro.exe hydro_routing_reservoirs)
 	target_link_libraries(wrfhydro.exe hydro_driver)
-	target_link_libraries(wrfhydro.exe noahmp_util)
-	target_link_libraries(wrfhydro.exe noahmp_phys)
-	target_link_libraries(wrfhydro.exe noahmp_data)
+	# target_link_libraries(wrfhydro.exe noahmp_util)
+	# target_link_libraries(wrfhydro.exe noahmp_phys)
+	# target_link_libraries(wrfhydro.exe noahmp_data)
+	target_link_libraries(wrfhydro.exe noahmp_refactor)
 	target_link_libraries(wrfhydro.exe hydro_noahmp_cpl)
 	target_link_libraries(wrfhydro.exe ${NETCDF_LIBRARIES})
 
@@ -116,7 +121,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
 		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
 		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run
 		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/hrldas/run/*.TBL ${CMAKE_BINARY_DIR}/Run
 		COMMAND ln -s wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
 		COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
 	)
