@@ -8,15 +8,14 @@ set(noahmp_hrldas NoahMP/hrldas/Utility_routines)
 set(noahmp_wrf NoahMP/wrf)
 
 add_library(noahmp_refactor_hrldas
-# add_library(noahmp_refactor
-  ${noahmp_hrldas}/kwm_string_utilities.F
-  ${noahmp_hrldas}/module_date_utilities.F
-  ${noahmp_hrldas}/module_domain.F
-  ${noahmp_hrldas}/module_model_constants.F
-  ${noahmp_hrldas}/module_ra_gfdleta.F
-  ${noahmp_hrldas}/module_wrf_error.F
-  ${noahmp_hrldas}/module_wrf_utilities.F
-  )
+  ${noahmp_hrldas}/kwm_string_utilities.F  # MP two places each, Noah 6
+  ${noahmp_hrldas}/module_date_utilities.F # Triple
+  ${noahmp_hrldas}/module_domain.F         # only NoahMP
+  ${noahmp_hrldas}/module_model_constants.F # Triple
+  ${noahmp_hrldas}/module_ra_gfdleta.F     # only NoahMP
+  ${noahmp_hrldas}/module_wrf_error.F      # only NoahMP
+  ${noahmp_hrldas}/module_wrf_utilities.F) # Both
+
 add_library(noahmp_refactor_noahmp
   ${noahmp_drivers}/NoahmpDriverMainMod.F90
   ${noahmp_drivers}/NoahmpGroundwaterInitMod.F90
@@ -170,17 +169,19 @@ add_library(noahmp_refactor_wrf
   ${noahmp_wrf}/module_sf_urban.F
   ${noahmp_wrf}/NoahmpUrbanDriverMainMod.F)
 
+add_library(wrf_hydro_noahmp
+  NoahMP_WRF_H/phys/surfex/ini_csts.F
+  NoahMP_WRF_H/phys/surfex/modd_csts.F
+  )
+
 add_dependencies(
   noahmp_refactor_noahmp
-  noahmp_refactor_hrldas
-  )
+  noahmp_refactor_hrldas)
 
 add_dependencies(
   noahmp_refactor_wrf
   noahmp_refactor_noahmp
-  noahmp_refactor_hrldas
-  )
-
+  noahmp_refactor_hrldas)
 
 add_library(noahmp_refactor INTERFACE)
 target_link_libraries(noahmp_refactor
@@ -188,17 +189,4 @@ target_link_libraries(noahmp_refactor
   noahmp_refactor_wrf
   noahmp_refactor_noahmp
   noahmp_refactor_hrldas
-  )
-
-
-# add_library(noahmp_refactor
-#   noahmp_refactor_hrldas
-#   noahmp_refactor_noahmp)
-
-# add_executable(jedi_snow_increment jedi_snow_incr.f90)
-
-# target_link_libraries(jedi_snow_increment
-#   PUBLIC jedi_disag var_names NetCDF::NetCDF_Fortran MPI::MPI_Fortran)
-
-
-# add_subdirectory("NoahMP_WRF_H")
+  wrf_hydro_noahmp)

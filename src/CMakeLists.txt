@@ -75,12 +75,12 @@ if (HYDRO_LSM MATCHES "NoahMP")
 
 
 	add_executable(wrfhydro.exe
-		# Land_models/NoahMP_WRF_H/IO_code/main_hrldas_driver.F
-		# Land_models/NoahMP_WRF_H/IO_code/module_hrldas_netcdf_io.F
-		# Land_models/NoahMP_WRF_H/IO_code/module_NoahMP_hrldas_driver.F
-		Land_models/NoahMP/hrldas/IO_code/main_hrldas_driver.F
-		Land_models/NoahMP/hrldas/IO_code/module_hrldas_netcdf_io.F
-		Land_models/NoahMP/hrldas/IO_code/module_NoahMP_hrldas_driver.F
+		Land_models/NoahMP_WRF_H/IO_code/main_hrldas_driver.F
+		Land_models/NoahMP_WRF_H/IO_code/module_hrldas_netcdf_io.F
+		Land_models/NoahMP_WRF_H/IO_code/module_NoahMP_hrldas_driver.F
+		# Land_models/NoahMP/hrldas/IO_code/main_hrldas_driver.F
+		# Land_models/NoahMP/hrldas/IO_code/module_hrldas_netcdf_io.F
+		# Land_models/NoahMP/hrldas/IO_code/module_NoahMP_hrldas_driver.F
 	)
 
 	target_include_directories(wrfhydro.exe BEFORE PUBLIC ${PROJECT_BINARY_DIR}/mods)
