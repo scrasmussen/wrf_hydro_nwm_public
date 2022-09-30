@@ -48,8 +48,7 @@ module module_NoahMP_hrldas_driver
 #ifdef WRF_HYDRO
    REAL,    allocatable, DIMENSION(:,:)   :: infxsrt,sfcheadrt, soldrain
    !LRK - Remove HRLDAS_ini_typ for WRF-Hydro
-   integer :: forc_typ, snow_assim, HRLDAS_ini_typ
-   !integer :: forc_typ, snow_assim
+   integer :: snow_assim, HRLDAS_ini_typ
    REAL,    allocatable, DIMENSION(:,:)   :: etpnd, greenfrac, prcp0
    real :: etpnd1
    character(len=19) :: forcDate
@@ -176,7 +175,6 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  EQZWT
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RIVERBEDXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RIVERCONDXY
-  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  PEXPXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  FDEPTHXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  AREAXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QRFSXY
@@ -219,16 +217,7 @@ module module_NoahMP_hrldas_driver
 ! Timing:
 !------------------------------------------------------------------------
 
-  INTEGER :: NTIME          ! total timesteps
   INTEGER :: ITIME          ! LSM time step
-  integer :: clock_count_1 = 0
-  integer :: clock_count_2 = 0
-  integer :: clock_rate    = 0
-  real    :: timing_sum    = 0.0
-
-  integer :: sflx_count_sum
-  integer :: count_before_sflx
-  integer :: count_after_sflx
 
 !---------------------------------------------------------------------
 !  DECLARE/Initialize constants
@@ -312,7 +301,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
 #ifdef WRF_HYDRO
-    forc_typ = wrf_hydro%forc_typ
+    ! forc_typ = wrf_hydro%forc_typ ! artless
 #endif
 
   dtbl = real(noah_lsm%noah_timestep)
@@ -343,11 +332,11 @@ module module_NoahMP_hrldas_driver
   !!----------------------------------------------------------------------------
   !! channel_only
   call updateNameList("channel_only",0)
-  if(forc_typ .eq. 9)  call updateNameList("channel_only",1)
+  if(state%forc_typ .eq. 9)  call updateNameList("channel_only",1)
   call updateNameList("channelBucket_only",0)
-  if(forc_typ .eq. 10) call updateNameList("channelBucket_only",1)
+  if(state%forc_typ .eq. 10) call updateNameList("channelBucket_only",1)
 
-  if(forc_typ .eq. 9 .or. forc_typ .eq. 10) then
+  if(state%forc_typ .eq. 9 .or. state%forc_typ .eq. 10) then
      write(state%olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
           noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, noah_lsm%start_hour, noah_lsm%start_min, 0
      forcdate = state%olddate
@@ -363,12 +352,12 @@ module module_NoahMP_hrldas_driver
      end if
      NTIME = khour*3600./nint(dtbl)
      NTIME_out = NTIME
-
+      ! artless how to handle nlst
      if(.not. RT_DOMAIN(did)%initialized) then
         nlst(did)%dt = real(noah_lsm%noah_timestep)
         nlst(did)%khour = khour ! Adding kHOUR to be used in the NWM output routines.
-        nlst(did)%olddate(1:19) = olddate(1:19)
-        nlst(did)%startdate(1:19) = olddate(1:19)
+        nlst(did)%olddate(1:19) = state%olddate(1:19)
+        nlst(did)%startdate(1:19) = state%olddate(1:19)
         nlst(did)%nsoil = -999999
 #ifdef MPP_LAND
         call mpp_land_bcast_int1(nlst(did)%nsoil)
@@ -721,14 +710,14 @@ module module_NoahMP_hrldas_driver
 ! Read Landuse Type and Soil Texture and Other Information
 !----------------------------------------------------------------------
 
-  call READLAND_HRLDAS(noah_lsm%HRLDAS_SETUP_FILE, XSTART, XEND, YSTART, &
-                       YEND,   ISWATER,    ISLAKE,   IVGTYP, &
-                       ISLTYP, TERRAIN,    TMN,      XLAT, &
-                       XLONG, XLAND,      SEAICE,   MSFTX, &
-                       MSFTY,  crocus_opt, GLACINFO, GLACT, &
-                       VIS_ICEALB)
+  call readland_hrldas(state%HRLDAS_SETUP_FILE, state%XSTART, state%XEND, state%YSTART, &
+       state%YEND, state%ISWATER, state%ISLAKE, state%IVGTYP, &
+       state%ISLTYP, state%TERRAIN, state%TMN, state%XLAT, &
+       state%XLONG, state%XLAND, state%SEAICE, state%MSFTX, &
+       state%MSFTY,  crocus_opt, GLACINFO, GLACT, &
+       VIS_ICEALB)
 
-  WHERE(SEAICE > 0.0) XICE = 1.0
+  where (state%SEAICE > 0.0) state%XICE = 1.0
 
 !----------------------------------------------------------------------
 ! Crocus: Initialize glacier
@@ -797,19 +786,22 @@ module module_NoahMP_hrldas_driver
 ! For spatially-varying soil parameters, read in necessary extra fields
 !------------------------------------------------------------------------
 
-#ifdef SPATIAL_SOIL
-    call READ_3D_SOIL(noah_lsm%SPATIAL_FILENAME, XSTART, XEND, YSTART, YEND, &
-                      NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
-		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
-		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D, &
-                      SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D)
+#ifdef SPATIAL_SOIL ! artless this could be an iopt_soil option like in noahmpr??
+    call READ_3D_SOIL(state%SPATIAL_FILENAME, state%XSTART, state%XEND, state%YSTART, &
+         state%YEND, state%NSOIL, state%BEXP_3D, state%SMCDRY_3D, &
+         state%SMCWLT_3D, state%SMCREF_3D, state%SMCMAX_3D, state%DKSAT_3D,&
+         state%DWSAT_3D, state%PSISAT_3D, state%QUARTZ_3D, state%REFDK_2D, &
+         state%REFKDT_2D, state%SLOPE_2D, state%CWPVT_2D, state%VCMX25_2D, &
+         state%MP_2D, state%HVT_2D, state%MFSNO_2D, state%RSURFEXP_2D, &
+         state%SSI_2D, state%SNOWRETFAC_2D, state%TAU0_2D, state%RSURFSNOW_2D,&
+         state%SCAMAX_2D)
 
-    if (noah_lsm%runoff_option == 7) then
-        call READ_XAJ_RUNOFF(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
-                             AXAJ_2D,BXAJ_2D,XXAJ_2D)
+    if (noah_lsm%runoff_option == 7) then ! artless
+       call READ_XAJ_RUNOFF(state%SPATIAL_FILENAME, state%XSTART, state%XEND, state%YSTART, &
+            YEND, state%AXAJ_2D, state%BXAJ_2D, state%XXAJ_2D)
     end if
 
-    if (noah_lsm%imperv_option > 0 .and. noah_lsm%imperv_option < 9) then
+    if (noah_lsm%imperv_option > 0 .and. noah_lsm%imperv_option < 9) then ! artless
         call READ_IMPERV(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
                              IMPERV_2D)
     end if
@@ -821,44 +813,55 @@ module module_NoahMP_hrldas_driver
 ! This option is not tested for parallel use in the offline driver
 !------------------------------------------------------------------------
 
-  if (noah_lsm%runoff_option == 5) then
-    call READ_MMF_RUNOFF(noah_lsm%MMF_RUNOFF_FILE, XSTART, XEND, YSTART, YEND,&
-                         ZWTXY,EQZWT,RIVERBEDXY,RIVERCONDXY,PEXPXY,FDEPTHXY)
+  if (state%runoff_option == 5) then
+     call READ_MMF_RUNOFF(state%MMF_RUNOFF_FILE, state%XSTART, state%XEND, state%YSTART, &
+          state%YEND, state%ZWTXY, state%EQZWT, state%RIVERBEDXY, &
+          state%RIVERCONDXY, state%PEXPXY, state%FDEPTHXY)
   end if
 
 !----------------------------------------------------------------------
 ! Initialize Model state
 !----------------------------------------------------------------------
 
-  SLOPETYP = 2
-  DZS       =  noah_lsm%SOIL_THICK_INPUT(1:NSOIL)
+  state%SLOPETYP = 2 ! artless: noahmpr message ! it was 2 here and 1 in the noahmpdrv- pvk
+  state%DZS = state%SOIL_THICK_INPUT(1:state%NSOIL)
 
-  ITIMESTEP = 1
+  state%ITIMESTEP = 1
 
-  if (noah_lsm%restart_filename_requested /= " ") then
-     restart_flag = .TRUE.
+  xstart = NoahmpIO%xstart
+  xend   = NoahmpIO%xend
+  ystart = NoahmpIO%ystart
+  yend   = NoahmpIO%yend
+  ixfull = NoahmpIO%ixfull
+  jxfull = NoahmpIO%jxfull
 
-  if(noah_lsm%rst_bi_in .eq. 0) then
+
+  if (state%restart_filename_requested /= " ") then
+     state%restart_flag = .TRUE.
+
+  if (noah_lsm%rst_bi_in .eq. 0) then
 
 #ifdef WRF_HYDRO
-      tmpdate = olddate
+     tmpdate = state%olddate
 #endif
 
-     call find_restart_file(rank, trim(noah_lsm%restart_filename_requested), startdate, khour, olddate, restart_flnm)
+     call find_restart_file(state%rank, trim(state%restart_filename_requested), state%startdate, &
+          khour, state%olddate, state%restart_flnm)  ! artless check khour
 
-     call read_restart(trim(restart_flnm), xstart, xend, xstart, ixfull, jxfull, noah_lsm%nsoil, olddate)
+     call read_restart(trim(state%restart_flnm), xstart, xend, xstart, &
+          ixfull, jxfull, state%nsoil, state%olddate)
 
 #ifdef WRF_HYDRO
-      olddate = tmpdate
+      state%olddate = tmpdate
 #endif
 
        ITIMESTEP = 2
 
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,OLDDATE(1:19))
+     call mpp_land_bcast_char(19, state%olddate(1:19))
 #endif
 
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SOIL_T"  , TSLB     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SOIL_T"  , state%TSLB     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOW_T"  , state%TSNOXY   )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC"     , SMOIS    )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O"    , SH2O     )
@@ -926,62 +929,63 @@ module module_NoahMP_hrldas_driver
      if(checkRstV("ACCETRAN") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCETRAN" ,ACCETRAN    )
 #endif
 ! below for opt_run = 5
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMOISEQ"   , SMOISEQ    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "AREAXY"    , AREAXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMCWTDXY"  , SMCWTDXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QRFXY"     , QRFXY      )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "DEEPRECHXY", DEEPRECHXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSPRINGXY" , QSPRINGXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSLATXY"   , QSLATXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QRFSXY"    , QRFSXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSPRINGSXY", QSPRINGSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RECHXY"    , RECHXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FDEPTHXY"   ,FDEPTHXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RIVERCONDXY",RIVERCONDXY)
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RIVERBEDXY" ,RIVERBEDXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EQZWT"      ,EQZWT      )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PEXPXY"     ,PEXPXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMOISEQ"   , state%SMOISEQ    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "AREAXY"    , state%AREAXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMCWTDXY"  , state%SMCWTDXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QRFXY"     , state%QRFXY      )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "DEEPRECHXY", state%DEEPRECHXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSPRINGXY" , state%QSPRINGXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSLATXY"   , state%QSLATXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QRFSXY"    , state%QRFSXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSPRINGSXY", state%QSPRINGSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RECHXY"    , state%RECHXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FDEPTHXY"   ,state%FDEPTHXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RIVERCONDXY",state%RIVERCONDXY)
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RIVERBEDXY" ,state%RIVERBEDXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EQZWT"      ,state%EQZWT      )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PEXPXY"     ,state%PEXPXY     )
   else  !  rst_bi_in
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,OLDDATE(1:19))
+     call mpp_land_bcast_char(19,OLDDATE(1:19))  ! artless, not in noahmpr
 #endif
      ITIMESTEP = 2
      call lsm_rst_bi_in(state)
   end if
 
-     STEPWTD = nint(WTDDT*60./DTBL)
-     STEPWTD = max(STEPWTD,1)
+     state%STEPWTD = nint(state%WTDDT*60. / state%DTBL)
+     state%STEPWTD = max(state%STEPWTD, 1)
 
 ! Must still call NOAHMPINITMAIN even in restart to set up parameter arrays (also done in WRF)
-
-     call NOAHMPINITMAIN(    LLANDUSE,     state%SNOW,    state%SNOWH,   CANWAT,   ISLTYP,   IVGTYP, &   ! call from WRF phys_init
-                    TSLB,    SMOIS,     SH2O,      DZS, FNDSOILW, FNDSNOWH, &
-                     TSK,  ISNOWXY,     TVXY,     TGXY, CANICEXY,      TMN,     XICE, &
-                CANLIQXY,    EAHXY,    TAHXY,     CMXY,     CHXY,                     &
-                  FWETXY, SNEQVOXY, ALBOLDXY,  QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY, &
-                    WTXY,   state%TSNOXY,  state%ZSNSOXY,  state%SNICEXY,  state%SNLIQXY, LFMASSXY, RTMASSXY, &
-                STMASSXY,   WOODXY, STBLCPXY, FASTCPXY,   XSAIXY, LAI,                    &
-                  T2MVXY,   T2MBXY, CHSTARXY,                                         &
-                   NSOIL,  .true.,                                                   &
-                  .true.,noah_lsm%runoff_option,noah_lsm%crop_option,noah_lsm%pedotransfer_option, &
-                  ids,ide+1, jds,jde+1, kds,kde,                &  ! domain
-                  ims,ime, jms,jme, kms,kme,                &  ! memory
-                  its,ite, jts,jte, kts,kte                 &  ! tile
-                     ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
-                     wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
-                     fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
-                     )
+     call NoahmpInitMain(state)
+     ! artless, need to check if our noahmpinitmain does something more for us?
+     ! call NOAHMPINITMAIN(    LLANDUSE,     state%SNOW,    state%SNOWH,   CANWAT,   ISLTYP,   IVGTYP, &   ! call from WRF phys_init
+     !                TSLB,    SMOIS,     SH2O,      DZS, FNDSOILW, FNDSNOWH, &
+     !                 TSK,  ISNOWXY,     TVXY,     TGXY, CANICEXY,      TMN,     XICE, &
+     !            CANLIQXY,    EAHXY,    TAHXY,     CMXY,     CHXY,                     &
+     !              FWETXY, SNEQVOXY, ALBOLDXY,  QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY, &
+     !                WTXY,   state%TSNOXY,  state%ZSNSOXY,  state%SNICEXY,  state%SNLIQXY, LFMASSXY, RTMASSXY, &
+     !            STMASSXY,   WOODXY, STBLCPXY, FASTCPXY,   XSAIXY, LAI,                    &
+     !              T2MVXY,   T2MBXY, CHSTARXY,                                         &
+     !               NSOIL,  .true.,                                                   &
+     !              .true.,noah_lsm%runoff_option,noah_lsm%crop_option,noah_lsm%pedotransfer_option, &
+     !              ids,ide+1, jds,jde+1, kds,kde,                &  ! domain
+     !              ims,ime, jms,jme, kms,kme,                &  ! memory
+     !              its,ite, jts,jte, kts,kte                 &  ! tile
+     !                 ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
+     !                 wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
+     !                 fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+     !                 )
   else  ! for none restart
 
      restart_flag = .FALSE.
 
-     SMOIS     =  undefined_real
-     TSLB      =  undefined_real
-     SH2O      =  undefined_real
-     CANLIQXY  =  undefined_real
-     TSK       =  undefined_real
-     RAINBL_tmp    =  undefined_real
-     !SNOW      =  undefined_real
+     state%SMOIS      =  undefined_real
+     state%TSLB       =  undefined_real
+     state%SH2O       =  undefined_real
+     state%CANLIQXY   =  undefined_real
+     state%TSK        =  undefined_real
+     state%RAINBL_tmp =  undefined_real
+     !SNOW      =  undefined_real  ! ARTLESS
      !SNOWH     =  undefined_real
 
 ! LRK - Remove HRLDAS_ini_typ for WRF-Hydro. Originally, there was a fork
@@ -1013,17 +1017,20 @@ module module_NoahMP_hrldas_driver
 !          ".LDASIN_DOMAIN"//hgrid
 !#endif
 
-     call READINIT_HRLDAS(noah_lsm%HRLDAS_SETUP_FILE, xstart, xend, ystart, yend,  &
-          NSOIL, DZS, OLDDATE, LDASIN_VERSION, SMOIS,       &
-          TSLB, CANWAT, TSK, state%SNOW, state%SNOWH, FNDSNOWH)
+     ! artless, just use state variable??
+     call READINIT_HRLDAS(state%HRLDAS_SETUP_FILE, state%xstart, state%xend, state%ystart, &
+          state%yend, state%NSOIL, state%DZS, state%OLDDATE, &
+          LDASIN_VERSION, state%SMOIS, state%TSLB, state%CANWAT, &
+          state%TSK, state%SNOW, state%SNOWH, state%FNDSNOWH)
 
 !yw     VEGFRA    =  undefined_real
 !yw     LAI       =  undefined_real
 !yw     GVFMIN    =  undefined_real
 !yw     GVFMAX    =  undefined_real
 
-     call READVEG_HRLDAS(noah_lsm%HRLDAS_SETUP_FILE, xstart, xend, ystart, yend,  &
-          OLDDATE, IVGTYP, VEGFRA, LAI, GVFMIN, GVFMAX)
+     call READVEG_HRLDAS(state%HRLDAS_SETUP_FILE, state%xstart, state%xend, state%ystart, &
+          state%yend, state%OLDDATE, state%IVGTYP, state%VEGFRA, &
+          state%LAI, state%GVFMIN, state%GVFMAX)
 
 !#ifdef WRF_HYDRO
 !  else   !  HRLDAS_ini_typ
@@ -1052,30 +1059,31 @@ module module_NoahMP_hrldas_driver
 !     SNOW = SNOW * 1000.    ! Convert snow water equivalent to mm. MB: remove v3.7
 
      FNDSOILW = .FALSE.
-     call NOAHMPINITMAIN(    LLANDUSE,     state%SNOW,    state%SNOWH,   CANWAT,   ISLTYP,   IVGTYP, &   ! call from WRF phys_init
-                    TSLB,    SMOIS,     SH2O,      DZS, FNDSOILW, FNDSNOWH, &
-                     TSK,  ISNOWXY,     TVXY,     TGXY, CANICEXY,      TMN,     XICE, &
-                CANLIQXY,    EAHXY,    TAHXY,     CMXY,     CHXY,                     &
-                  FWETXY, SNEQVOXY, ALBOLDXY,  QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY, &
-                    WTXY,   state%TSNOXY,  state%ZSNSOXY,  state%SNICEXY,  state%SNLIQXY, LFMASSXY, RTMASSXY, &
-                STMASSXY,   WOODXY, STBLCPXY, FASTCPXY,   XSAIXY, LAI,                    &
-                  T2MVXY,   T2MBXY, CHSTARXY,                                         &
-                   NSOIL,  .false.,                                                   &
-                  .true.,noah_lsm%runoff_option,noah_lsm%crop_option,noah_lsm%pedotransfer_option,  &
-                  ids,ide+1, jds,jde+1, kds,kde,                &  ! domain
-                  ims,ime, jms,jme, kms,kme,                &  ! memory
-                  its,ite, jts,jte, kts,kte                 &  ! tile
-                     ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
-                     wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
-                     fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
-                     )
+     call NoahmpInitMain(state)
+     ! artless: make sure these subs are the same
+     ! call NOAHMPINITMAIN(    LLANDUSE,     state%SNOW,    state%SNOWH,   CANWAT,   ISLTYP,   IVGTYP, &   ! call from WRF phys_init
+     !                TSLB,    SMOIS,     SH2O,      DZS, FNDSOILW, FNDSNOWH, &
+     !                 TSK,  ISNOWXY,     TVXY,     TGXY, CANICEXY,      TMN,     XICE, &
+     !            CANLIQXY,    EAHXY,    TAHXY,     CMXY,     CHXY,                     &
+     !              FWETXY, SNEQVOXY, ALBOLDXY,  QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY, &
+     !                WTXY,   state%TSNOXY,  state%ZSNSOXY,  state%SNICEXY,  state%SNLIQXY, LFMASSXY, RTMASSXY, &
+     !            STMASSXY,   WOODXY, STBLCPXY, FASTCPXY,   XSAIXY, LAI,                    &
+     !              T2MVXY,   T2MBXY, CHSTARXY,                                         &
+     !               NSOIL,  .false.,                                                   &
+     !              .true.,noah_lsm%runoff_option,noah_lsm%crop_option,noah_lsm%pedotransfer_option,  &
+     !              ids,ide+1, jds,jde+1, kds,kde,                &  ! domain
+     !              ims,ime, jms,jme, kms,kme,                &  ! memory
+     !              its,ite, jts,jte, kts,kte                 &  ! tile
+     !                 ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
+     !                 wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
+     !                 fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+     !                 )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
 
-
   end if  ! end of restart if block
 
-  NTIME=(KHOUR)*3600./nint(dtbl)
+  state%NTIME = (KHOUR)*3600./nint(state%dtbl) !*(NoahmpIO%spinup_loops+1)  !artless noahmpr addition
 
 #ifdef HYDRO_D
   print*, "NTIME = ", NTIME , "KHOUR=",KHOUR,"dtbl = ", dtbl
@@ -1096,24 +1104,23 @@ module module_NoahMP_hrldas_driver
    prcp0     = 0   !artless are these qtiledrain or zwatble2d??
    etpnd     = 0.0
 
-   allocate(zsoil (NSOIL))
+   allocate(zsoil(state%NSOIL))
    zsoil = 0
 
-   zsoil(1) = -1 * noah_lsm%soil_thick_input(1)
-   do kk = 2, NSOIL
-      zsoil(kk) = zsoil(kk-1)-noah_lsm%soil_thick_input(kk)
+   zsoil(1) = -1 * state%soil_thick_input(1)
+   do kk = 2, state%NSOIL
+      zsoil(kk) = zsoil(kk-1)-state%soil_thick_input(kk)
    end do
 #ifdef HYDRO_D
-   print*, "zsoil/soil_thick_input = ", noah_lsm%soil_thick_input(1:NSOIL)
+   print*, "zsoil/soil_thick_input = ", state%soil_thick_input(1:state%NSOIL)
 #endif
 
    call hrldas_drv_HYDRO_ini(state%TSLB(:,1:state%NSOIL,:), &
         state%SMOIS(:,1:state%NSOIL,:), state%SH2O(:,1:state%NSOIL,:), &
         state%infxsrt, state%sfcheadrt, state%soldrain, &
         ! they have added state%qtiledrain,state%ZWATBLE2D,                     & ! ARTLESS
-        state%ix, &
-        state%jx, state%NSOIL, state%SMOIS, real(state%noah_timestep), &
-        state%olddate, zsoil(1:state%NSOIL))
+        state%ix, state%jx, state%NSOIL, state%SMOIS, &
+        real(state%noah_timestep), state%olddate, zsoil(1:state%NSOIL))
 
 call get_iocflag(1, io_config_outputs)
 
@@ -1188,8 +1195,8 @@ end if
        end if
    end do
 
-   if(wrf_hydro%finemesh .ne. 0 ) then
-       if(restart_flag) then
+   if(state%finemesh .ne. 0 ) then ! finemesh was wrf_hydro
+       if(state%restart_flag) then
           NTIME_out =  10
        else
           NTIME_out =  1
@@ -1198,7 +1205,7 @@ end if
    end if
 #endif
 
-   NTIME_out = NTIME
+   NTIME_out = state%NTIME
 
 #ifdef WRF_HYDRO
    call get_t0OutputFlag(1, t0OutputFlag)
@@ -1248,17 +1255,18 @@ end subroutine land_driver_ini
 #endif
 
 #ifdef WRF_HYDRO
-      if(forc_typ .eq. 8) then
-          call read_forc_ldasout(olddate, state%hgrid, noah_lsm%indir, dtbl,ix,jx,infxsrt,soldrain)
+      if(state%forc_typ .eq. 8) then
+         call read_forc_ldasout(state%olddate, state%hgrid, state%indir, state%dtbl, &
+              state%ix, state%jx, state%infxsrt, state%soldrain)
           call hrldas_drv_HYDRO(state%TSLB(:,1:state%NSOIL,:), &
                state%SMOIS(:,1:state%NSOIL,:), state%SH2O(:,1:state%NSOIL,:), &
                state%infxsrt, state%sfcheadrt, state%soldrain, state%ix, &
                state%jx, state%NSOIL)
-          call geth_newdate(newdate, olddate, nint(dtbl))
+          call geth_newdate(state%newdate, state%olddate, nint(dtbl))
           olddate = newdate
           return
       end if
-      if(forc_typ .eq. 9 .or. forc_typ .eq. 10) then
+      if(state%forc_typ .eq. 9 .or. state%forc_typ .eq. 10) then
          !! JLM:: fix hgrid: This becomes 1 eventhough 3 is specified in hydro.namelist
          !! JLM: This is initalized by read_hrldas_hdrinfo
          !! JLM: Appears that we should differentiate the LSM and HYDRO igrids, define a local
@@ -1293,11 +1301,10 @@ end subroutine land_driver_ini
 
      if(wrf_hydro%finemesh .ne. 0) goto 991
 
-     if(forc_typ .eq. 0) then
+     if(state%forc_typ .eq. 0) then
         call READFORC_HRLDAS(state%INFLNM_TEMPLATE, state%FORCING_TIMESTEP, &
              state%OLDDATE, state%XSTART, state%XEND, state%YSTART, &
-             state%YEND,                                  &
-             state%T_PHY(:,1,:), state%QV_CURR(:,1,:), state%U_PHY(:,1,:), &
+             state%YEND, state%T_PHY(:,1,:), state%QV_CURR(:,1,:), state%U_PHY(:,1,:), &
              state%V_PHY(:,1,:), state%P8W(:,1,:), state%GLW, state%SWDOWN, &
              state%RAINBL_tmp, state%VEGFRA, state%update_veg, state%LAI, &
              state%update_lai)
@@ -1461,45 +1468,46 @@ end subroutine land_driver_ini
  end if   ! SKIP FIRST TIMESTEP
 
 #ifdef WRF_HYDRO
-     call geth_newdate(newdate, olddate, nint(dtbl))
-     olddate = newdate
-     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+     call geth_newdate(state%newdate, state%olddate, nint(state%dtbl))
+     state%olddate = state%newdate
+     call hrldas_drv_HYDRO(state%TSLB(:,1:state%NSOIL,:), state%SMOIS(:,1:state%NSOIL,:), &
+          state%SH2O(:,1:state%NSOIL,:), state%infxsrt, state%sfcheadrt, state%soldrain, &
+          state%ix, state%jx, state%NSOIL)
 #endif
 
 ! Output for history
-     OUTPUT_FOR_HISTORY: if (noah_lsm%output_timestep > 0) then
-        if (mod(ITIME * noah_lsm%noah_timestep, noah_lsm%output_timestep) == 0) then
-
+     OUTPUT_FOR_HISTORY: if (state%output_timestep > 0) then
+        if (mod(ITIME * state%noah_timestep, state%output_timestep) == 0) then
            ! convert RAINRATE back to mm/s for output
            RAINBL = RAINBL_tmp
            call ldas_output(ITIME,state)
-
-
         end if
      end if OUTPUT_FOR_HISTORY
 
-     if (IVGTYP(xstart,ystart)==ISWATER) then
-       write(*,'(" ***DATE=", A19)', advance="NO") olddate
+     if (state%IVGTYP(state%xstart, state%ystart) == state%ISWATER) then
+        write(*,'(" ***DATE=", A19)', advance="NO") state%olddate
      else
-       write(*,'(" ***DATE=", A19, 6F10.5)', advance="NO") olddate, TSLB(xstart,1,ystart), LAI(xstart,ystart)
+        write(*,'(" ***DATE=", A19, 6F10.5)', advance="NO") state%olddate, &
+             state%TSLB(state%xstart,1,state%ystart), &
+             state%LAI(state%xstart,state%ystart)
      end if
 
 !------------------------------------------------------------------------
 ! Write Restart - timestamp equal to output will have same states
 !------------------------------------------------------------------------
 
-      if ( (noah_lsm%restart_frequency_hours .gt. 0) .and. &
-           (mod(ITIME, int(noah_lsm%restart_frequency_hours*3600./nint(dtbl))) == 0)) then
-       if(noah_lsm%rst_bi_out .eq. 0) then
+      if ( (state%restart_frequency_hours .gt. 0) .and. &
+           (mod(ITIME, int(state%restart_frequency_hours*3600./nint(state%dtbl))) == 0)) then
+       if(noah_lsm%rst_bi_out .eq. 0) then ! artless, rst_bi_out, why not in noahmpr
            call lsm_restart(state)
        else
            call lsm_rst_bi_out(state)
        end if
 #ifdef WRF_HYDRO
       else
-       if (noah_lsm%restart_frequency_hours <= 0) then
-          if ( (olddate( 9:10) == "01") .and. (olddate(12:13) == "00") .and. &
-               (olddate(15:16) == "00") .and. (olddate(18:19) == "00") ) then
+       if (state%restart_frequency_hours <= 0) then
+          if ( (state%olddate( 9:10) == "01") .and. (state%olddate(12:13) == "00") .and. &
+               (state%olddate(15:16) == "00") .and. (state%olddate(18:19) == "00") ) then
                if(noah_lsm%rst_bi_out .eq. 0) then
                    call lsm_restart(state)  ! jlm - i moved all the restart code to a subroutine.
                else
@@ -1514,21 +1522,20 @@ end subroutine land_driver_ini
 ! Advance the time
 !------------------------------------------------------------------------
 #ifndef WRF_HYDRO
-     call geth_newdate(newdate, olddate, nint(dtbl))
-     olddate = newdate
+     call geth_newdate(state%newdate, state%olddate, nint(state%dtbl))
+     state%olddate = state%newdate
 #endif
 
 ! update the timer
      call system_clock(count=clock_count_2, count_rate=clock_rate)
-     timing_sum = timing_sum + float(clock_count_2-clock_count_1)/float(clock_rate)
+     state%timing_sum = state%timing_sum + &
+          float(state%clock_count_2-state%clock_count_1)/float(state%clock_rate)
      write(*,'("    Timing: ",f6.2," Cumulative:  ", f10.2, "  SFLX: ", f6.2 )') &
-          float(clock_count_2-clock_count_1)/float(clock_rate), &
-          timing_sum, real(sflx_count_sum) / real(clock_rate)
-     clock_count_1 = clock_count_2
+          float(state%clock_count_2-state%clock_count_1)/float(state%clock_rate), &
+          state%timing_sum, real(state%sflx_count_sum) / real(state%clock_rate)
+     state%clock_count_1 = state%clock_count_2
 
-
-      ITIMESTEP = ITIMESTEP + 1
-
+     state%ITIMESTEP = state%ITIMESTEP + 1
 end subroutine land_driver_exe
 
 !!===============================================================================
@@ -1811,19 +1818,20 @@ subroutine lsm_restart(state)
   integer :: ncid
 
 #ifdef HYDRO_D
-  print*, 'Write restart at '//olddate(1:13)
+  print*, 'Write restart at '//state%olddate(1:13)
 #endif
 
-  call prepare_restart_file (trim(noah_lsm%outdir), version,   igrid,     llanduse,  &
-                             olddate,               startdate, ixfull,    jxfull,    &
-                             ixpar,                 jxpar,     xstartpar, ystartpar, &
-                             nsoil,                 nsnow,     dx,        dy,        &
-                             truelat1,              truelat2,  mapproj,   lat1,      &
-                             lon1,                  cen_lon,   iswater,   ivgtyp,    &
-                             glacinfo,              glact,     act_lev,   VIS_ICEALB)
+  call prepare_restart_file (trim(state%outdir), state%version, state%igrid, llanduse,  &
+       state%olddate, state%startdate, state%ixfull, state%jxfull,    &
+       state%ixpar, state%jxpar, state%xstartpar, state%ystartpar, &
+       state%nsoil, state%nsnow, state%dx, state%dy,        &
+       state%truelat1, state%truelat2, state%mapproj, state%lat1,      &
+       state%lon1, state%cen_lon, state%iswater, state%ivgtyp,    &
+       state%glacinfo, state%glact, state%act_lev,   VIS_ICEALB)
 
-
-   write(tmpStr, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(noah_lsm%outdir), olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13), igrid
+  write(tmpStr, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(state%outdir), &
+       state%olddate(1:4)//state%olddate(6:7)//state%olddate(9:10)//state%olddate(12:13), &
+       state%igrid
 
 
 #ifdef MPP_LAND
@@ -1835,49 +1843,49 @@ subroutine lsm_restart(state)
   end if
 #endif
 
-  call add_to_restart(ncid,TSLB      , "SOIL_T", layers="SOIL")
-  call add_to_restart(ncid,state%TSNOXY    , "SNOW_T", layers="SNOW")
-  call add_to_restart(ncid,SMOIS     , "SMC"   , layers="SOIL")
-  call add_to_restart(ncid,SH2O      , "SH2O"  , layers="SOIL")
-  call add_to_restart(ncid,state%ZSNSOXY   , "ZSNSO" , layers="SOSN")
-  call add_to_restart(ncid,state%SNICEXY   , "SNICE" , layers="SNOW")
-  call add_to_restart(ncid,state%SNLIQXY   , "SNLIQ" , layers="SNOW")
-  call add_to_restart(ncid,QSNOWXY   , "QSNOW" )
-  call add_to_restart(ncid,FWETXY    , "FWET"  )
-  call add_to_restart(ncid,SNEQVOXY  , "SNEQVO")
-  call add_to_restart(ncid,EAHXY     , "EAH"   )
-  call add_to_restart(ncid,TAHXY     , "TAH"   )
-  call add_to_restart(ncid,ALBOLDXY  , "ALBOLD")
-  call add_to_restart(ncid,CMXY      , "CM"    )
-  call add_to_restart(ncid,CHXY      , "CH"    )
-  call add_to_restart(ncid,ISNOWXY   , "ISNOW" )
-  call add_to_restart(ncid,CANLIQXY  , "CANLIQ")
-  call add_to_restart(ncid,CANICEXY  , "CANICE")
-  call add_to_restart(ncid,state%SNOW      , "SNEQV" )
-  call add_to_restart(ncid,state%SNOWH     , "SNOWH" )
-  call add_to_restart(ncid,TVXY      , "TV"    )
-  call add_to_restart(ncid,TGXY      , "TG"    )
-  call add_to_restart(ncid,ZWTXY     , "ZWT"   )
-  call add_to_restart(ncid,WAXY      , "WA"    )
-  call add_to_restart(ncid,WTXY      , "WT"    )
-  call add_to_restart(ncid,WSLAKEXY  , "WSLAKE")
-  call add_to_restart(ncid,LFMASSXY  , "LFMASS")
-  call add_to_restart(ncid,RTMASSXY  , "RTMASS")
-  call add_to_restart(ncid,STMASSXY  , "STMASS")
-  call add_to_restart(ncid,WOODXY    , "WOOD"  )
-  call add_to_restart(ncid,STBLCPXY  , "STBLCP")
-  call add_to_restart(ncid,FASTCPXY  , "FASTCP")
-  call add_to_restart(ncid,LAI       , "LAI"   )
-  call add_to_restart(ncid,XSAIXY    , "SAI"   )
-  call add_to_restart(ncid,VEGFRA    , "VEGFRA")
-  call add_to_restart(ncid,GVFMIN    , "GVFMIN")
-  call add_to_restart(ncid,GVFMAX    , "GVFMAX")
-  call add_to_restart(ncid,ACSNOM    , "ACMELT")
-  call add_to_restart(ncid,ACSNOW    , "ACSNOW")
-  call add_to_restart(ncid,TAUSSXY   , "TAUSS" )
-  call add_to_restart(ncid,QSFC      , "QSFC"  )
-  call add_to_restart(ncid,SFCRUNOFF , "SFCRUNOFF")
-  call add_to_restart(ncid,UDRUNOFF  , "UDRUNOFF" )
+  call add_to_restart(ncid, state%TSLB      , "SOIL_T", layers="SOIL")
+  call add_to_restart(ncid, state%TSNOXY    , "SNOW_T", layers="SNOW")
+  call add_to_restart(ncid, state%SMOIS     , "SMC"   , layers="SOIL")
+  call add_to_restart(ncid, state%SH2O      , "SH2O"  , layers="SOIL")
+  call add_to_restart(ncid, state%ZSNSOXY   , "ZSNSO" , layers="SOSN")
+  call add_to_restart(ncid, state%SNICEXY   , "SNICE" , layers="SNOW")
+  call add_to_restart(ncid, state%SNLIQXY   , "SNLIQ" , layers="SNOW")
+  call add_to_restart(ncid, state%QSNOWXY   , "QSNOW" )
+  call add_to_restart(ncid, state%FWETXY    , "FWET"  )
+  call add_to_restart(ncid, state%SNEQVOXY  , "SNEQVO")
+  call add_to_restart(ncid, state%EAHXY     , "EAH"   )
+  call add_to_restart(ncid, state%TAHXY     , "TAH"   )
+  call add_to_restart(ncid, state%ALBOLDXY  , "ALBOLD")
+  call add_to_restart(ncid, state%CMXY      , "CM"    )
+  call add_to_restart(ncid, state%CHXY      , "CH"    )
+  call add_to_restart(ncid, state%ISNOWXY   , "ISNOW" )
+  call add_to_restart(ncid, state%CANLIQXY  , "CANLIQ")
+  call add_to_restart(ncid, state%CANICEXY  , "CANICE")
+  call add_to_restart(ncid, state%SNOW      , "SNEQV" )
+  call add_to_restart(ncid, state%SNOWH     , "SNOWH" )
+  call add_to_restart(ncid, state%TVXY      , "TV"    )
+  call add_to_restart(ncid, state%TGXY      , "TG"    )
+  call add_to_restart(ncid, state%ZWTXY     , "ZWT"   )
+  call add_to_restart(ncid, state%WAXY      , "WA"    )
+  call add_to_restart(ncid, state%WTXY      , "WT"    )
+  call add_to_restart(ncid, state%WSLAKEXY  , "WSLAKE")
+  call add_to_restart(ncid, state%LFMASSXY  , "LFMASS")
+  call add_to_restart(ncid, state%RTMASSXY  , "RTMASS")
+  call add_to_restart(ncid, state%STMASSXY  , "STMASS")
+  call add_to_restart(ncid, state%WOODXY    , "WOOD"  )
+  call add_to_restart(ncid, state%STBLCPXY  , "STBLCP")
+  call add_to_restart(ncid, state%FASTCPXY  , "FASTCP")
+  call add_to_restart(ncid, state%LAI       , "LAI"   )
+  call add_to_restart(ncid, state%XSAIXY    , "SAI"   )
+  call add_to_restart(ncid, state%VEGFRA    , "VEGFRA")
+  call add_to_restart(ncid, state%GVFMIN    , "GVFMIN")
+  call add_to_restart(ncid, state%GVFMAX    , "GVFMAX")
+  call add_to_restart(ncid, state%ACSNOM    , "ACMELT")
+  call add_to_restart(ncid, state%ACSNOW    , "ACSNOW")
+  call add_to_restart(ncid, state%TAUSSXY   , "TAUSS" )
+  call add_to_restart(ncid, state%QSFC      , "QSFC"  )
+  call add_to_restart(ncid, state%SFCRUNOFF , "SFCRUNOFF")
+  call add_to_restart(ncid, state%UDRUNOFF  , "UDRUNOFF" )
   if (crocus_opt /= 0) then
      call add_to_restart(ncid, PSNOWAGEXY    , "PSNOWAGE"  , LAYERS="MAXS")
      call add_to_restart(ncid, PSNOWDZXY     , "PSNOWDZ"   , LAYERS="MAXS")
@@ -1903,21 +1911,21 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,ACCETRAN  , "ACCETRAN" )
 #endif
 ! below for opt_run = 5
-  call add_to_restart(ncid,SMOISEQ   , "SMOISEQ"  , layers="SOIL"  )
-  call add_to_restart(ncid,AREAXY    , "AREAXY"     )
-  call add_to_restart(ncid,SMCWTDXY  , "SMCWTDXY"   )
-  call add_to_restart(ncid,DEEPRECHXY, "DEEPRECHXY" )
-  call add_to_restart(ncid,QSLATXY   , "QSLATXY"    )
-  call add_to_restart(ncid,QRFSXY    , "QRFSXY"     )
-  call add_to_restart(ncid,QSPRINGSXY, "QSPRINGSXY" )
-  call add_to_restart(ncid,RECHXY    , "RECHXY"     )
-  call add_to_restart(ncid,QRFXY     , "QRFXY"      )
-  call add_to_restart(ncid,QSPRINGXY , "QSPRINGXY"  )
-  call add_to_restart(ncid,FDEPTHXY , "FDEPTHXY"  )
-  call add_to_restart(ncid,RIVERCONDXY , "RIVERCONDXY"  )
-  call add_to_restart(ncid,RIVERBEDXY , "RIVERBEDXY"  )
-  call add_to_restart(ncid,EQZWT , "EQZWT"  )
-  call add_to_restart(ncid,PEXPXY , "PEXPXY"  )
+  call add_to_restart(ncid, state%SMOISEQ   , "SMOISEQ"  , layers="SOIL"  )
+  call add_to_restart(ncid, state%AREAXY    , "AREAXY"     )
+  call add_to_restart(ncid, state%SMCWTDXY  , "SMCWTDXY"   )
+  call add_to_restart(ncid, state%DEEPRECHXY, "DEEPRECHXY" )
+  call add_to_restart(ncid, state%QSLATXY   , "QSLATXY"    )
+  call add_to_restart(ncid, state%QRFSXY    , "QRFSXY"     )
+  call add_to_restart(ncid, state%QSPRINGSXY, "QSPRINGSXY" )
+  call add_to_restart(ncid, state%RECHXY    , "RECHXY"     )
+  call add_to_restart(ncid, state%QRFXY     , "QRFXY"      )
+  call add_to_restart(ncid, state%QSPRINGXY , "QSPRINGXY"  )
+  call add_to_restart(ncid, state%FDEPTHXY  , "FDEPTHXY"   )
+  call add_to_restart(ncid, state%RIVERCONDXY, "RIVERCONDXY")
+  call add_to_restart(ncid, state%RIVERBEDXY , "RIVERBEDXY" )
+  call add_to_restart(ncid, state%EQZWT     , "EQZWT"      )
+  call add_to_restart(ncid, state%PEXPXY    , "PEXPXY"     )
 
 #ifdef MPP_LAND
   if(my_id .eq. io_id) then
@@ -1937,10 +1945,8 @@ subroutine lsm_rst_bi_out(state)
   character(len=256) :: output_flnm, str_tmp
   integer  :: i0,ie, i, istep, mkdirStatus
 
-
 #ifdef MPP_LAND
   call mpp_land_sync()
-
 
  i0 = 0
  istep = 64
@@ -1949,8 +1955,9 @@ subroutine lsm_rst_bi_out(state)
    if(my_id .ge. i0 .and. my_id .lt. ie) then
 #endif
 
-  write(output_flnm, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(noah_lsm%outdir), olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13),igrid
-  iunit =56
+      write(output_flnm, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(state%outdir), &
+           state%olddate(1:4)//state%olddate(6:7)//state%olddate(9:10)//state%olddate(12:13),state%igrid
+  iunit = 56
 
 #ifdef MPP_LAND
              if(my_id .lt. 10) then
@@ -1971,49 +1978,49 @@ subroutine lsm_rst_bi_out(state)
   open(iunit,file="restart/"//trim(output_flnm),form="unformatted",ERR=102, access="sequential")
 #endif
 
-  write(iunit,ERR=101) TSLB
+  write(iunit,ERR=101) state%TSLB
   write(iunit,ERR=101) state%TSNOXY
-  write(iunit,ERR=101) SMOIS
-  write(iunit,ERR=101) SH2O
+  write(iunit,ERR=101) state%SMOIS
+  write(iunit,ERR=101) state%SH2O
   write(iunit,ERR=101) state%ZSNSOXY
   write(iunit,ERR=101) state%SNICEXY
   write(iunit,ERR=101) state%SNLIQXY
-  write(iunit,ERR=101) QSNOWXY
-  write(iunit,ERR=101) FWETXY
-  write(iunit,ERR=101) SNEQVOXY
-  write(iunit,ERR=101) EAHXY
-  write(iunit,ERR=101) TAHXY
-  write(iunit,ERR=101) ALBOLDXY
-  write(iunit,ERR=101) CMXY
-  write(iunit,ERR=101) CHXY
-  write(iunit,ERR=101) ISNOWXY
-  write(iunit,ERR=101) CANLIQXY
-  write(iunit,ERR=101) CANICEXY
+  write(iunit,ERR=101) state%QSNOWXY
+  write(iunit,ERR=101) state%FWETXY
+  write(iunit,ERR=101) state%SNEQVOXY
+  write(iunit,ERR=101) state%EAHXY
+  write(iunit,ERR=101) state%TAHXY
+  write(iunit,ERR=101) state%ALBOLDXY
+  write(iunit,ERR=101) state%CMXY
+  write(iunit,ERR=101) state%CHXY
+  write(iunit,ERR=101) state%ISNOWXY
+  write(iunit,ERR=101) state%CANLIQXY
+  write(iunit,ERR=101) state%CANICEXY
   write(iunit,ERR=101) state%SNOW
   write(iunit,ERR=101) state%SNOWH
-  write(iunit,ERR=101) TVXY
-  write(iunit,ERR=101) TGXY
-  write(iunit,ERR=101) ZWTXY
-  write(iunit,ERR=101) WAXY
-  write(iunit,ERR=101) WTXY
-  write(iunit,ERR=101) WSLAKEXY
-  write(iunit,ERR=101) LFMASSXY
-  write(iunit,ERR=101) RTMASSXY
-  write(iunit,ERR=101) STMASSXY
-  write(iunit,ERR=101) WOODXY
-  write(iunit,ERR=101) STBLCPXY
-  write(iunit,ERR=101) FASTCPXY
-  write(iunit,ERR=101) LAI
-  write(iunit,ERR=101) XSAIXY
-  write(iunit,ERR=101) VEGFRA
-  write(iunit,ERR=101) GVFMIN
-  write(iunit,ERR=101) GVFMAX
-  write(iunit,ERR=101) ACSNOM
-  write(iunit,ERR=101) ACSNOW
-  write(iunit,ERR=101) TAUSSXY
-  write(iunit,ERR=101) QSFC
-  write(iunit,ERR=101) SFCRUNOFF
-  write(iunit,ERR=101) UDRUNOFF
+  write(iunit,ERR=101) state%TVXY
+  write(iunit,ERR=101) state%TGXY
+  write(iunit,ERR=101) state%ZWTXY
+  write(iunit,ERR=101) state%WAXY
+  write(iunit,ERR=101) state%WTXY
+  write(iunit,ERR=101) state%WSLAKEXY
+  write(iunit,ERR=101) state%LFMASSXY
+  write(iunit,ERR=101) state%RTMASSXY
+  write(iunit,ERR=101) state%STMASSXY
+  write(iunit,ERR=101) state%WOODXY
+  write(iunit,ERR=101) state%STBLCPXY
+  write(iunit,ERR=101) state%FASTCPXY
+  write(iunit,ERR=101) state%LAI
+  write(iunit,ERR=101) state%XSAIXY
+  write(iunit,ERR=101) state%VEGFRA
+  write(iunit,ERR=101) state%GVFMIN
+  write(iunit,ERR=101) state%GVFMAX
+  write(iunit,ERR=101) state%ACSNOM
+  write(iunit,ERR=101) state%ACSNOW
+  write(iunit,ERR=101) state%TAUSSXY
+  write(iunit,ERR=101) state%QSFC
+  write(iunit,ERR=101) state%SFCRUNOFF
+  write(iunit,ERR=101) state%UDRUNOFF
   if (crocus_opt /= 0) then
      write(iunit,ERR=101) PSNOWAGEXY
      write(iunit,ERR=101) PSNOWDZXY
@@ -2119,49 +2126,49 @@ subroutine lsm_rst_bi_in(state)
 #endif
 
 
-  read(iunit,ERR=101) TSLB
+  read(iunit,ERR=101) state%TSLB
   read(iunit,ERR=101) state%TSNOXY
-  read(iunit,ERR=101) SMOIS
-  read(iunit,ERR=101) SH2O
+  read(iunit,ERR=101) state%SMOIS
+  read(iunit,ERR=101) state%SH2O
   read(iunit,ERR=101) state%ZSNSOXY
   read(iunit,ERR=101) state%SNICEXY
   read(iunit,ERR=101) state%SNLIQXY
-  read(iunit,ERR=101) QSNOWXY
-  read(iunit,ERR=101) FWETXY
-  read(iunit,ERR=101) SNEQVOXY
-  read(iunit,ERR=101) EAHXY
-  read(iunit,ERR=101) TAHXY
-  read(iunit,ERR=101) ALBOLDXY
-  read(iunit,ERR=101) CMXY
-  read(iunit,ERR=101) CHXY
-  read(iunit,ERR=101) ISNOWXY
-  read(iunit,ERR=101) CANLIQXY
-  read(iunit,ERR=101) CANICEXY
+  read(iunit,ERR=101) state%QSNOWXY
+  read(iunit,ERR=101) state%FWETXY
+  read(iunit,ERR=101) state%SNEQVOXY
+  read(iunit,ERR=101) state%EAHXY
+  read(iunit,ERR=101) state%TAHXY
+  read(iunit,ERR=101) state%ALBOLDXY
+  read(iunit,ERR=101) state%CMXY
+  read(iunit,ERR=101) state%CHXY
+  read(iunit,ERR=101) state%ISNOWXY
+  read(iunit,ERR=101) state%CANLIQXY
+  read(iunit,ERR=101) state%CANICEXY
   read(iunit,ERR=101) state%SNOW
   read(iunit,ERR=101) state%SNOWH
-  read(iunit,ERR=101) TVXY
-  read(iunit,ERR=101) TGXY
-  read(iunit,ERR=101) ZWTXY
-  read(iunit,ERR=101) WAXY
-  read(iunit,ERR=101) WTXY
-  read(iunit,ERR=101) WSLAKEXY
-  read(iunit,ERR=101) LFMASSXY
-  read(iunit,ERR=101) RTMASSXY
-  read(iunit,ERR=101) STMASSXY
-  read(iunit,ERR=101) WOODXY
-  read(iunit,ERR=101) STBLCPXY
-  read(iunit,ERR=101) FASTCPXY
-  read(iunit,ERR=101) LAI
-  read(iunit,ERR=101) XSAIXY
-  read(iunit,ERR=101) VEGFRA
-  read(iunit,ERR=101) GVFMIN
-  read(iunit,ERR=101) GVFMAX
-  read(iunit,ERR=101) ACSNOM
-  read(iunit,ERR=101) ACSNOW
-  read(iunit,ERR=101) TAUSSXY
-  read(iunit,ERR=101) QSFC
-  read(iunit,ERR=101) SFCRUNOFF
-  read(iunit,ERR=101) UDRUNOFF
+  read(iunit,ERR=101) state%TVXY
+  read(iunit,ERR=101) state%TGXY
+  read(iunit,ERR=101) state%ZWTXY
+  read(iunit,ERR=101) state%WAXY
+  read(iunit,ERR=101) state%WTXY
+  read(iunit,ERR=101) state%WSLAKEXY
+  read(iunit,ERR=101) state%LFMASSXY
+  read(iunit,ERR=101) state%RTMASSXY
+  read(iunit,ERR=101) state%STMASSXY
+  read(iunit,ERR=101) state%WOODXY
+  read(iunit,ERR=101) state%STBLCPXY
+  read(iunit,ERR=101) state%FASTCPXY
+  read(iunit,ERR=101) state%LAI
+  read(iunit,ERR=101) state%XSAIXY
+  read(iunit,ERR=101) state%VEGFRA
+  read(iunit,ERR=101) state%GVFMIN
+  read(iunit,ERR=101) state%GVFMAX
+  read(iunit,ERR=101) state%ACSNOM
+  read(iunit,ERR=101) state%ACSNOW
+  read(iunit,ERR=101) state%TAUSSXY
+  read(iunit,ERR=101) state%QSFC
+  read(iunit,ERR=101) state%SFCRUNOFF
+  read(iunit,ERR=101) state%UDRUNOFF
   if (crocus_opt /= 0) then
      read(iunit,ERR=101) PSNOWAGEXY
      read(iunit,ERR=101) PSNOWDZXY
@@ -2223,7 +2230,7 @@ subroutine lsm_rst_bi_in(state)
 101  continue
 #ifdef MPP_LAND
   call fatal_error_stop("FATAL ERROR: failed to read in lsm restartfile "   &
-          //trim(noah_lsm%restart_filename_requested)//"."//trim(str_tmp))
+          //trim(state%restart_filename_requested)//"."//trim(str_tmp))
 #else
   stop "FATAL ERROR: failed to read lsm restart file"
 #endif
@@ -2244,49 +2251,49 @@ subroutine define_rst_variables(ncid, state)
        "Problem nf90_redef")
 ! add the variables
 
-  call define_rst_var(ncid,TSLB      , "SOIL_T", layers="SOIL")
-  call define_rst_var(ncid,state%TSNOXY    , "SNOW_T", layers="SNOW")
-  call define_rst_var(ncid,SMOIS     , "SMC"   , layers="SOIL")
-  call define_rst_var(ncid,SH2O      , "SH2O"  , layers="SOIL")
-  call define_rst_var(ncid,state%ZSNSOXY   , "ZSNSO" , layers="SOSN")
-  call define_rst_var(ncid,state%SNICEXY   , "SNICE" , layers="SNOW")
-  call define_rst_var(ncid,state%SNLIQXY   , "SNLIQ" , layers="SNOW")
-  call define_rst_var(ncid,QSNOWXY   , "QSNOW" )
-  call define_rst_var(ncid,FWETXY    , "FWET"  )
-  call define_rst_var(ncid,SNEQVOXY  , "SNEQVO")
-  call define_rst_var(ncid,EAHXY     , "EAH"   )
-  call define_rst_var(ncid,TAHXY     , "TAH"   )
-  call define_rst_var(ncid,ALBOLDXY  , "ALBOLD")
-  call define_rst_var(ncid,CMXY      , "CM"    )
-  call define_rst_var(ncid,CHXY      , "CH"    )
-  call define_rst_var(ncid,ISNOWXY   , "ISNOW" )
-  call define_rst_var(ncid,CANLIQXY  , "CANLIQ")
-  call define_rst_var(ncid,CANICEXY  , "CANICE")
-  call define_rst_var(ncid,state%SNOW      , "SNEQV" )
-  call define_rst_var(ncid,state%SNOWH     , "SNOWH" )
-  call define_rst_var(ncid,TVXY      , "TV"    )
-  call define_rst_var(ncid,TGXY      , "TG"    )
-  call define_rst_var(ncid,ZWTXY     , "ZWT"   )
-  call define_rst_var(ncid,WAXY      , "WA"    )
-  call define_rst_var(ncid,WTXY      , "WT"    )
-  call define_rst_var(ncid,WSLAKEXY  , "WSLAKE")
-  call define_rst_var(ncid,LFMASSXY  , "LFMASS")
-  call define_rst_var(ncid,RTMASSXY  , "RTMASS")
-  call define_rst_var(ncid,STMASSXY  , "STMASS")
-  call define_rst_var(ncid,WOODXY    , "WOOD"  )
-  call define_rst_var(ncid,STBLCPXY  , "STBLCP")
-  call define_rst_var(ncid,FASTCPXY  , "FASTCP")
-  call define_rst_var(ncid,LAI       , "LAI"   )
-  call define_rst_var(ncid,XSAIXY    , "SAI"   )
-  call define_rst_var(ncid,VEGFRA    , "VEGFRA")
-  call define_rst_var(ncid,GVFMIN    , "GVFMIN")
-  call define_rst_var(ncid,GVFMAX    , "GVFMAX")
-  call define_rst_var(ncid,ACSNOM    , "ACMELT")
-  call define_rst_var(ncid,ACSNOW    , "ACSNOW")
-  call define_rst_var(ncid,TAUSSXY   , "TAUSS" )
-  call define_rst_var(ncid,QSFC      , "QSFC"  )
-  call define_rst_var(ncid,SFCRUNOFF , "SFCRUNOFF")
-  call define_rst_var(ncid,UDRUNOFF  , "UDRUNOFF" )
+  call define_rst_var(ncid, state%TSLB      , "SOIL_T", layers="SOIL")
+  call define_rst_var(ncid, state%TSNOXY    , "SNOW_T", layers="SNOW")
+  call define_rst_var(ncid, state%SMOIS     , "SMC"   , layers="SOIL")
+  call define_rst_var(ncid, state%SH2O      , "SH2O"  , layers="SOIL")
+  call define_rst_var(ncid, state%ZSNSOXY   , "ZSNSO" , layers="SOSN")
+  call define_rst_var(ncid, state%SNICEXY   , "SNICE" , layers="SNOW")
+  call define_rst_var(ncid, state%SNLIQXY   , "SNLIQ" , layers="SNOW")
+  call define_rst_var(ncid, state%QSNOWXY   , "QSNOW" )
+  call define_rst_var(ncid, state%FWETXY    , "FWET"  )
+  call define_rst_var(ncid, state%SNEQVOXY  , "SNEQVO")
+  call define_rst_var(ncid, state%EAHXY     , "EAH"   )
+  call define_rst_var(ncid, state%TAHXY     , "TAH"   )
+  call define_rst_var(ncid, state%ALBOLDXY  , "ALBOLD")
+  call define_rst_var(ncid, state%CMXY      , "CM"    )
+  call define_rst_var(ncid, state%CHXY      , "CH"    )
+  call define_rst_var(ncid, state%ISNOWXY   , "ISNOW" )
+  call define_rst_var(ncid, state%CANLIQXY  , "CANLIQ")
+  call define_rst_var(ncid, state%CANICEXY  , "CANICE")
+  call define_rst_var(ncid, state%SNOW      , "SNEQV" )
+  call define_rst_var(ncid, state%SNOWH     , "SNOWH" )
+  call define_rst_var(ncid, state%TVXY      , "TV"    )
+  call define_rst_var(ncid, state%TGXY      , "TG"    )
+  call define_rst_var(ncid, state%ZWTXY     , "ZWT"   )
+  call define_rst_var(ncid, state%WAXY      , "WA"    )
+  call define_rst_var(ncid, state%WTXY      , "WT"    )
+  call define_rst_var(ncid, state%WSLAKEXY  , "WSLAKE")
+  call define_rst_var(ncid, state%LFMASSXY  , "LFMASS")
+  call define_rst_var(ncid, state%RTMASSXY  , "RTMASS")
+  call define_rst_var(ncid, state%STMASSXY  , "STMASS")
+  call define_rst_var(ncid, state%WOODXY    , "WOOD"  )
+  call define_rst_var(ncid, state%STBLCPXY  , "STBLCP")
+  call define_rst_var(ncid, state%FASTCPXY  , "FASTCP")
+  call define_rst_var(ncid, state%LAI       , "LAI"   )
+  call define_rst_var(ncid, state%XSAIXY    , "SAI"   )
+  call define_rst_var(ncid, state%VEGFRA    , "VEGFRA")
+  call define_rst_var(ncid, state%GVFMIN    , "GVFMIN")
+  call define_rst_var(ncid, state%GVFMAX    , "GVFMAX")
+  call define_rst_var(ncid, state%ACSNOM    , "ACMELT")
+  call define_rst_var(ncid, state%ACSNOW    , "ACSNOW")
+  call define_rst_var(ncid, state%TAUSSXY   , "TAUSS" )
+  call define_rst_var(ncid, state%QSFC      , "QSFC"  )
+  call define_rst_var(ncid, state%SFCRUNOFF , "SFCRUNOFF")
+  call define_rst_var(ncid, state%UDRUNOFF  , "UDRUNOFF" )
   if (crocus_opt /= 0) then
      call define_rst_var(ncid,PSNOWAGEXY    , "PSNOWAGE"  , layers="MAXS")
      call define_rst_var(ncid,PSNOWDZXY     , "PSNOWDZ"   , layers="MAXS")
@@ -2312,21 +2319,21 @@ subroutine define_rst_variables(ncid, state)
   call define_rst_var(ncid,ACCETRAN  , "ACCETRAN" )
 #endif
 ! below for opt_run = 5
-  call define_rst_var(ncid,SMOISEQ   , "SMOISEQ"  , layers="SOIL"  )
-  call define_rst_var(ncid,AREAXY    , "AREAXY"     )
-  call define_rst_var(ncid,SMCWTDXY  , "SMCWTDXY"   )
-  call define_rst_var(ncid,DEEPRECHXY, "DEEPRECHXY" )
-  call define_rst_var(ncid,QSLATXY   , "QSLATXY"    )
-  call define_rst_var(ncid,QRFSXY    , "QRFSXY"     )
-  call define_rst_var(ncid,QSPRINGSXY, "QSPRINGSXY" )
-  call define_rst_var(ncid,RECHXY    , "RECHXY"     )
-  call define_rst_var(ncid,QRFXY     , "QRFXY"      )
-  call define_rst_var(ncid,QSPRINGXY , "QSPRINGXY"  )
-  call define_rst_var(ncid,FDEPTHXY , "FDEPTHXY"  )
-  call define_rst_var(ncid,RIVERCONDXY , "RIVERCONDXY"  )
-  call define_rst_var(ncid,RIVERBEDXY , "RIVERBEDXY"  )
-  call define_rst_var(ncid,EQZWT , "EQZWT"  )
-  call define_rst_var(ncid,PEXPXY , "PEXPXY"  )
+  call define_rst_var(ncid, state%SMOISEQ   , "SMOISEQ"  , layers="SOIL"  )
+  call define_rst_var(ncid, state%AREAXY    , "AREAXY"     )
+  call define_rst_var(ncid, state%SMCWTDXY  , "SMCWTDXY"   )
+  call define_rst_var(ncid, state%DEEPRECHXY, "DEEPRECHXY" )
+  call define_rst_var(ncid, state%QSLATXY   , "QSLATXY"    )
+  call define_rst_var(ncid, state%QRFSXY    , "QRFSXY"     )
+  call define_rst_var(ncid, state%QSPRINGSXY, "QSPRINGSXY" )
+  call define_rst_var(ncid, state%RECHXY    , "RECHXY"     )
+  call define_rst_var(ncid, state%QRFXY     , "QRFXY"      )
+  call define_rst_var(ncid, state%QSPRINGXY , "QSPRINGXY"  )
+  call define_rst_var(ncid, state%FDEPTHXY , "FDEPTHXY"  )
+  call define_rst_var(ncid, state%RIVERCONDXY , "RIVERCONDXY"  )
+  call define_rst_var(ncid, state%RIVERBEDXY , "RIVERBEDXY"  )
+  call define_rst_var(ncid, state%EQZWT , "EQZWT"  )
+  call define_rst_var(ncid, state%PEXPXY , "PEXPXY"  )
       ierr = nf90_enddef(ncid)
       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_2d_float() - "// &
                              "Problem nf90_enddef")
