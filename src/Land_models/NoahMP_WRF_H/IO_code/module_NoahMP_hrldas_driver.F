@@ -83,7 +83,6 @@ module module_NoahMP_hrldas_driver
   ! artless note xlat_urb2d is xlat in noahmpr
   INTEGER                                 ::  ITIMESTEP ! timestep number
   INTEGER                                 ::  YR        ! 4-digit year
-  REAL                                    ::  JULIAN_IN ! Julian day
   REAL                                    ::  DTBL      ! timestep [s]
   INTEGER                                 ::  NSOIL     ! number of soil layers
   INTEGER                                 ::  NUM_SOIL_LAYERS     ! number of soil layers
@@ -350,8 +349,8 @@ module module_NoahMP_hrldas_driver
         write(*, '("WARNING: In land_driver_ini() - Check Namelist: KHOUR and KDAY both defined.")')
         stop
      end if
-     NTIME = khour*3600./nint(dtbl)
-     NTIME_out = NTIME
+     state%NTIME = khour*3600./nint(dtbl)
+     NTIME_out = state%NTIME
       ! artless how to handle nlst
      if(.not. RT_DOMAIN(did)%initialized) then
         nlst(did)%dt = real(noah_lsm%noah_timestep)
@@ -365,7 +364,7 @@ module module_NoahMP_hrldas_driver
         allocate(nlst(did)%zsoil8(nlst(did)%nsoil))
         nlst(did)%zsoil8(1:nlst(did)%nsoil) = zsoil(1:nlst(did)%nsoil) ! artless double check zsoil
         ! is allocated??
-        call HYDRO_ini(ntime,did,ix0=1,jx0=1)
+        call HYDRO_ini(state%ntime,did,ix0=1,jx0=1)
         RT_DOMAIN(did)%initialized = .true.
      end if ! if .not. RT_DOMAIN(did)%initialized
 
@@ -525,12 +524,12 @@ module module_NoahMP_hrldas_driver
          noah_lsm%xstart, noah_lsm%xend, noah_lsm%ystart, noah_lsm%yend, &
          iswater, islake, isurban, isice, llanduse, dx, dy, truelat1, truelat2, cen_lon, lat1, lon1, &
          igrid, mapproj)
-  write(hgrid,'(I1)') igrid
+  write(state%hgrid,'(I1)') igrid
 
-  write(olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
+  write(state%olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
        noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, noah_lsm%start_hour, noah_lsm%start_min, 0
 
-  startdate = olddate
+  state%startdate = state%olddate
 
 #ifdef MPP_LAND
   ix = ix_tmp
@@ -538,7 +537,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
 #ifdef WRF_HYDRO
-  forcdate = olddate
+  forcdate = state%olddate
 #endif
 
   ! Convenience variables
@@ -741,11 +740,11 @@ module module_NoahMP_hrldas_driver
      !PSNOWAGEXY     = undefined_real
 
 ! These should probably be kept initialized with an undefined value (above)
-! to allow tracking of cells that fall through the cracks in value updates 
+! to allow tracking of cells that fall through the cracks in value updates
 ! (also worth noting that 0 is not a valid value for all of these variables).
-! However, since restarts are not currently water-masking 2d reals, this makes 
+! However, since restarts are not currently water-masking 2d reals, this makes
 ! for odd value ranges in the LSM restarts so leaving as 0s for now.
-! On quick tests, the only one of these that changes answers if NOT initialized 
+! On quick tests, the only one of these that changes answers if NOT initialized
 ! at 0 is PSNOWHISTXY so making sure that one is covered in value initialization
 ! loop below in case we go back to undefined_real for these.
      PSNOWLIQXY     = 0.
@@ -813,8 +812,8 @@ module module_NoahMP_hrldas_driver
 ! This option is not tested for parallel use in the offline driver
 !------------------------------------------------------------------------
 
-  if (state%runoff_option == 5) then
-     call READ_MMF_RUNOFF(state%MMF_RUNOFF_FILE, state%XSTART, state%XEND, state%YSTART, &
+  if (noah_lsm%runoff_option == 5) then
+     call READ_MMF_RUNOFF(noah_lsm%MMF_RUNOFF_FILE, state%XSTART, state%XEND, state%YSTART, &
           state%YEND, state%ZWTXY, state%EQZWT, state%RIVERBEDXY, &
           state%RIVERCONDXY, state%PEXPXY, state%FDEPTHXY)
   end if
@@ -828,12 +827,12 @@ module module_NoahMP_hrldas_driver
 
   state%ITIMESTEP = 1
 
-  xstart = NoahmpIO%xstart
-  xend   = NoahmpIO%xend
-  ystart = NoahmpIO%ystart
-  yend   = NoahmpIO%yend
-  ixfull = NoahmpIO%ixfull
-  jxfull = NoahmpIO%jxfull
+  xstart = State%xstart
+  xend   = State%xend
+  ystart = State%ystart
+  yend   = State%yend
+  ixfull = State%ixfull
+  jxfull = State%jxfull
 
 
   if (state%restart_filename_requested /= " ") then
@@ -863,47 +862,47 @@ module module_NoahMP_hrldas_driver
 
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SOIL_T"  , state%TSLB     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOW_T"  , state%TSNOXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC"     , SMOIS    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O"    , SH2O     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC"     , state%SMOIS    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O"    , state%SH2O     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ZSNSO"   , state%ZSNSOXY  )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNICE"   , state%SNICEXY  )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNLIQ"   , state%SNLIQXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSNOW"   , QSNOWXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FWET"    , FWETXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQVO"  , SNEQVOXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EAH"     , EAHXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAH"     , TAHXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ALBOLD"  , ALBOLDXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CM"      , CMXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CH"      , CHXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ISNOW"   , ISNOWXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANLIQ"  , CANLIQXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANICE"  , CANICEXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSNOW"   , state%QSNOWXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FWET"    , state%FWETXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQVO"  , state%SNEQVOXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EAH"     , state%EAHXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAH"     , state%TAHXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ALBOLD"  , state%ALBOLDXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CM"      , state%CMXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CH"      , state%CHXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ISNOW"   , state%ISNOWXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANLIQ"  , state%CANLIQXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANICE"  , state%CANICEXY )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQV"   , state%SNOW     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOWH"   , state%SNOWH    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TV"      , TVXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TG"      , TGXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ZWT"     , ZWTXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WA"      , WAXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WT"      , WTXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WSLAKE"  , WSLAKEXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LFMASS"  , LFMASSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RTMASS"  , RTMASSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STMASS"  , STMASSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WOOD"    , WOODXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STBLCP"  , STBLCPXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FASTCP"  , FASTCPXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAI"     , LAI      )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SAI"     , XSAIXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "VEGFRA"  , VEGFRA   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMIN"  , GVFMIN   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMAX"  , GVFMAX   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACMELT"  , ACSNOM   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACSNOW"  , ACSNOW   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAUSS"   , TAUSSXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSFC"    , QSFC     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",SFCRUNOFF   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,UDRUNOFF    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TV"      , state%TVXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TG"      , state%TGXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ZWT"     , state%ZWTXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WA"      , state%WAXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WT"      , state%WTXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WSLAKE"  , state%WSLAKEXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LFMASS"  , state%LFMASSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RTMASS"  , state%RTMASSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STMASS"  , state%STMASSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WOOD"    , state%WOODXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STBLCP"  , state%STBLCPXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FASTCP"  , state%FASTCPXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAI"     , state%LAI      )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SAI"     , state%XSAIXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "VEGFRA"  , state%VEGFRA   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMIN"  , state%GVFMIN   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMAX"  , state%GVFMAX   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACMELT"  , state%ACSNOM   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACSNOW"  , state%ACSNOW   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAUSS"   , state%TAUSSXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSFC"    , state%QSFC     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",state%SFCRUNOFF   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,state%UDRUNOFF    )
      if (crocus_opt /= 0) then
         call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWAGE",     PSNOWAGEXY    )
         call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWDZ",      PSNOWDZXY     )
@@ -946,7 +945,7 @@ module module_NoahMP_hrldas_driver
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PEXPXY"     ,state%PEXPXY     )
   else  !  rst_bi_in
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,OLDDATE(1:19))  ! artless, not in noahmpr
+     call mpp_land_bcast_char(19,state%olddate(1:19))  ! artless, not in noahmpr
 #endif
      ITIMESTEP = 2
      call lsm_rst_bi_in(state)
@@ -1079,7 +1078,7 @@ module module_NoahMP_hrldas_driver
      !                 fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
      !                 )
 
-      TAUSSXY = 0.0   ! Need to be added to _INIT later
+      state%TAUSSXY = 0.0   ! Need to be added to _INIT later
 
   end if  ! end of restart if block
 
@@ -1092,7 +1091,7 @@ module module_NoahMP_hrldas_driver
   ! assinging the KHOUR to be used in the NWM output routing for global metadata
   nlst(did)%khour = khour
 
-  call system_clock(count=clock_count_1)   ! Start a timer
+  call system_clock(count=state%clock_count_1)   ! Start a timer
 
   if (crocus_opt /= 0) &
      PSNOWTHRUFALXY(:,:) = 0.
@@ -1130,10 +1129,10 @@ if (io_config_outputs .gt. 0) then
      ACCECAN = 0.0
      ACCEDIR = 0.0
      ACCETRAN = 0.0
-     SFCRUNOFF = 0.0
-     UDRUNOFF = 0.0
-     ACSNOM = 0.0
-     ACSNOW = 0.0
+     state%SFCRUNOFF = 0.0
+     state%UDRUNOFF = 0.0
+     state%ACSNOM = 0.0
+     state%ACSNOW = 0.0
 end if
 #endif
 
@@ -1243,7 +1242,7 @@ end subroutine land_driver_ini
 !---------------------------------------------------------------------------------
 
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,OLDDATE(1:19))
+     call mpp_land_bcast_char(19,state%OLDDATE(1:19))
 #endif
 
 #ifdef WRF_HYDRO
@@ -1263,7 +1262,7 @@ end subroutine land_driver_ini
                state%infxsrt, state%sfcheadrt, state%soldrain, state%ix, &
                state%jx, state%NSOIL)
           call geth_newdate(state%newdate, state%olddate, nint(dtbl))
-          olddate = newdate
+          state%olddate = state%newdate
           return
       end if
       if(state%forc_typ .eq. 9 .or. state%forc_typ .eq. 10) then
@@ -1275,13 +1274,13 @@ end subroutine land_driver_ini
          !! JLM:  Simple modification which forces type, rank and kind checking...
           call getNameList('igrid', igrid_hydro)  !! get hydro namelist info :: case sensitive
           write(hgrid_hydro,'(I1)') igrid_hydro
-          call read_channel_only(olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
+          call read_channel_only(state%olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
           call hrldas_drv_HYDRO(state%TSLB(:,1:state%NSOIL,:),&
                state%SMOIS(:,1:state%NSOIL,:),state%SH2O(:,1:state%NSOIL,:), &
                state%infxsrt, state%sfcheadrt, state%soldrain, state%ix, &
                state%jx, state%NSOIL)
-          call geth_newdate(newdate, olddate, nint(dtbl))
-          olddate = newdate
+          call geth_newdate(state%newdate, state%olddate, nint(state%dtbl))
+          state%olddate = state%newdate
           return
       end if
 #endif
@@ -1290,11 +1289,11 @@ end subroutine land_driver_ini
 ! separate file.  So we can open a new one right now.
 
      state%inflnm = trim(noah_lsm%indir)//"/"//&
-          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
-          ".LDASIN_DOMAIN"//hgrid
+          state%olddate(1:4)//state%olddate(6:7)//state%olddate(9:10)//state%olddate(12:13)//&
+          ".LDASIN_DOMAIN"//state%hgrid
 
      ! Build a filename template
-     state%inflnm_template = trim(noah_lsm%indir)//"/<date>.LDASIN_DOMAIN"//hgrid
+     state%inflnm_template = trim(noah_lsm%indir)//"/<date>.LDASIN_DOMAIN"//state%hgrid
 
 
 #ifdef WRF_HYDRO
@@ -1370,12 +1369,12 @@ end subroutine land_driver_ini
 ! Noah-MP updates we can do before spatial loop.
 !------------------------------------------------------------------------
 
-   ! create a few fields that are IN in WRF - coszen, julian_in,yr
+   ! create a few fields that are IN in WRF - coszen, julian,yr
 
     do J = state%YSTART, state%YEND
     do I = state%XSTART, state%XEND
        call CALC_DECLIN(state%OLDDATE(1:19), state%XLAT(I,J), state%XLONG(I,J), state%COSZEN(I,J), &
-            state%JULIAN_IN) ! ARTLESS JULIAN_IN IS JULIAN in noahmpr
+            state%JULIAN)
     end do
     end do
 
@@ -1408,7 +1407,7 @@ end subroutine land_driver_ini
 !------------------------------------------------------------------------
 ! Call to Noah-MP driver same as surface_driver
 !------------------------------------------------------------------------
-      sflx_count_sum = 0 ! Timing
+      state%sflx_count_sum = 0 ! Timing
 
       ! Timing information for SFLX:
 
@@ -1479,7 +1478,7 @@ end subroutine land_driver_ini
      OUTPUT_FOR_HISTORY: if (state%output_timestep > 0) then
         if (mod(ITIME * state%noah_timestep, state%output_timestep) == 0) then
            ! convert RAINRATE back to mm/s for output
-           RAINBL = RAINBL_tmp
+           state%RAINBL = state%RAINBL_tmp
            call ldas_output(ITIME,state)
         end if
      end if OUTPUT_FOR_HISTORY
@@ -1527,7 +1526,7 @@ end subroutine land_driver_ini
 #endif
 
 ! update the timer
-     call system_clock(count=clock_count_2, count_rate=clock_rate)
+     call system_clock(count=state%clock_count_2, count_rate=state%clock_rate)
      state%timing_sum = state%timing_sum + &
           float(state%clock_count_2-state%clock_count_1)/float(state%clock_rate)
      write(*,'("    Timing: ",f6.2," Cumulative:  ", f10.2, "  SFLX: ", f6.2 )') &
@@ -1781,25 +1780,42 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNIXY,IVGTYP,97)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QRAINXY,IVGTYP,98)
    if (crocus_opt /= 0) then
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(GLACINFO),IVGTYP,99)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(GLACT),IVGTYP,100)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWALBXY,IVGTYP,101)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWTHRUFALXY,IVGTYP,102)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWHEIGHTXY,IVGTYP,103)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWTOTSWEXY,IVGTYP,104)
-
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN1XY,IVGTYP,105)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN2XY,IVGTYP,106)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWAGEXY,IVGTYP,107)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWTEMPXY,IVGTYP,108)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWDZXY,IVGTYP,109)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHISTXY,IVGTYP,110)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,(PSNOWLIQXY),IVGTYP,111)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHEATXY,IVGTYP,112)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWRHOXY ,IVGTYP,113)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWSWEXY,IVGTYP,114)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,float(GLACINFO),state%IVGTYP,99)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,(GLACT),state%IVGTYP,100)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWALBXY,state%IVGTYP,101)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWTHRUFALXY,state%IVGTYP,102)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWHEIGHTXY,state%IVGTYP,103)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWTOTSWEXY,state%IVGTYP,104)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN1XY,state%IVGTYP,105)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN2XY,state%IVGTYP,106)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWAGEXY,state%IVGTYP,107)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWTEMPXY,state%IVGTYP,108)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWDZXY,state%IVGTYP,109)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHISTXY,state%IVGTYP,110)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,(PSNOWLIQXY),state%IVGTYP,111)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHEATXY,state%IVGTYP,112)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWRHOXY ,state%IVGTYP,113)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWSWEXY,state%IVGTYP,114)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,FLOW_ICE,state%IVGTYP,115)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,FLOW_SNOW,state%IVGTYP,116)
    end if ! crocus_opt /= 0
 #endif /* WRF_HYDRO */
 
@@ -1821,13 +1837,13 @@ subroutine lsm_restart(state)
   print*, 'Write restart at '//state%olddate(1:13)
 #endif
 
-  call prepare_restart_file (trim(state%outdir), state%version, state%igrid, llanduse,  &
+  call prepare_restart_file (trim(state%outdir), version, state%igrid, llanduse,  &
        state%olddate, state%startdate, state%ixfull, state%jxfull,    &
        state%ixpar, state%jxpar, state%xstartpar, state%ystartpar, &
        state%nsoil, state%nsnow, state%dx, state%dy,        &
        state%truelat1, state%truelat2, state%mapproj, state%lat1,      &
        state%lon1, state%cen_lon, state%iswater, state%ivgtyp,    &
-       state%glacinfo, state%glact, state%act_lev,   VIS_ICEALB)
+       glacinfo, glact, act_lev,   VIS_ICEALB)
 
   write(tmpStr, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(state%outdir), &
        state%olddate(1:4)//state%olddate(6:7)//state%olddate(9:10)//state%olddate(12:13), &
