@@ -83,7 +83,6 @@ module module_NoahMP_hrldas_driver
   ! artless note xlat_urb2d is xlat in noahmpr
   INTEGER                                 ::  ITIMESTEP ! timestep number
   INTEGER                                 ::  YR        ! 4-digit year
-  REAL                                    ::  JULIAN_IN ! Julian day
   REAL                                    ::  DTBL      ! timestep [s]
   INTEGER                                 ::  NSOIL     ! number of soil layers
   INTEGER                                 ::  NUM_SOIL_LAYERS     ! number of soil layers
@@ -350,8 +349,8 @@ module module_NoahMP_hrldas_driver
         write(*, '("WARNING: In land_driver_ini() - Check Namelist: KHOUR and KDAY both defined.")')
         stop
      end if
-     NTIME = khour*3600./nint(dtbl)
-     NTIME_out = NTIME
+     state%NTIME = khour*3600./nint(dtbl)
+     NTIME_out = state%NTIME
       ! artless how to handle nlst
      if(.not. RT_DOMAIN(did)%initialized) then
         nlst(did)%dt = real(noah_lsm%noah_timestep)
@@ -365,7 +364,7 @@ module module_NoahMP_hrldas_driver
         allocate(nlst(did)%zsoil8(nlst(did)%nsoil))
         nlst(did)%zsoil8(1:nlst(did)%nsoil) = zsoil(1:nlst(did)%nsoil) ! artless double check zsoil
         ! is allocated??
-        call HYDRO_ini(ntime,did,ix0=1,jx0=1)
+        call HYDRO_ini(state%ntime,did,ix0=1,jx0=1)
         RT_DOMAIN(did)%initialized = .true.
      end if ! if .not. RT_DOMAIN(did)%initialized
 
@@ -525,12 +524,12 @@ module module_NoahMP_hrldas_driver
          noah_lsm%xstart, noah_lsm%xend, noah_lsm%ystart, noah_lsm%yend, &
          iswater, islake, isurban, isice, llanduse, dx, dy, truelat1, truelat2, cen_lon, lat1, lon1, &
          igrid, mapproj)
-  write(hgrid,'(I1)') igrid
+  write(state%hgrid,'(I1)') igrid
 
-  write(olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
+  write(state%olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
        noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, noah_lsm%start_hour, noah_lsm%start_min, 0
 
-  startdate = olddate
+  state%startdate = state%olddate
 
 #ifdef MPP_LAND
   ix = ix_tmp
@@ -538,7 +537,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
 #ifdef WRF_HYDRO
-  forcdate = olddate
+  forcdate = state%olddate
 #endif
 
   ! Convenience variables
@@ -804,8 +803,8 @@ module module_NoahMP_hrldas_driver
 ! This option is not tested for parallel use in the offline driver
 !------------------------------------------------------------------------
 
-  if (state%runoff_option == 5) then
-     call READ_MMF_RUNOFF(state%MMF_RUNOFF_FILE, state%XSTART, state%XEND, state%YSTART, &
+  if (noah_lsm%runoff_option == 5) then
+     call READ_MMF_RUNOFF(noah_lsm%MMF_RUNOFF_FILE, state%XSTART, state%XEND, state%YSTART, &
           state%YEND, state%ZWTXY, state%EQZWT, state%RIVERBEDXY, &
           state%RIVERCONDXY, state%PEXPXY, state%FDEPTHXY)
   end if
@@ -819,12 +818,12 @@ module module_NoahMP_hrldas_driver
 
   state%ITIMESTEP = 1
 
-  xstart = NoahmpIO%xstart
-  xend   = NoahmpIO%xend
-  ystart = NoahmpIO%ystart
-  yend   = NoahmpIO%yend
-  ixfull = NoahmpIO%ixfull
-  jxfull = NoahmpIO%jxfull
+  xstart = State%xstart
+  xend   = State%xend
+  ystart = State%ystart
+  yend   = State%yend
+  ixfull = State%ixfull
+  jxfull = State%jxfull
 
 
   if (state%restart_filename_requested /= " ") then
@@ -854,47 +853,47 @@ module module_NoahMP_hrldas_driver
 
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SOIL_T"  , state%TSLB     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOW_T"  , state%TSNOXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC"     , SMOIS    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O"    , SH2O     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC"     , state%SMOIS    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O"    , state%SH2O     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ZSNSO"   , state%ZSNSOXY  )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNICE"   , state%SNICEXY  )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNLIQ"   , state%SNLIQXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSNOW"   , QSNOWXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FWET"    , FWETXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQVO"  , SNEQVOXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EAH"     , EAHXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAH"     , TAHXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ALBOLD"  , ALBOLDXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CM"      , CMXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CH"      , CHXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ISNOW"   , ISNOWXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANLIQ"  , CANLIQXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANICE"  , CANICEXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSNOW"   , state%QSNOWXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FWET"    , state%FWETXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQVO"  , state%SNEQVOXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EAH"     , state%EAHXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAH"     , state%TAHXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ALBOLD"  , state%ALBOLDXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CM"      , state%CMXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CH"      , state%CHXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ISNOW"   , state%ISNOWXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANLIQ"  , state%CANLIQXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANICE"  , state%CANICEXY )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQV"   , state%SNOW     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOWH"   , state%SNOWH    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TV"      , TVXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TG"      , TGXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ZWT"     , ZWTXY    )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WA"      , WAXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WT"      , WTXY     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WSLAKE"  , WSLAKEXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LFMASS"  , LFMASSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RTMASS"  , RTMASSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STMASS"  , STMASSXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WOOD"    , WOODXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STBLCP"  , STBLCPXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FASTCP"  , FASTCPXY )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAI"     , LAI      )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SAI"     , XSAIXY   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "VEGFRA"  , VEGFRA   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMIN"  , GVFMIN   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMAX"  , GVFMAX   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACMELT"  , ACSNOM   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACSNOW"  , ACSNOW   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAUSS"   , TAUSSXY  )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSFC"    , QSFC     )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",SFCRUNOFF   )
-     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,UDRUNOFF    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TV"      , state%TVXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TG"      , state%TGXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ZWT"     , state%ZWTXY    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WA"      , state%WAXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WT"      , state%WTXY     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WSLAKE"  , state%WSLAKEXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LFMASS"  , state%LFMASSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RTMASS"  , state%RTMASSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STMASS"  , state%STMASSXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WOOD"    , state%WOODXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "STBLCP"  , state%STBLCPXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FASTCP"  , state%FASTCPXY )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAI"     , state%LAI      )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SAI"     , state%XSAIXY   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "VEGFRA"  , state%VEGFRA   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMIN"  , state%GVFMIN   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "GVFMAX"  , state%GVFMAX   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACMELT"  , state%ACSNOM   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACSNOW"  , state%ACSNOW   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "TAUSS"   , state%TAUSSXY  )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSFC"    , state%QSFC     )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",state%SFCRUNOFF   )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,state%UDRUNOFF    )
      if (crocus_opt /= 0) then
         call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWAGE",     PSNOWAGEXY    )
         call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PSNOWDZ",      PSNOWDZXY     )
@@ -937,7 +936,7 @@ module module_NoahMP_hrldas_driver
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PEXPXY"     ,state%PEXPXY     )
   else  !  rst_bi_in
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,OLDDATE(1:19))  ! artless, not in noahmpr
+     call mpp_land_bcast_char(19,state%olddate(1:19))  ! artless, not in noahmpr
 #endif
      ITIMESTEP = 2
      call lsm_rst_bi_in(state)
@@ -1070,7 +1069,7 @@ module module_NoahMP_hrldas_driver
      !                 fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
      !                 )
 
-      TAUSSXY = 0.0   ! Need to be added to _INIT later
+      state%TAUSSXY = 0.0   ! Need to be added to _INIT later
 
   end if  ! end of restart if block
 
@@ -1083,7 +1082,7 @@ module module_NoahMP_hrldas_driver
   ! assinging the KHOUR to be used in the NWM output routing for global metadata
   nlst(did)%khour = khour
 
-  call system_clock(count=clock_count_1)   ! Start a timer
+  call system_clock(count=state%clock_count_1)   ! Start a timer
 
   if (crocus_opt /= 0) &
      PSNOWTHRUFALXY(:,:) = 0.
@@ -1121,10 +1120,10 @@ if (io_config_outputs .gt. 0) then
      ACCECAN = 0.0
      ACCEDIR = 0.0
      ACCETRAN = 0.0
-     SFCRUNOFF = 0.0
-     UDRUNOFF = 0.0
-     ACSNOM = 0.0
-     ACSNOW = 0.0
+     state%SFCRUNOFF = 0.0
+     state%UDRUNOFF = 0.0
+     state%ACSNOM = 0.0
+     state%ACSNOW = 0.0
 end if
 #endif
 
@@ -1234,7 +1233,7 @@ end subroutine land_driver_ini
 !---------------------------------------------------------------------------------
 
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,OLDDATE(1:19))
+     call mpp_land_bcast_char(19,state%OLDDATE(1:19))
 #endif
 
 #ifdef WRF_HYDRO
@@ -1254,7 +1253,7 @@ end subroutine land_driver_ini
                state%infxsrt, state%sfcheadrt, state%soldrain, state%ix, &
                state%jx, state%NSOIL)
           call geth_newdate(state%newdate, state%olddate, nint(dtbl))
-          olddate = newdate
+          state%olddate = state%newdate
           return
       end if
       if(state%forc_typ .eq. 9 .or. state%forc_typ .eq. 10) then
@@ -1266,13 +1265,13 @@ end subroutine land_driver_ini
          !! JLM:  Simple modification which forces type, rank and kind checking...
           call getNameList('igrid', igrid_hydro)  !! get hydro namelist info :: case sensitive
           write(hgrid_hydro,'(I1)') igrid_hydro
-          call read_channel_only(olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
+          call read_channel_only(state%olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
           call hrldas_drv_HYDRO(state%TSLB(:,1:state%NSOIL,:),&
                state%SMOIS(:,1:state%NSOIL,:),state%SH2O(:,1:state%NSOIL,:), &
                state%infxsrt, state%sfcheadrt, state%soldrain, state%ix, &
                state%jx, state%NSOIL)
-          call geth_newdate(newdate, olddate, nint(dtbl))
-          olddate = newdate
+          call geth_newdate(state%newdate, state%olddate, nint(state%dtbl))
+          state%olddate = state%newdate
           return
       end if
 #endif
@@ -1281,11 +1280,11 @@ end subroutine land_driver_ini
 ! separate file.  So we can open a new one right now.
 
      state%inflnm = trim(noah_lsm%indir)//"/"//&
-          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
-          ".LDASIN_DOMAIN"//hgrid
+          state%olddate(1:4)//state%olddate(6:7)//state%olddate(9:10)//state%olddate(12:13)//&
+          ".LDASIN_DOMAIN"//state%hgrid
 
      ! Build a filename template
-     state%inflnm_template = trim(noah_lsm%indir)//"/<date>.LDASIN_DOMAIN"//hgrid
+     state%inflnm_template = trim(noah_lsm%indir)//"/<date>.LDASIN_DOMAIN"//state%hgrid
 
 
 #ifdef WRF_HYDRO
@@ -1361,12 +1360,12 @@ end subroutine land_driver_ini
 ! Noah-MP updates we can do before spatial loop.
 !------------------------------------------------------------------------
 
-   ! create a few fields that are IN in WRF - coszen, julian_in,yr
+   ! create a few fields that are IN in WRF - coszen, julian,yr
 
     do J = state%YSTART, state%YEND
     do I = state%XSTART, state%XEND
        call CALC_DECLIN(state%OLDDATE(1:19), state%XLAT(I,J), state%XLONG(I,J), state%COSZEN(I,J), &
-            state%JULIAN_IN) ! ARTLESS JULIAN_IN IS JULIAN in noahmpr
+            state%JULIAN)
     end do
     end do
 
@@ -1399,7 +1398,7 @@ end subroutine land_driver_ini
 !------------------------------------------------------------------------
 ! Call to Noah-MP driver same as surface_driver
 !------------------------------------------------------------------------
-      sflx_count_sum = 0 ! Timing
+      state%sflx_count_sum = 0 ! Timing
 
       ! Timing information for SFLX:
 
@@ -1470,7 +1469,7 @@ end subroutine land_driver_ini
      OUTPUT_FOR_HISTORY: if (state%output_timestep > 0) then
         if (mod(ITIME * state%noah_timestep, state%output_timestep) == 0) then
            ! convert RAINRATE back to mm/s for output
-           RAINBL = RAINBL_tmp
+           state%RAINBL = state%RAINBL_tmp
            call ldas_output(ITIME,state)
         end if
      end if OUTPUT_FOR_HISTORY
@@ -1518,7 +1517,7 @@ end subroutine land_driver_ini
 #endif
 
 ! update the timer
-     call system_clock(count=clock_count_2, count_rate=clock_rate)
+     call system_clock(count=state%clock_count_2, count_rate=state%clock_rate)
      state%timing_sum = state%timing_sum + &
           float(state%clock_count_2-state%clock_count_1)/float(state%clock_rate)
      write(*,'("    Timing: ",f6.2," Cumulative:  ", f10.2, "  SFLX: ", f6.2 )') &
@@ -1672,125 +1671,240 @@ subroutine  ldas_output(itime, state)
    ! Go through each variable. For the first time the NWM output routine is
    ! called, the file is created and all output variables (desired per flags),
    ! are created in define mode.
-
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,ITIME,startdate,olddate,ixpar,jxpar,1,float(IVGTYP),IVGTYP,1)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(ISLTYP),IVGTYP,2)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FVEGXY,IVGTYP,3)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAI,IVGTYP,4)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,XSAIXY,IVGTYP,5)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SWDOWN,IVGTYP,6)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,COSZEN,IVGTYP,7)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,GLW,IVGTYP,8)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,RAINBL,IVGTYP,9)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EMISS,IVGTYP,10)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FSAXY,IVGTYP,11)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FIRAXY,IVGTYP,12)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,GRDFLX,IVGTYP,13)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,HFX,IVGTYP,14)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LH,IVGTYP,15)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ECANXY,IVGTYP,16)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EDIRXY,IVGTYP,17)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ALBEDO,IVGTYP,18)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ETRANXY,IVGTYP,19)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,UDRUNOFF,IVGTYP,20)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SFCRUNOFF,IVGTYP,21)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANLIQXY,IVGTYP,22)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANICEXY,IVGTYP,23)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ZWTXY,IVGTYP,24)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WAXY,IVGTYP,25)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WTXY,IVGTYP,26)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACCPRCP,IVGTYP,27)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACCECAN,IVGTYP,28)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACCEDIR,IVGTYP,29)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACCETRAN,IVGTYP,30)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SAVXY,IVGTYP,31)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TRXY,IVGTYP,32)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EVCXY,IVGTYP,33)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,IRCXY,IVGTYP,34)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SHCXY,IVGTYP,35)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,IRGXY,IVGTYP,36)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SHGXY,IVGTYP,37)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EVGXY,IVGTYP,38)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,GHVXY,IVGTYP,39)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SAGXY,IVGTYP,40)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,IRBXY,IVGTYP,41)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SHBXY,IVGTYP,42)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EVBXY,IVGTYP,43)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,GHBXY,IVGTYP,44)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TRADXY,IVGTYP,45)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TGXY,IVGTYP,46)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TVXY,IVGTYP,47)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TAHXY,IVGTYP,48)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TGVXY,IVGTYP,49)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,TGBXY,IVGTYP,50)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,T2MVXY,IVGTYP,51)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,T2MBXY,IVGTYP,52)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,Q2MVXY,IVGTYP,53)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,Q2MBXY,IVGTYP,54)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EAHXY,IVGTYP,55)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FWETXY,IVGTYP,56)
-   !call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(ZSNOXY(:,-nsnow+1:0,:)),IVGTYP,57)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%SNICEXY,IVGTYP,58)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%SNLIQXY,IVGTYP,59)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,TSLB,IVGTYP,60)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SH2O,IVGTYP,61)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%TSNOXY,IVGTYP,62)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SMOIS,IVGTYP,63)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,state%SNOWH,IVGTYP,64)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,state%SNOW,IVGTYP,65)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY,IVGTYP,66)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(ISNOWXY),IVGTYP,67)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWC,IVGTYP,68)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW,IVGTYP,69)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM,IVGTYP,70)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CMXY,IVGTYP,71)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHXY,IVGTYP,72)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHVXY,IVGTYP,73)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHBXY,IVGTYP,74)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHLEAFXY,IVGTYP,75)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHUCXY,IVGTYP,76)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHV2XY,IVGTYP,77)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CHB2XY,IVGTYP,78)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LFMASSXY,IVGTYP,79)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,RTMASSXY,IVGTYP,80)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,STMASSXY,IVGTYP,81)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WOODXY,IVGTYP,82)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,STBLCPXY,IVGTYP,83)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FASTCPXY,IVGTYP,84)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,NEEXY,IVGTYP,85)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,GPPXY,IVGTYP,86)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,NPPXY,IVGTYP,87)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNXY,IVGTYP,88)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,APARXY,IVGTYP,89)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(ACCECAN+ACCEDIR+ACCETRAN),IVGTYP,90)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(CANLIQXY+CANICEXY),IVGTYP,91)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(SOILICE),IVGTYP,92)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(SOILSAT_TOP),IVGTYP,93)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(SOILSAT),IVGTYP,94)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(SNOWT_AVG),IVGTYP,95)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNDXY,IVGTYP,96)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNIXY,IVGTYP,97)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QRAINXY,IVGTYP,98)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,ITIME, &
+       state%startdate,state%olddate,ixpar,jxpar,1,float(state%IVGTYP),state%IVGTYP,1)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,float(state%ISLTYP),state%IVGTYP,2)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%FVEGXY,state%IVGTYP,3)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%LAI,state%IVGTYP,4)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%XSAIXY,state%IVGTYP,5)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SWDOWN,state%IVGTYP,6)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%COSZEN,state%IVGTYP,7)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%GLW,state%IVGTYP,8)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%RAINBL,state%IVGTYP,9)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%EMISS,state%IVGTYP,10)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%FSAXY,state%IVGTYP,11)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%FIRAXY,state%IVGTYP,12)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%GRDFLX,state%IVGTYP,13)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%HFX,state%IVGTYP,14)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%LH,state%IVGTYP,15)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%ECANXY,state%IVGTYP,16)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%EDIRXY,state%IVGTYP,17)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%ALBEDO,state%IVGTYP,18)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%ETRANXY,state%IVGTYP,19)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%UDRUNOFF,state%IVGTYP,20)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SFCRUNOFF,state%IVGTYP,21)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CANLIQXY,state%IVGTYP,22)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CANICEXY,state%IVGTYP,23)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%ZWTXY,state%IVGTYP,24)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%WAXY,state%IVGTYP,25)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%WTXY,state%IVGTYP,26)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,ACCPRCP,state%IVGTYP,27)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,ACCECAN,state%IVGTYP,28)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,ACCEDIR,state%IVGTYP,29)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,ACCETRAN,state%IVGTYP,30)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SAVXY,state%IVGTYP,31)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TRXY,state%IVGTYP,32)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%EVCXY,state%IVGTYP,33)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%IRCXY,state%IVGTYP,34)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SHCXY,state%IVGTYP,35)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%IRGXY,state%IVGTYP,36)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SHGXY,state%IVGTYP,37)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%EVGXY,state%IVGTYP,38)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%GHVXY,state%IVGTYP,39)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SAGXY,state%IVGTYP,40)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%IRBXY,state%IVGTYP,41)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SHBXY,state%IVGTYP,42)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%EVBXY,state%IVGTYP,43)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%GHBXY,state%IVGTYP,44)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TRADXY,state%IVGTYP,45)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TGXY,state%IVGTYP,46)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TVXY,state%IVGTYP,47)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TAHXY,state%IVGTYP,48)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TGVXY,state%IVGTYP,49)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%TGBXY,state%IVGTYP,50)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%T2MVXY,state%IVGTYP,51)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%T2MBXY,state%IVGTYP,52)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%Q2MVXY,state%IVGTYP,53)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%Q2MBXY,state%IVGTYP,54)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%EAHXY,state%IVGTYP,55)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%FWETXY,state%IVGTYP,56)
+  ! call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+  !      state%startdate,state%olddate,ixpar,jxpar,1, &
+  !      float(state%ZSNOXY(:,-nsnow+1:0,:)),state%IVGTYP,57)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,3,state%SNICEXY,state%IVGTYP,58)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,3,state%SNLIQXY,state%IVGTYP,59)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,4,state%TSLB,state%IVGTYP,60)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,4,state%SH2O,state%IVGTYP,61)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,3,state%TSNOXY,state%IVGTYP,62)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,4,state%SMOIS,state%IVGTYP,63)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SNOWH,state%IVGTYP,64)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SNOW,state%IVGTYP,65)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%QSNOWXY,state%IVGTYP,66)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,float(state%ISNOWXY),state%IVGTYP,67)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%SNOWC,state%IVGTYP,68)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%ACSNOW,state%IVGTYP,69)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%ACSNOM,state%IVGTYP,70)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CMXY,state%IVGTYP,71)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHXY,state%IVGTYP,72)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHVXY,state%IVGTYP,73)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHBXY,state%IVGTYP,74)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHLEAFXY,state%IVGTYP,75)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHUCXY,state%IVGTYP,76)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHV2XY,state%IVGTYP,77)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%CHB2XY,state%IVGTYP,78)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%LFMASSXY,state%IVGTYP,79)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%RTMASSXY,state%IVGTYP,80)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%STMASSXY,state%IVGTYP,81)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%WOODXY,state%IVGTYP,82)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%STBLCPXY,state%IVGTYP,83)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%FASTCPXY,state%IVGTYP,84)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%NEEXY,state%IVGTYP,85)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%GPPXY,state%IVGTYP,86)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%NPPXY,state%IVGTYP,87)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%PSNXY,state%IVGTYP,88)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%APARXY,state%IVGTYP,89)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,(ACCECAN+ACCEDIR+ACCETRAN),state%IVGTYP,90)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,(state%CANLIQXY+state%CANICEXY),state%IVGTYP,91)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,(SOILICE),state%IVGTYP,92)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,(SOILSAT_TOP),state%IVGTYP,93)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,(SOILSAT),state%IVGTYP,94)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,(SNOWT_AVG),state%IVGTYP,95)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,2,ALBSNDXY,state%IVGTYP,96)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,2,ALBSNIXY,state%IVGTYP,97)
+  call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+       state%startdate,state%olddate,ixpar,jxpar,1,state%QRAINXY,state%IVGTYP,98)
    if (crocus_opt /= 0) then
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(GLACINFO),IVGTYP,99)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(GLACT),IVGTYP,100)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWALBXY,IVGTYP,101)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWTHRUFALXY,IVGTYP,102)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWHEIGHTXY,IVGTYP,103)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,PSNOWTOTSWEXY,IVGTYP,104)
-
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN1XY,IVGTYP,105)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN2XY,IVGTYP,106)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWAGEXY,IVGTYP,107)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWTEMPXY,IVGTYP,108)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWDZXY,IVGTYP,109)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHISTXY,IVGTYP,110)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,(PSNOWLIQXY),IVGTYP,111)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHEATXY,IVGTYP,112)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWRHOXY ,IVGTYP,113)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWSWEXY,IVGTYP,114)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,float(GLACINFO),state%IVGTYP,99)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,(GLACT),state%IVGTYP,100)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWALBXY,state%IVGTYP,101)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWTHRUFALXY,state%IVGTYP,102)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWHEIGHTXY,state%IVGTYP,103)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,PSNOWTOTSWEXY,state%IVGTYP,104)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN1XY,state%IVGTYP,105)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWGRAN2XY,state%IVGTYP,106)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWAGEXY,state%IVGTYP,107)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWTEMPXY,state%IVGTYP,108)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWDZXY,state%IVGTYP,109)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHISTXY,state%IVGTYP,110)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,(PSNOWLIQXY),state%IVGTYP,111)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWHEATXY,state%IVGTYP,112)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWRHOXY ,state%IVGTYP,113)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWSWEXY,state%IVGTYP,114)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,FLOW_ICE,state%IVGTYP,115)
+      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime, &
+           state%startdate,state%olddate,ixpar,jxpar,1,FLOW_SNOW,state%IVGTYP,116)
    end if ! crocus_opt /= 0
 #endif /* WRF_HYDRO */
 
@@ -1812,13 +1926,13 @@ subroutine lsm_restart(state)
   print*, 'Write restart at '//state%olddate(1:13)
 #endif
 
-  call prepare_restart_file (trim(state%outdir), state%version, state%igrid, llanduse,  &
+  call prepare_restart_file (trim(state%outdir), version, state%igrid, llanduse,  &
        state%olddate, state%startdate, state%ixfull, state%jxfull,    &
        state%ixpar, state%jxpar, state%xstartpar, state%ystartpar, &
        state%nsoil, state%nsnow, state%dx, state%dy,        &
        state%truelat1, state%truelat2, state%mapproj, state%lat1,      &
        state%lon1, state%cen_lon, state%iswater, state%ivgtyp,    &
-       state%glacinfo, state%glact, state%act_lev,   VIS_ICEALB)
+       glacinfo, glact, act_lev,   VIS_ICEALB)
 
   write(tmpStr, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(state%outdir), &
        state%olddate(1:4)//state%olddate(6:7)//state%olddate(9:10)//state%olddate(12:13), &
