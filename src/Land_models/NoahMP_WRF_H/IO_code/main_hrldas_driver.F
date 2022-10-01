@@ -30,15 +30,12 @@ program noah_hrldas_driver
 #endif
 
   ! NEW MODULE WITH DT INCLUDING STATE, PARAMETER,FORCING AND GEOMETRY. Different modules
-  use state_module, only: state_type
-  use parameters
-  use forcing
-  use geometry
+  use NoahmpIOVarType, only: NoahmpIO_type
   use orchestrator_base
 
   implicit none
   integer :: ITIME, NTIME
-  type(state_type) :: state
+  type(NoahmpIO_type) :: state
 
   call orchestrator%init()
 
