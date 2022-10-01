@@ -22,6 +22,7 @@ module module_NoahMP_hrldas_driver
 
   use module_hrldas_netcdf_io ! artless add only
   use NoahmpIOVarType, only: NoahmpIO_type
+  USE NoahmpIOVarInitMod, only : NoahmpIOVarInitDefault ! ReadNoahmpTable, ReadNamelist,  artless, add these??
   use GroundWaterMmfMod, only: WTABLE_mmf_noahmp
   use NoahmpInitMainMod, only: NoahmpInitMain
   use NoahmpDriverMainMod, only: NoahmpDriverMain
