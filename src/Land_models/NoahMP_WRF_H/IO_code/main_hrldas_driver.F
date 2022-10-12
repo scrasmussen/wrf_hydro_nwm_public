@@ -15,11 +15,10 @@ program noah_hrldas_driver
 
   implicit none
   integer :: ITIME, NTIME
-  type(NoahmpIO_type) :: state
 
   call orchestrator%init()
 
-  call land_driver_ini(NTIME, state)
+  call land_driver_ini(NTIME)
 
 #ifdef WRF_HYDRO
   do ITIME = 1, NTIME
@@ -27,7 +26,7 @@ program noah_hrldas_driver
   do ITIME = 0, NTIME
 #endif
      ! DTs must be passed to the exe.
-     call land_driver_exe(ITIME, state)
+     call land_driver_exe(ITIME)
   end do
 #ifdef WRF_HYDRO
   !Pass state for destruction
