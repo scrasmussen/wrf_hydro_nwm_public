@@ -20,14 +20,14 @@
 
 module module_NoahMP_hrldas_driver
 
-  use module_hrldas_netcdf_io ! artless add only
+  use module_hrldas_netcdf_io ! =REFACTOR= add only
   use NoahmpIOVarType, only: NoahmpIO_type
-  USE NoahmpIOVarInitMod, only : NoahmpIOVarInitDefault ! ReadNoahmpTable, ReadNamelist,  artless, add these??
+  USE NoahmpIOVarInitMod, only : NoahmpIOVarInitDefault ! ReadNoahmpTable, ReadNamelist,  =REFACTOR=, add these??
   use GroundWaterMmfMod, only: WTABLE_mmf_noahmp
   use NoahmpInitMainMod, only: NoahmpInitMain
   use NoahmpDriverMainMod, only: NoahmpDriverMain
-  use module_date_utilities ! artless add only
-  use orchestrator_base ! artless add only
+  use module_date_utilities ! =REFACTOR= add only
+  use orchestrator_base ! =REFACTOR= add only
   use config_base, only: wrf_hydro, noah_lsm
   use modi_ini_csts, only: ini_csts
 #ifdef MPP_LAND
@@ -81,7 +81,7 @@ module module_NoahMP_hrldas_driver
 !------------------------------------------------------------------------
 
 ! IN only (as defined in WRF)
-  ! artless note xlat_urb2d is xlat in noahmpr
+  ! =REFACTOR= note xlat_urb2d is xlat in noahmpr
   INTEGER                                 ::  ITIMESTEP ! timestep number
   INTEGER                                 ::  YR        ! 4-digit year
   REAL                                    ::  DTBL      ! timestep [s]
@@ -122,7 +122,7 @@ module module_NoahMP_hrldas_driver
 
   CHARACTER(LEN = 256)                    ::  spatial_filename
 #ifdef SPATIAL_SOIL
-  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  slope_2D   ! Soil Drainage Parameter ! artless what
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  slope_2D   ! Soil Drainage Parameter ! =REFACTOR= what
   ! is this in noahmpr
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  cwpvt_2D   ! Canopy wind parameter
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  vcmx25_2D  ! VCmax at 25C
@@ -140,7 +140,7 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfsnow_2D    ! surface resistence for snow [s/m]
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  scamax_2D       ! maximum fractional snow covered area (0.0-1.0)
 #endif
-! ARTLESS WHY ARE THESE COMMENTED OUT??
+! =REFACTOR= WHY ARE THESE COMMENTED OUT??
 !  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOW      ! snow water equivalent [mm] ** (sometime) PROGNOSTIC VARIABLE
 !  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOWH     ! physical snow depth [m] ** (sometime) PROGNOSTIC VARIABLE
 
@@ -275,12 +275,12 @@ module module_NoahMP_hrldas_driver
   integer :: brkflag = 0
   integer :: varind = 1
 #endif
-  ! ARTLESS  remove these if they disappear
+  ! =REFACTOR=  remove these if they disappear
   integer :: xstart, xend, ystart, yend !convenience variables
-
+  type(NoahmpIO_type)                                    :: state
   contains
 
-  subroutine land_driver_ini(NTIME_out, state, wrfits,wrfite,wrfjts,wrfjte)
+  subroutine land_driver_ini(NTIME_out, wrfits,wrfite,wrfjts,wrfjte)
      use module_HYDRO_drv, only: HYDRO_ini
      use config_base, only: nlst
      use module_rt_data, only: rt_domain
@@ -290,7 +290,6 @@ module module_NoahMP_hrldas_driver
      integer, intent(out) :: NTIME_out
      integer, parameter :: did=1
      integer :: khour
-     type(NoahmpIO_type), intent(out) :: state
 
     ! initilization for stand alone parallel code.
     integer, optional, intent(in) :: wrfits,wrfite,wrfjts,wrfjte
@@ -301,7 +300,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
 #ifdef WRF_HYDRO
-    ! forc_typ = wrf_hydro%forc_typ ! artless
+    ! forc_typ = wrf_hydro%forc_typ ! =REFACTOR=
 #endif
 
   dtbl = real(noah_lsm%noah_timestep)
@@ -352,7 +351,7 @@ module module_NoahMP_hrldas_driver
      end if
      state%NTIME = khour*3600./nint(dtbl)
      NTIME_out = state%NTIME
-      ! artless how to handle nlst
+      ! =REFACTOR= how to handle nlst
      if(.not. RT_DOMAIN(did)%initialized) then
         nlst(did)%dt = real(noah_lsm%noah_timestep)
         nlst(did)%khour = khour ! Adding kHOUR to be used in the NWM output routines.
@@ -363,7 +362,7 @@ module module_NoahMP_hrldas_driver
         call mpp_land_bcast_int1(nlst(did)%nsoil)
 #endif
         allocate(nlst(did)%zsoil8(nlst(did)%nsoil))
-        nlst(did)%zsoil8(1:nlst(did)%nsoil) = zsoil(1:nlst(did)%nsoil) ! artless double check zsoil
+        nlst(did)%zsoil8(1:nlst(did)%nsoil) = zsoil(1:nlst(did)%nsoil) ! =REFACTOR= double check zsoil
         ! is allocated??
         call HYDRO_ini(state%ntime,did,ix0=1,jx0=1)
         RT_DOMAIN(did)%initialized = .true.
@@ -584,12 +583,12 @@ module module_NoahMP_hrldas_driver
 !  initialize NoahmpIOVarType data type and variables
 !---------------------------------------------------------------------
 
-  call NoahmpIOVarInitDefault(state) ! ARTLESS NEED TO FIND WERE noahmpiovarinitmod.f90:1603 occurs
+  call NoahmpIOVarInitDefault(state) ! =REFACTOR= NEED TO FIND WHERE noahmpiovarinitmod.f90:1603 occurs
 
 !   ------- from here, these need to be sorted, these are just in ours
   ! NAME CHANGEES
   ! ALLOCATE ( XLAT(XSTART:XEND,YSTART:YEND) )    ! latitude [rad]
-  ! ARTLESS CROCUS needs to be handled, added to state varible??
+  ! =REFACTOR= CROCUS needs to be handled, added to state varible??
   if (crocus_opt /= 0) then
      ALLOCATE (GLACINFO(XSTART:XEND,YSTART:YEND) )    ! loacation of glacier
      ALLOCATE (GLACT   (XSTART:XEND,YSTART:YEND) )    ! glacier thickness [m]
@@ -604,7 +603,7 @@ module module_NoahMP_hrldas_driver
   ! NoahmpIO%KLAT_FAC       NoahmpIO%TDSMC_FAC      NoahmpIO%TD_DC          NoahmpIO%TD_DCOEF
   ! NoahmpIO%TD_DDRAIN      NoahmpIO%TD_RADI        NoahmpIO%TD_SPAC
 
-#ifdef SPATIAL_SOIL  ! ARTLESS, this is happening either way!
+#ifdef SPATIAL_SOIL  ! =REFACTOR=, this is happening either way!
   ALLOCATE ( slope_2D   (XSTART:XEND,YSTART:YEND) )            ! Soil Drainage Parameter
   ALLOCATE ( cwpvt_2D   (XSTART:XEND,YSTART:YEND) )            ! Canopy wind parameter
   ALLOCATE ( vcmx25_2D  (XSTART:XEND,YSTART:YEND) )            ! VCmax at 25C
@@ -612,7 +611,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( hvt_2D     (XSTART:XEND,YSTART:YEND) )            ! Canopy Height
   ALLOCATE ( mfsno_2D   (XSTART:XEND,YSTART:YEND) )            ! Snow cover m parameter
   ALLOCATE ( rsurfexp_2D(XSTART:XEND,YSTART:YEND) )            ! exponent in the shape parameter for soil resistance option 1
-  ! ARTLESS, this is now not happening
+  ! =REFACTOR=, this is now not happening
   ALLOCATE ( imperv_2D  (XSTART:XEND,YSTART:YEND) )            ! impervious fraction
   ALLOCATE ( ssi_2D     (XSTART:XEND,YSTART:YEND) )            ! liquid water holding capacity for snowpack (m3/m3)
   ALLOCATE ( snowretfac_2D (XSTART:XEND,YSTART:YEND) )         ! snowpack water release timescale factor (1/s)
@@ -620,7 +619,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( rsurfsnow_2D (XSTART:XEND,YSTART:YEND) )          ! surface resistence for snow [s/m]
   ALLOCATE ( scamax_2D  (XSTART:XEND,YSTART:YEND) )            ! maximum fractional snow covered area (0.0-1.0)
 #endif
-  ! ARTLESS WHY ARE THESE NOT ALLOCATED HERE?? they are in nmpiovarinit
+  ! =REFACTOR= WHY ARE THESE NOT ALLOCATED HERE?? they are in nmpiovarinit
   !ALLOCATE ( TSNOXY    (XSTART:XEND,-NSNOW+1:0,    YSTART:YEND) )  ! snow temperature [K]
   !ALLOCATE ( ZSNSOXY   (XSTART:XEND,-NSNOW+1:NSOIL,YSTART:YEND) )  ! snow layer depth [m]
   !ALLOCATE ( SNICEXY   (XSTART:XEND,-NSNOW+1:0,    YSTART:YEND) )  ! snow layer ice [mm]
@@ -664,7 +663,7 @@ module module_NoahMP_hrldas_driver
      ALLOCATE ( PSNOWDZXY      (XSTART:XEND,1:act_lev,YSTART:YEND) )
      ALLOCATE ( PSNOWHISTXY    (XSTART:XEND,1:act_lev,YSTART:YEND) )
    end if ! crocus_opt /= 0
-   ! artless
+   ! =REFACTOR=
 #ifdef WRF_HYDRO
    ! noahmpr allocating qtiledrain and zwatble2d
    ALLOCATE ( ACCPRCP  (XSTART:XEND,YSTART:YEND) )  ! accumulated precip [mm]
@@ -689,6 +688,7 @@ module module_NoahMP_hrldas_driver
      GLACT      = undefined_real
      VIS_ICEALB = undefined_real
   end if
+  !SNOW       = undefined_real ! =REFACTOR= why are these undefined?
   !SNOWH      = undefined_real
   !TSNOXY     = undefined_real
   !SNICEXY    = undefined_real
@@ -785,7 +785,7 @@ module module_NoahMP_hrldas_driver
 ! For spatially-varying soil parameters, read in necessary extra fields
 !------------------------------------------------------------------------
 
-#ifdef SPATIAL_SOIL ! artless this could be an iopt_soil option like in noahmpr??
+#ifdef SPATIAL_SOIL ! =REFACTOR= this could be an iopt_soil option like in noahmpr??
     call READ_3D_SOIL(state%SPATIAL_FILENAME, state%XSTART, state%XEND, state%YSTART, &
          state%YEND, state%NSOIL, state%BEXP_3D, state%SMCDRY_3D, &
          state%SMCWLT_3D, state%SMCREF_3D, state%SMCMAX_3D, state%DKSAT_3D,&
@@ -795,12 +795,12 @@ module module_NoahMP_hrldas_driver
          state%SSI_2D, state%SNOWRETFAC_2D, state%TAU0_2D, state%RSURFSNOW_2D,&
          state%SCAMAX_2D)
 
-    if (noah_lsm%runoff_option == 7) then ! artless
+    if (noah_lsm%runoff_option == 7) then ! =REFACTOR=
        call READ_XAJ_RUNOFF(state%SPATIAL_FILENAME, state%XSTART, state%XEND, state%YSTART, &
             YEND, state%AXAJ_2D, state%BXAJ_2D, state%XXAJ_2D)
     end if
 
-    if (noah_lsm%imperv_option > 0 .and. noah_lsm%imperv_option < 9) then ! artless
+    if (noah_lsm%imperv_option > 0 .and. noah_lsm%imperv_option < 9) then ! =REFACTOR=
         call READ_IMPERV(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
                              IMPERV_2D)
     end if
@@ -822,7 +822,7 @@ module module_NoahMP_hrldas_driver
 ! Initialize Model state
 !----------------------------------------------------------------------
 
-  state%SLOPETYP = 2 ! artless: noahmpr message ! it was 2 here and 1 in the noahmpdrv- pvk
+  state%SLOPETYP = 2 ! =REFACTOR=: noahmpr message ! it was 2 here and 1 in the noahmpdrv- pvk
   state%DZS = state%SOIL_THICK_INPUT(1:state%NSOIL)
 
   state%ITIMESTEP = 1
@@ -845,7 +845,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
      call find_restart_file(state%rank, trim(state%restart_filename_requested), state%startdate, &
-          khour, state%olddate, state%restart_flnm)  ! artless check khour
+          khour, state%olddate, state%restart_flnm)  ! =REFACTOR= check khour
 
      call read_restart(trim(state%restart_flnm), xstart, xend, xstart, &
           ixfull, jxfull, state%nsoil, state%olddate)
@@ -945,7 +945,7 @@ module module_NoahMP_hrldas_driver
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PEXPXY"     ,state%PEXPXY     )
   else  !  rst_bi_in
 #ifdef MPP_LAND
-     call mpp_land_bcast_char(19,state%olddate(1:19))  ! artless, not in noahmpr
+     call mpp_land_bcast_char(19,state%olddate(1:19))  ! =REFACTOR=, not in noahmpr
 #endif
      ITIMESTEP = 2
      call lsm_rst_bi_in(state)
@@ -956,7 +956,7 @@ module module_NoahMP_hrldas_driver
 
 ! Must still call NOAHMPINITMAIN even in restart to set up parameter arrays (also done in WRF)
      call NoahmpInitMain(state)
-     ! artless, need to check if our noahmpinitmain does something more for us?
+     ! =REFACTOR=, need to check if our noahmpinitmain does something more for us?
      ! call NOAHMPINITMAIN(    LLANDUSE,     state%SNOW,    state%SNOWH,   CANWAT,   ISLTYP,   IVGTYP, &   ! call from WRF phys_init
      !                TSLB,    SMOIS,     SH2O,      DZS, FNDSOILW, FNDSNOWH, &
      !                 TSK,  ISNOWXY,     TVXY,     TGXY, CANICEXY,      TMN,     XICE, &
@@ -984,7 +984,7 @@ module module_NoahMP_hrldas_driver
      state%CANLIQXY   =  undefined_real
      state%TSK        =  undefined_real
      state%RAINBL_tmp =  undefined_real
-     !SNOW      =  undefined_real  ! ARTLESS
+     !SNOW      =  undefined_real  ! =REFACTOR=
      !SNOWH     =  undefined_real
 
 ! LRK - Remove HRLDAS_ini_typ for WRF-Hydro. Originally, there was a fork
@@ -1016,7 +1016,7 @@ module module_NoahMP_hrldas_driver
 !          ".LDASIN_DOMAIN"//hgrid
 !#endif
 
-     ! artless, just use state variable??
+     ! =REFACTOR=, just use state variable??
      call READINIT_HRLDAS(state%HRLDAS_SETUP_FILE, state%xstart, state%xend, state%ystart, &
           state%yend, state%NSOIL, state%DZS, state%OLDDATE, &
           LDASIN_VERSION, state%SMOIS, state%TSLB, state%CANWAT, &
@@ -1059,7 +1059,7 @@ module module_NoahMP_hrldas_driver
 
      FNDSOILW = .FALSE.
      call NoahmpInitMain(state)
-     ! artless: make sure these subs are the same
+     ! =REFACTOR=: make sure these subs are the same
      ! call NOAHMPINITMAIN(    LLANDUSE,     state%SNOW,    state%SNOWH,   CANWAT,   ISLTYP,   IVGTYP, &   ! call from WRF phys_init
      !                TSLB,    SMOIS,     SH2O,      DZS, FNDSOILW, FNDSNOWH, &
      !                 TSK,  ISNOWXY,     TVXY,     TGXY, CANICEXY,      TMN,     XICE, &
@@ -1082,10 +1082,10 @@ module module_NoahMP_hrldas_driver
 
   end if  ! end of restart if block
 
-  state%NTIME = (KHOUR)*3600./nint(state%dtbl) !*(NoahmpIO%spinup_loops+1)  !artless noahmpr addition
+  state%NTIME = (KHOUR)*3600./nint(state%dtbl) !*(NoahmpIO%spinup_loops+1)  !=REFACTOR= noahmpr addition
 
 #ifdef HYDRO_D
-  print*, "NTIME = ", NTIME , "KHOUR=",KHOUR,"dtbl = ", dtbl
+  print*, "NTIME = ", state%NTIME , "KHOUR=", state%KHOUR,"dtbl = ", state%dtbl
 #endif
 
   ! assinging the KHOUR to be used in the NWM output routing for global metadata
@@ -1100,7 +1100,7 @@ module module_NoahMP_hrldas_driver
    allocate( etpnd     (ix,jx) )
    allocate( prcp0     (ix,jx) )
 
-   prcp0     = 0   !artless are these qtiledrain or zwatble2d??
+   prcp0     = 0   !=REFACTOR= are these qtiledrain or zwatble2d??
    etpnd     = 0.0
 
    allocate(zsoil(state%NSOIL))
@@ -1117,7 +1117,7 @@ module module_NoahMP_hrldas_driver
    call hrldas_drv_HYDRO_ini(state%TSLB(:,1:state%NSOIL,:), &
         state%SMOIS(:,1:state%NSOIL,:), state%SH2O(:,1:state%NSOIL,:), &
         state%infxsrt, state%sfcheadrt, state%soldrain, &
-        ! they have added state%qtiledrain,state%ZWATBLE2D,                     & ! ARTLESS
+        ! they have added state%qtiledrain,state%ZWATBLE2D,                     & ! =REFACTOR=
         state%ix, state%jx, state%NSOIL, state%SMOIS, &
         real(state%noah_timestep), state%olddate, zsoil(1:state%NSOIL))
 
@@ -1230,11 +1230,10 @@ end if
 end subroutine land_driver_ini
 
 !===============================================================================
-  subroutine land_driver_exe(itime, state)
+  subroutine land_driver_exe(itime)
     use module_hydro_io, only: read_channel_only
     use NoahmpIOVarType, only: NoahmpIO_type
     implicit  none
-    type(NoahmpIO_type) :: state
     integer :: itime          ! timestep loop
 
 !---------------------------------------------------------------------------------
@@ -1307,7 +1306,7 @@ end subroutine land_driver_ini
              state%V_PHY(:,1,:), state%P8W(:,1,:), state%GLW, state%SWDOWN, &
              state%RAINBL_tmp, state%VEGFRA, state%update_veg, state%LAI, &
              state%update_lai)
-        ! REFACTOR, they have this! what to do with this?
+        ! =REFACTOR=, they have this! what to do with this?
         ! state%VEGFRA = state%VEGFRA * 100.
      else
         if(state%olddate == forcDate) then
@@ -1340,7 +1339,7 @@ end subroutine land_driver_ini
 	  state%P8W(:,1,:), state%GLW, state%SWDOWN, state%RAINBL_tmp, &
           state%VEGFRA, state%update_veg, state%LAI, state%update_lai)
 
-     ! REFACTOR TODO: THIS WAS IN NOAHMPR
+     ! =REFACTOR= THIS WAS IN NOAHMPR
      ! if(maxval(state%VEGFRA) .le. 1) state%VEGFRA = state%VEGFRA * 100
 #endif
 
@@ -1425,7 +1424,7 @@ end subroutine land_driver_ini
       call system_clock(count=state%count_before_sflx, count_rate=state%clock_rate)
 
       call NoahmpDriverMain(state)
-! artless how to handle spatial_soil??
+! =REFACTOR= how to handle spatial_soil??
 ! #ifdef SPATIAL_SOIL
 !       BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,             &
 !            DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
@@ -1508,7 +1507,7 @@ end subroutine land_driver_ini
 
       if ( (state%restart_frequency_hours .gt. 0) .and. &
            (mod(ITIME, int(state%restart_frequency_hours*3600./nint(state%dtbl))) == 0)) then
-       if(noah_lsm%rst_bi_out .eq. 0) then ! artless, rst_bi_out, why not in noahmpr
+       if(noah_lsm%rst_bi_out .eq. 0) then ! =REFACTOR=, rst_bi_out, why not in noahmpr
            call lsm_restart(state)
        else
            call lsm_rst_bi_out(state)
