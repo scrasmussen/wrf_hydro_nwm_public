@@ -196,7 +196,9 @@ message("=============================================================")
 if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
     # set compile flags for gfortran
     message ( "-- Using gfortran")
-    set (CMAKE_Fortran_FLAGS "-cpp -O2 -g -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4 -fallow-argument-mismatch")
+    # set (CMAKE_Fortran_FLAGS "-cpp -O2 -g -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4 -fallow-argument-mismatch")
+    set (CMAKE_Fortran_FLAGS_DEBUG "-cpp -O0 -g -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4 -Wall")
+
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "Intel.*")
     # set compile flags for ifort
     message ( "Using ifort")
@@ -206,7 +208,7 @@ else (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
     message ("Fortran compiler: " ${Fortran_COMPILER_NAME})
     message ("No optimized Fortran compiler flags are known, we just try -O2...")
     set (CMAKE_Fortran_FLAGS_RELEASE "-cpp -O2")
-    set (CMAKE_Fortran_FLAGS_DEBUG   "-cpp -O0 -g")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-cpp -O0 -g -Wall")
 endif ( CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*" )
 
 #set output directories for libraries binaries and fortran .mod files
