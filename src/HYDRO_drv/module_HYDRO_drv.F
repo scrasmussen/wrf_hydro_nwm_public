@@ -977,7 +977,7 @@ else
        RT_DOMAIN(did)%HLINK, RT_DOMAIN(did)%ELRT,RT_DOMAIN(did)%CHANLEN,&
        RT_DOMAIN(did)%MannN,RT_DOMAIN(did)%So, RT_DOMAIN(did)%ChSSlp, &
        RT_DOMAIN(did)%Bw,RT_DOMAIN(did)%Tw,RT_DOMAIN(did)%Tw_CC, RT_DOMAIN(did)%n_CC, &
-       RT_DOMAIN(did)%ChannK,& 
+       RT_DOMAIN(did)%ChannK,&
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%ZELEV, RT_DOMAIN(did)%CVOL, &
        RT_DOMAIN(did)%NLAKES, RT_DOMAIN(did)%QLAKEI, RT_DOMAIN(did)%QLAKEO,&
@@ -1790,7 +1790,7 @@ end subroutine HYDRO_ini
        ! input from HYDRO.TBL.nc file
        print*, "reading from hydrotbl_f(HYDRO.TBL.nc)  file ...."
        call hdtbl_in_nc(did)
-       if (noah_lsm%imperv_option .eq. 9) then
+       if (noah_lsm%IOPT_IMPERV .eq. 9) then
          !ADCHANGE: For consistency, mirror urban and param value checks used in table read
          where (rt_domain(did)%VEGTYP == rt_domain(did)%isurban)
            rt_domain(did)%SMCMAX1 = 0.45

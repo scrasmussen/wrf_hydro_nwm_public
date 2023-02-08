@@ -427,7 +427,7 @@ contains
    if(self%reservoir_type_specified) then
       if(len(trim(self%reservoir_parameter_file)) .eq. 0) then
          call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_parameter_file for &
-         inputs to reservoirs that are not level pool type.')
+         &inputs to reservoirs that are not level pool type.')
       endif
       if(len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -438,7 +438,7 @@ contains
    if(self%reservoir_persistence_usgs) then
       if(len(trim(self%reservoir_usgs_timeslice_path)) .eq. 0) then
          call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usgs_timeslice_path for &
-         reservoir USGS persistence capability.')
+              &reservoir USGS persistence capability.')
       endif
       if(len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -449,7 +449,7 @@ contains
    if(self%reservoir_persistence_usace) then
       if(len(trim(self%reservoir_usace_timeslice_path)) .eq. 0) then
          call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usace_timeslice_path for &
-         reservoir USACE persistence capability.')
+         &reservoir USACE persistence capability.')
       endif
       if(len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -524,8 +524,6 @@ contains
     character(len=256) :: geo_static_flnm = ""
     character(len=1024) :: land_spatial_meta_flnm = ""
     integer  :: DEEPGWSPIN
-
-    integer :: i
 
     integer ::CHRTOUT_DOMAIN           ! Netcdf point timeseries output at all channel points
     integer ::CHRTOUT_GRID                ! Netcdf grid of channel streamflow values
@@ -1069,7 +1067,7 @@ contains
     type(crocus_options), intent(OUT) :: opt
     integer, intent(IN), optional :: f_in
     character(len=15) :: filename = "namelist.hrldas"
-    logical :: f_exists, f_opened
+    logical :: f_exists
     integer :: crocus_opt, act_lev
     integer :: ierr, f_local
     namelist /CROCUS_nlist/ &
@@ -1084,7 +1082,7 @@ contains
        inquire(file=filename, exist=f_exists)
        if (f_exists .eqv. .false.) &
            call hydro_stop (" FATAL ERROR: namelist.hrldas does not exist")
-       open(f_local, file=filename, form="FORMATTED", iostat=ierr)
+       open(newunit=f_local, file=filename, form="FORMATTED", iostat=ierr)
        read(f_local, NML=CROCUS_nlist, iostat=ierr)
        close(f_local)
     end if
