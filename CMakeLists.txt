@@ -206,7 +206,7 @@ else (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
     message ("Fortran compiler: " ${Fortran_COMPILER_NAME})
     message ("No optimized Fortran compiler flags are known, we just try -O2...")
     set (CMAKE_Fortran_FLAGS_RELEASE "-cpp -O2")
-    set (CMAKE_Fortran_FLAGS_DEBUG   "-cpp -O0 -g")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-cpp -O0 -g -Wall")
 endif ( CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*" )
 
 #set output directories for libraries binaries and fortran .mod files
