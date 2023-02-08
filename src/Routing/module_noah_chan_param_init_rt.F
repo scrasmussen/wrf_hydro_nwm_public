@@ -50,8 +50,8 @@ CONTAINS
 
 
 !-----READ IN CHANNEL PROPERTIES FROM CHANPARM.TBL :
-    IUNIT = 23
-    OPEN(IUNIT, &
+    ! IUNIT = 23
+    OPEN(newunit=IUNIT, &
 #ifndef NCEP_WCOSS
     FILE='CHANPARM.TBL', &
 #endif

@@ -1091,7 +1091,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    integer, intent(in) :: varInd ! Variable index used to extact meta-data from.
 
    ! Derived types.
-   type(ldasMeta) :: fileMeta
+   type(ldasMeta), allocatable :: fileMeta
 
    ! Local variables
    integer :: minSinceSim ! Number of minutes since beginning of simulation.
@@ -1163,6 +1163,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 
    ! Initialize NWM dictionary derived type containing all the necessary
    ! metadata for the output file.
+   allocate(fileMeta)
    call initLdasDict(fileMeta,myId,diagFlag)
 
    ! Calculate necessary datetime information that will go into the output file.
@@ -1770,7 +1771,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       endif
    endif
 
-
+   deallocate(fileMeta)
 end subroutine output_NoahMP_NWM
 
 !==============================================================================
@@ -1804,7 +1805,7 @@ subroutine output_rt_NWM(domainId,iGrid)
    integer, intent(in) :: iGrid
 
    ! Derived types.
-   type(rtDomainMeta) :: fileMeta
+   type(rtDomainMeta), allocatable :: fileMeta
 
    ! Local variables
    integer :: mppFlag, diagFlag
@@ -1872,6 +1873,7 @@ subroutine output_rt_NWM(domainId,iGrid)
 
    ! Initialize NWM dictionary derived type containing all the necessary metadat
    ! for the output file.
+   allocate(fileMeta)
    call initRtDomainDict(fileMeta,myId,diagFlag)
 
    if(nlst(domainId)%io_config_outputs .eq. 0) then
@@ -2326,7 +2328,7 @@ subroutine output_rt_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to close RT_DOMAIN file.')
    endif
 
-
+   deallocate(fileMeta)
 end subroutine output_rt_NWM
 
 !==============================================================================
@@ -3057,7 +3059,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    integer, intent(in) :: iGrid
 
    ! Derived types.
-   type(chrtGrdMeta) :: fileMeta
+   type(chrtGrdMeta), allocatable :: fileMeta
 
    ! Local variables
    integer :: mppFlag, diagFlag
@@ -3138,6 +3140,13 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
       return
    endif
 
+
+   ! Initialize NWM dictionary derived type containing all the necessary metadat
+   ! for the output file.
+   allocate(fileMeta)
+   call initChrtGrdDict(fileMeta,myId,diagFlag)
+
+
    ! Initialize qlink arrays and collect data from processors for output.
    gNumLnks = rt_domain(domainId)%gnlinks
    lNumLnks = rt_domain(domainId)%NLINKS
@@ -3175,10 +3184,6 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
       call write_chanel_real(RT_DOMAIN(domainId)%qlink(:,2),RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_qlink(:,2))
    endif
    call write_IO_rt_int8(RT_DOMAIN(domainId)%GCH_NETLNK, CH_NETLNK)
-
-   ! Initialize NWM dictionary derived type containing all the necessary metadat
-   ! for the output file.
-   call initChrtGrdDict(fileMeta,myId,diagFlag)
 
    ! For now, we will default to outputting all variables until further notice.
    fileMeta%outFlag(:) = [1]
@@ -3532,7 +3537,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
 
    ! Deallocate memory as needed
    deallocate(g_qlink, CH_NETLNK, tmpFlow, tmpFlowReal, strFlowLocal)
-
+   deallocate(fileMeta)
 end subroutine output_chrtout_grd_NWM
 
 !===============================================================================
@@ -3564,7 +3569,7 @@ subroutine output_lsmOut_NWM(domainId)
    integer, intent(in) :: domainId
 
    ! Derived types.
-   type(lsmMeta) :: fileMeta
+   type(lsmMeta), allocatable :: fileMeta
 
    ! Local variables
    integer :: minSinceSim ! Number of minutes since beginning of simulation.
@@ -3627,6 +3632,7 @@ subroutine output_lsmOut_NWM(domainId)
    endif
 
    ! Call routine to initialize metadata structure
+   allocate(fileMeta)
    call initLsmOutDict(fileMeta,myId,diagFlag)
 
    ! Initialize the water type
@@ -4004,7 +4010,7 @@ subroutine output_lsmOut_NWM(domainId)
    endif
 
    deallocate(localRealTmp)
-
+   deallocate(fileMeta)
 end subroutine output_lsmOut_NWM
 
 !==============================================================================

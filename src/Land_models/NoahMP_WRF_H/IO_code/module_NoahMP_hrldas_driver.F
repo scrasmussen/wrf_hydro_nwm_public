@@ -871,7 +871,8 @@ module module_NoahMP_hrldas_driver
 ! Initialize Model state
 !----------------------------------------------------------------------
 
-  noah_lsm%SLOPETYP = 2 ! =REFACTOR=: noahmpr message ! it was 2 here and 1 in the noahmpdrv- pvk
+  ! noah_lsm%SLOPETYP = 2 ! =REFACTOR=: noahmpr message ! it was 2 here and 1 in the noahmpdrv- pvk
+  noah_lsm%SLOPETYP = 1 ! =REFACTOR=: noahmpr message ! it was 2 here and 1 in the noahmpdrv- pvk
   noah_lsm%DZS = noah_lsm%SOIL_THICK_INPUT(1:noah_lsm%NSOIL)
 
   noah_lsm%ITIMESTEP = 1
