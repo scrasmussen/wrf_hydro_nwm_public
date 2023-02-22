@@ -1,0 +1,4 @@
+[submodule "src/Land_models/NoahMP"]
+        branch = noahmp_refactor_hrldas_wrf_hydro_fix
+	path = src/Land_models/NoahMP
+	url = git@github.com:scrasmussen/NoahMP_refactor.git
