@@ -1185,7 +1185,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Check NetCDF file for varname
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1246,7 +1246,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Read NetCDF variable into ESMF field
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1281,7 +1281,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Read NetCDF var into ESMF array
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1362,7 +1362,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Read NetCDF variable into I4 array
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1468,7 +1468,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Read NetCDF variable into I8 array
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1574,7 +1574,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Read NetCDF variable into R4 array
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1680,7 +1680,7 @@ contains
     integer, intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Read NetCDF variable into R8 array
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1785,7 +1785,7 @@ contains
     integer, intent(out),optional        :: rc
 ! !DESCRIPTION:
 !   Write ESMF state information to PET Logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1826,7 +1826,7 @@ contains
     integer,intent(out),optional :: rc
 ! !DESCRIPTION:
 !   Write ESMF state information to PET Logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -1928,7 +1928,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write ESMF state connection to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2003,7 +2003,7 @@ contains
     integer, intent(out), optional         :: rc
 ! !DESCRIPTION:
 !   Write ESMF grid information to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2129,7 +2129,7 @@ contains
     integer,intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Write ESMF field information to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2168,7 +2168,7 @@ contains
     integer,intent(out),optional         :: rc
 ! !DESCRIPTION:
 !   Write ESMF field information to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2273,7 +2273,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write ESMF field local vals to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2315,7 +2315,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write ESMF array local vals to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2463,7 +2463,7 @@ contains
     integer, intent(out), optional             :: rc
 ! !DESCRIPTION:
 !   Write I41D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2512,7 +2512,7 @@ contains
     integer, intent(out), optional             :: rc
 ! !DESCRIPTION:
 !   Write I42D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2561,7 +2561,7 @@ contains
     integer, intent(out), optional             :: rc
 ! !DESCRIPTION:
 !   Write I43D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2610,7 +2610,7 @@ contains
     integer, intent(out), optional             :: rc
 ! !DESCRIPTION:
 !   Write I81D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2659,7 +2659,7 @@ contains
     integer, intent(out), optional             :: rc
 ! !DESCRIPTION:
 !   Write I82D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2708,7 +2708,7 @@ contains
     integer, intent(out), optional             :: rc
 ! !DESCRIPTION:
 !   Write I83D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2757,7 +2757,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write R41D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2806,7 +2806,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write R41D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2855,7 +2855,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write R43D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2904,7 +2904,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write R81D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -2953,7 +2953,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write R81D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -3002,7 +3002,7 @@ contains
     integer, intent(out), optional          :: rc
 ! !DESCRIPTION:
 !   Write R83D array local vals to log
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
@@ -3050,7 +3050,7 @@ contains
     integer, intent(out),optional        :: rc
 ! !DESCRIPTION:
 !   Write ESMF CplList to PET logs
-!   
+!
 !   The arguments are:
 !   \begin{description}
 !   \end{description}
