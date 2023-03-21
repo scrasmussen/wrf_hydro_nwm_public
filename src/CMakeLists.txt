@@ -102,7 +102,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
 	# target_link_libraries(wrfhydro.exe noahmp_util)
 	# target_link_libraries(wrfhydro.exe noahmp_phys)
 	# target_link_libraries(wrfhydro.exe noahmp_data)
-	target_link_libraries(wrfhydro.exe noahmp_refactor)
+	target_link_libraries(wrfhydro.exe noahmp)
 	target_link_libraries(wrfhydro.exe hydro_noahmp_cpl)
 	target_link_libraries(wrfhydro.exe ${NETCDF_LIBRARIES})
 
