@@ -99,7 +99,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
 	target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_rfc)
 	target_link_libraries(wrfhydro.exe hydro_routing_reservoirs)
 	target_link_libraries(wrfhydro.exe hydro_driver)
-	# target_link_libraries(wrfhydro.exe noahmp_util)
+	target_link_libraries(wrfhydro.exe noahmp_util)
 	# target_link_libraries(wrfhydro.exe noahmp_phys)
 	# target_link_libraries(wrfhydro.exe noahmp_data)
 	target_link_libraries(wrfhydro.exe noahmp)
@@ -119,7 +119,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
 		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
 		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run
 		COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
-		COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/hrldas/run/*.TBL ${CMAKE_BINARY_DIR}/Run
+		COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/parameters/NoahmpTable.TBL ${CMAKE_BINARY_DIR}/Run
 		COMMAND ln -s wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
 		COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
 	)

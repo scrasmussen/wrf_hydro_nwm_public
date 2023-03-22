@@ -3,7 +3,7 @@ module config_base
 
   use module_hydro_stop, only:HYDRO_stop
   use NoahmpIOVarType, only: NoahmpIO_type
-  use NoahmpIOVarInitMod, only: ReadNamelist!, ReadNoahmpTable
+  use NoahmpReadNamelistMod, only: NoahmpReadNamelist
 
   implicit none
 
@@ -967,7 +967,7 @@ contains
     write(*,*) 'Calling config noahlsm_offline'
 
 ! #ifndef NCEP_WCOSS
-    call ReadNamelist(noah_lsm)
+    call NoahmpReadNamelist(noah_lsm)
     ! call ReadNoahmpTable(noah_lsm)  ! MOVE THIS TO THE DRIVER??
     print *, "ARTLESS: NAMELISTS DIFFS NEED TO BE CONFIRMED"
 

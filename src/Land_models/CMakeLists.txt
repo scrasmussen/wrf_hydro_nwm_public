@@ -7,9 +7,12 @@ set(noahmp_drivers_hrldas_dir NoahMP/drivers/hrldas)
 # set(noahmp_hrldas NoahMP/hrldas/Utility_routines)
 set(noahmp_wrf NoahMP/wrf)
 
-
 # drivers/hrldas/
 add_library(noahmp_hrldas_driver
+  ${noahmp_drivers_hrldas_dir}/NoahmpDriverMainMod.F90
+  )
+
+add_library(noahmp_hrldas_lib
   ${noahmp_drivers_hrldas_dir}/BiochemVarInTransferMod.F90
   ${noahmp_drivers_hrldas_dir}/BiochemVarOutTransferMod.F90
   ${noahmp_drivers_hrldas_dir}/ConfigVarInTransferMod.F90
@@ -20,11 +23,9 @@ add_library(noahmp_hrldas_driver
   ${noahmp_drivers_hrldas_dir}/ForcingVarOutTransferMod.F90
   ${noahmp_drivers_hrldas_dir}/module_domain.F90
   ${noahmp_drivers_hrldas_dir}/module_ra_gfdleta.F90
-  ${noahmp_drivers_hrldas_dir}/NoahmpDriverMainMod.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpGroundwaterInitMod.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpInitMainMod.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpIOVarInitMod.F90
-  ${noahmp_drivers_hrldas_dir}/NoahmpIOVarType.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpReadNamelistMod.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpReadTableMod.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpSnowInitMod.F90
@@ -39,6 +40,16 @@ add_library(noahmp_utility
   ${noahmp_utility}/Machine.F90
   )
 
+add_library(noahmp_var_types
+  ${noahmp_drivers_hrldas_dir}/NoahmpIOVarType.F90
+  ${noahmp_dir}/NoahmpVarType.F90
+  ${noahmp_dir}/BiochemVarType.F90
+  ${noahmp_dir}/ConfigVarType.F90
+  ${noahmp_dir}/EnergyVarType.F90
+  ${noahmp_dir}/ForcingVarType.F90
+  ${noahmp_dir}/WaterVarType.F90
+  )
+
 add_library(noahmp_lib
   ${noahmp_dir}/AtmosForcingMod.F90
   ${noahmp_dir}/BalanceErrorCheckGlacierMod.F90
@@ -46,23 +57,19 @@ add_library(noahmp_lib
   ${noahmp_dir}/BiochemCropMainMod.F90
   ${noahmp_dir}/BiochemNatureVegMainMod.F90
   ${noahmp_dir}/BiochemVarInitMod.F90
-  ${noahmp_dir}/BiochemVarType.F90
   ${noahmp_dir}/CanopyHydrologyMod.F90
   ${noahmp_dir}/CanopyRadiationTwoStreamMod.F90
   ${noahmp_dir}/CanopyWaterInterceptMod.F90
   ${noahmp_dir}/CarbonFluxCropMod.F90
   ${noahmp_dir}/CarbonFluxNatureVegMod.F90
   ${noahmp_dir}/ConfigVarInitMod.F90
-  ${noahmp_dir}/ConfigVarType.F90
   ${noahmp_dir}/ConstantDefineMod.F90
   ${noahmp_dir}/CropGrowDegreeDayMod.F90
   ${noahmp_dir}/CropPhotosynthesisMod.F90
   ${noahmp_dir}/EnergyMainGlacierMod.F90
   ${noahmp_dir}/EnergyMainMod.F90
   ${noahmp_dir}/EnergyVarInitMod.F90
-  ${noahmp_dir}/EnergyVarType.F90
   ${noahmp_dir}/ForcingVarInitMod.F90
-  ${noahmp_dir}/ForcingVarType.F90
   ${noahmp_dir}/GeneralInitGlacierMod.F90
   ${noahmp_dir}/GeneralInitMod.F90
   ${noahmp_dir}/GlacierIceThermalPropertyMod.F90
@@ -88,7 +95,6 @@ add_library(noahmp_lib
   ${noahmp_dir}/MatrixSolverTriDiagonalMod.F90
   ${noahmp_dir}/NoahmpMainGlacierMod.F90
   ${noahmp_dir}/NoahmpMainMod.F90
-  ${noahmp_dir}/NoahmpVarType.F90
   ${noahmp_dir}/PhenologyMainMod.F90
   ${noahmp_dir}/PrecipitationHeatAdvectGlacierMod.F90
   ${noahmp_dir}/PrecipitationHeatAdvectMod.F90
@@ -165,32 +171,55 @@ add_library(noahmp_lib
   ${noahmp_dir}/WaterTableDepthSearchMod.F90
   ${noahmp_dir}/WaterTableEquilibriumMod.F90
   ${noahmp_dir}/WaterVarInitMod.F90
-  ${noahmp_dir}/WaterVarType.F90
   ) # end noahmp_lib
 
+# REFACTOR TODO: after build works, NoahMP_WRF_H and these CMake path
+#                directories can be put in it's new dir structure
 add_library(wrf_hydro_noahmp
   NoahMP_WRF_H/phys/surfex/ini_csts.F
   NoahMP_WRF_H/phys/surfex/modd_csts.F
   )
 
-add_dependencies(
-  noahmp_hrldas_driver
-  noahmp_utility
+add_library(noahmp_util # REFACTOR TODO: can these modules be removed?
+  NoahMP_WRF_H/Utility_routines/kwm_string_utilities.F
+  NoahMP_WRF_H/Utility_routines/module_date_utilities.F
   )
 
-add_dependencies(
+target_link_libraries(
+  noahmp_hrldas_lib
+  noahmp_var_types
   noahmp_lib
+  )
+
+target_link_libraries(
+  noahmp_hrldas_driver
+  noahmp_var_types
+  noahmp_utility
+  noahmp_lib
+  noahmp_hrldas_lib
+  )
+
+target_link_libraries(
+  noahmp_hrldas_lib
+  noahmp_var_types
+  )
+
+target_link_libraries(
+  noahmp_var_types
   noahmp_utility
   )
 
-# add_dependecies(
-#   noahmp_hrldas_driver
-#   noahmp_lib
-#   )
+target_link_libraries(
+  noahmp_lib
+  noahmp_var_types
+  noahmp_utility
+  )
 
 add_library(noahmp INTERFACE)
 target_link_libraries(noahmp
   INTERFACE
   noahmp_lib
+  noahmp_hrldas_driver
+  noahmp_hrldas_lib
   wrf_hydro_noahmp
   )
