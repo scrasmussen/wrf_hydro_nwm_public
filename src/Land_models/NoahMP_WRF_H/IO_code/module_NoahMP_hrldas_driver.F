@@ -2,11 +2,13 @@ module module_NoahMP_hrldas_driver
 
   use module_hrldas_netcdf_io ! =REFACTOR= add only
   use NoahmpIOVarType, only: NoahmpIO_type
-  USE NoahmpIOVarInitMod, only : NoahmpIOVarInitDefault, ReadNoahmpTable , ReadNamelist  !=REFACTOR=, add these??
+  use NoahmpIOVarInitMod, only : NoahmpIOVarInitDefault
+  use NoahmpReadNamelistMod, only : NoahmpReadNamelist  !=REFACTOR=, add these??
+  use NoahmpReadTableMod, only : NoahmpReadTable
   use GroundWaterMmfMod, only: WTABLE_mmf_noahmp
   use NoahmpInitMainMod, only: NoahmpInitMain
   use NoahmpDriverMainMod, only: NoahmpDriverMain
-  use module_date_utilities ! =REFACTOR= add only
+  use module_date_utilities, only: geth_newdate, geth_idts
   use orchestrator_base ! =REFACTOR= add only
   use config_base, only: wrf_hydro, noah_lsm
   use modi_ini_csts, only: ini_csts
@@ -260,11 +262,11 @@ module module_NoahMP_hrldas_driver
     ! forc_typ = wrf_hydro%forc_typ ! =REFACTOR=
 #endif
 
-    ! =REFACTOR= can remove this spot
+    ! =REFACTOR= can remove this spot?
 !---------------------------------------------------------------------
 !  read in input data from table and initial file
 !---------------------------------------------------------------------
-  ! call ReadNamelist(noah_lsm) ! REFACTOR CALL, this done in orchestrator
+  ! call NoahmpReadNamelist(noah_lsm) ! REFACTOR CALL, this done in orchestrator??
                                 ! namelist.hrldas diff between NoahMPs, working thorug
 
 
@@ -725,7 +727,7 @@ module module_NoahMP_hrldas_driver
 !  read in Noah-MP Parameters from MPTABLE
 !---------------------------------------------------------------------
 
-  call ReadNoahmpTable(noah_lsm)
+  call NoahmpReadTable(noah_lsm)
 
 #ifdef WRF_HYDRO
    allocate( noah_lsm%greenfrac   (xstart:noah_lsm%xend,noah_lsm%ystart:noah_lsm%yend))
@@ -1484,18 +1486,19 @@ end subroutine land_driver_ini
 
 !gmm update wtable from lateral flow and shed water to rivers
            CALL WTABLE_MMF_NOAHMP(noah_lsm, &
-                noah_lsm%NUM_SOIL_LAYERS, noah_lsm%XLAND, noah_lsm%XICE, noah_lsm%XICE_THRESHOLD, &
+                noah_lsm%NSOIL, noah_lsm%XLAND, noah_lsm%XICE, noah_lsm%XICE_THRESHOLD, &
                 noah_lsm%ISICE, noah_lsm%ISLTYP, noah_lsm%SMOISEQ, noah_lsm%DZS, &
                 noah_lsm%WTDDT, noah_lsm%FDEPTHXY, noah_lsm%AREAXY, noah_lsm%TERRAIN, &
                 noah_lsm%ISURBAN, noah_lsm%IVGTYP, noah_lsm%RIVERCONDXY, noah_lsm%RIVERBEDXY, &
                 noah_lsm%EQZWT, noah_lsm%PEXPXY, noah_lsm%SMOIS, noah_lsm%SH2O, &
-                noah_lsm%SMCWTDXY, noah_lsm%ZWTXY, noah_lsm%QRFXY, noah_lsm%DEEPRECHXY, &
+                noah_lsm%SMCWTDXY, noah_lsm%ZWTXY, noah_lsm%QLATXY, &
+                noah_lsm%QRFXY, noah_lsm%DEEPRECHXY, &
                 noah_lsm%QSPRINGXY, noah_lsm%QSLATXY, noah_lsm%QRFSXY, noah_lsm%QSPRINGSXY, &
                 noah_lsm%RECHXY, noah_lsm%IDS, noah_lsm%IDE, noah_lsm%JDS, &
                 noah_lsm%JDE, noah_lsm%KDS, noah_lsm%KDE, noah_lsm%IMS, &
                 noah_lsm%IME, noah_lsm%JMS, noah_lsm%JME, noah_lsm%KMS, &
                 noah_lsm%KME, noah_lsm%ITS, noah_lsm%ITE, noah_lsm%JTS, &
-                noah_lsm%JTE, noah_lsm%KTS,noah_lsm%KTE)
+                noah_lsm%JTE, noah_lsm%KTS, noah_lsm%KTE)
 
  end if
 
@@ -1559,6 +1562,7 @@ end subroutine land_driver_ini
 !------------------------------------------------------------------------
 ! Advance the time
 !------------------------------------------------------------------------
+
 #ifndef WRF_HYDRO
      call geth_newdate(noah_lsm%newdate, noah_lsm%olddate, nint(noah_lsm%dtbl))
      noah_lsm%olddate = noah_lsm%newdate
@@ -2497,11 +2501,11 @@ subroutine define_rst_variables(ncid, noah_lsm)
 
 end module module_NoahMP_hrldas_driver
 
-!subroutine wrf_message(msg)
-!  implicit none
-!  character(len=*), intent(in) :: msg
-!  print*, msg
-!end subroutine wrf_message
+subroutine wrf_message(msg)
+ implicit none
+ character(len=*), intent(in) :: msg
+ print*, trim(msg)
+end subroutine wrf_message
 
 logical function wrf_dm_on_monitor() result(l)
   l = .TRUE.
