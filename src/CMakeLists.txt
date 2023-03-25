@@ -11,6 +11,7 @@ add_subdirectory("Routing/Reservoirs")
 add_subdirectory("Data_Rec")
 add_subdirectory("Routing")
 add_subdirectory("HYDRO_drv")
+add_subdirectory("bmi")
 
 if (WRF_HYDRO_NUDGING STREQUAL "1")
     add_subdirectory("nudging")
