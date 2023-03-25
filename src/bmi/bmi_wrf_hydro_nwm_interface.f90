@@ -3,9 +3,9 @@ module bmi_wrf_hydro_nwm_mod
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
   implicit none
 
-  type, extends (bmi) :: bmi_wrf_hydro_nwm
+  type, extends(bmi), abstract :: bmi_wrf_hydro_nwm
      private
-     type (wrf_hydro_model) :: model
+     ! type (wrf_hydro_model) :: model
    contains
      procedure :: get_component_name => wrf_hydro_component_name
      ! procedure :: get_input_item_count => wrf_hydro_input_item_count
@@ -80,6 +80,7 @@ module bmi_wrf_hydro_nwm_mod
      !      set_value_at_indices_double
      ! procedure :: print_model_info
   end type bmi_wrf_hydro_nwm
+
   interface
      ! Get the name of the model.
      module function wrf_hydro_component_name(this, name) result(bmi_status)
