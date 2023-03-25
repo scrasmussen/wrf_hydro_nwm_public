@@ -1,7 +1,12 @@
-submodule (bmi_wrf_hydron_nwm) bmi_wrf_hydro_nwm_submod
+submodule (bmi_wrf_hydro_nwm_mod) bmi_wrf_hydro_nwm_smod
+  implicit none
 contains
+
   module procedure wrf_hydro_component_name
-    name => "WRF_HYDRO_FOOBAR"
+    character(len=128), target :: model_name
+    model_name = "WRF-HYDRO v5.3.x"
+    name => model_name
     bmi_status = BMI_SUCCESS
-  end procedure wrf_hydro_component_name
-end submodule bmi_wrf_hydro_nwm_submod
+  end procedure !wrf_hydro_component_name
+
+end submodule bmi_wrf_hydro_nwm_smod

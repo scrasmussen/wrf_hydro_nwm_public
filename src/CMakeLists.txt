@@ -26,6 +26,7 @@ add_subdirectory("HYDRO_drv")
 if(${PROJECT_NAME} STREQUAL "WRF")
         add_subdirectory("CPL/WRF_cpl")
 endif()
+add_subdirectory("bmi")
 
 if (WRF_HYDRO_NUDGING STREQUAL "1")
         add_subdirectory("nudging")
