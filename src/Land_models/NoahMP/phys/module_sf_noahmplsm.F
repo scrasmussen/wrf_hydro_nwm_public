@@ -947,6 +947,7 @@ contains
           SWDOWN = SOLDN
        END IF
 
+
        SOLAD(1) = SWDOWN*0.7*0.5     ! direct  vis
        SOLAD(2) = SWDOWN*0.7*0.5     ! direct  nir
        SOLAI(1) = SWDOWN*0.3*0.5     ! diffuse vis
@@ -971,7 +972,7 @@ contains
 ! partition precipitation into rain and snow. Moved from CANWAT MB/AN: v3.7
 
 ! Jordan (1991)
-
+    ! print *, "U OPT_SNF", OPT_SNF
      IF(OPT_SNF == 1) THEN
        IF(SFCTMP > TFRZ+2.5)THEN
            FPICE = 0.
@@ -1021,7 +1022,7 @@ contains
 
      RAIN   = PRCP * (1.-FPICE)
      SNOW   = PRCP * FPICE
-
+     ! print *, "U SNOW",      SNOW   , PRCP , FPICE
 
   END SUBROUTINE ATM
 
@@ -1266,9 +1267,10 @@ ENDIF   ! CROPTYPE == 0
 ! for canopy ice
 
       MAXSNO = 6.6*(0.27+46./BDFALL) * (ELAI+ ESAI)
-
+      print *, "U ELAI + ESAI", ELAI, ESAI
       IF((ELAI+ ESAI).GT.0.) THEN
          QINTS = FVEG * SNOW * FP
+         ! print *, "U QINTS", FVEG, SNOW, FP
          QINTS = MIN(QINTS, (MAXSNO - CANICE)/DT * (1.-EXP(-SNOW*DT/MAXSNO)) )
          QINTS = MAX(QINTS, 0.)
          FT = MAX(0.0,(TV - 270.15) / 1.87E5)
@@ -1278,6 +1280,7 @@ ENDIF   ! CROPTYPE == 0
          QDRIPS = (FVEG * SNOW - QINTS) + ICEDRIP
          QTHROS = (1.0-FVEG) * SNOW
          CANICE= MAX(0.,CANICE + (QINTS - ICEDRIP)*DT)
+         ! print *, "U CANICE2", CANICE, QINTS, ICEDRIP,DT
       ELSE
          QINTS  = 0.
          QDRIPS = 0.
@@ -1291,7 +1294,7 @@ ENDIF   ! CROPTYPE == 0
 !      print*, "precip_heat canopy drip:",3600.0*MAX(0.,CANICE) * (FV+FT)
 
 ! wetted fraction of canopy
-
+      ! print *, "U CANICE=", CANICE
       IF(CANICE.GT.0.) THEN
            FWET = MAX(0.,CANICE) / MAX(MAXSNO,1.E-06)
       ELSE
@@ -2024,7 +2027,9 @@ ENDIF   ! CROPTYPE == 0
 !jref:start
                     QC      ,QSFC    ,PSFC    , & !in
                     Q2V     ,CHV2, CHLEAF, CHUC)               !inout
-!jref:end
+    !jref:end
+
+    print *, "CALLLED", TR
     END IF
 
     TGB = TG
@@ -2066,7 +2071,8 @@ ENDIF   ! CROPTYPE == 0
         Q1    = FVEG * (EAH*0.622/(SFCPRS - 0.378*EAH)) + (1.0 - FVEG)*QSFC
         Q2E   = FVEG * Q2V       + (1.0 - FVEG) * Q2B
 	Z0WRF = Z0M
-    ELSE
+        print *, "FCTR =", FCTR, TR
+     ELSE
         TAUX  = TAUXB
         TAUY  = TAUYB
         FIRA  = IRB
@@ -3727,6 +3733,8 @@ ENDIF   ! CROPTYPE == 0
         CAW  = 1./RAWC
         CEW  = FWET*VAIE/RB
         CTW  = (1.-FWET)*(LAISUNE/(RB+RSSUN) + LAISHAE/(RB+RSSHA))
+        print *, "U CTW               = ", ctw, FWET,LAISUNE,RB,RSSUN, LAISHAE,RB,RSSHA
+
         CGW  = 1./(RAWG+RSURF)
         COND = CAW + CEW + CTW + CGW
         AEA  = (EAIR*CAW + ESTG*CGW) / COND
@@ -3738,11 +3746,13 @@ ENDIF   ! CROPTYPE == 0
 
         TAH = ATA + BTA*TV               ! canopy air T.
         EAH = AEA + BEA*ESTV             ! canopy air e
+        print *, "~~EAH = ", EAH, AEA, BEA, ESTV
 
         IRC = FVEG*(AIR + CIR*TV**4)
         SHC = FVEG*RHOAIR*CPAIR*CVH * (  TV-TAH)
         EVC = FVEG*RHOAIR*CPAIR*CEW * (ESTV-EAH) / GAMMAV ! Barlage: change to v in v3.6
         TR  = FVEG*RHOAIR*CPAIR*CTW * (ESTV-EAH) / GAMMAV
+        print *, "TR1 = ", tr,FVEG,RHOAIR,CPAIR,CTW , ESTV,EAH, GAMMAV
 	IF (TV > TFRZ) THEN
           EVC = MIN(CANLIQ*LATHEAV/DT,EVC)    ! Barlage: add if block for canice in v3.6
 	ELSE
@@ -3757,7 +3767,7 @@ ENDIF   ! CROPTYPE == 0
         SHC = SHC + FVEG*CSH*DTV
         EVC = EVC + FVEG*CEV*DESTV*DTV
         TR  = TR  + FVEG*CTR*DESTV*DTV
-
+        print *, "TR2 = ", tr,FVEG,CTR,DESTV,DTV
 ! update vegetation surface temperature
         TV  = TV + DTV
 !        TAH = ATA + BTA*TV               ! canopy air T; update here for consistency
@@ -4254,7 +4264,9 @@ ENDIF   ! CROPTYPE == 0
        ENDIF
 
        CWPC = (CWP * VAI * HCAN * FHG)**0.5
-!       CWPC = (CWP*FHG)**0.5
+       ! print *, "U WECC =", CWPC, CWP, VAI, HCAN, FHG, 0.5
+
+       !       CWPC = (CWP*FHG)**0.5
 
        TMP1 = EXP( -CWPC*Z0HG/HCAN )
        TMP2 = EXP( -CWPC*(Z0H+ZPD)/HCAN )
@@ -4270,9 +4282,13 @@ ENDIF   ! CROPTYPE == 0
 ! leaf boundary layer resistance
 
        TMPRB  = CWPC*50. / (1. - EXP(-CWPC/2.))
+       ! print *, "U TMPRB = ",TMPRB, CWPC
        RB     = TMPRB * SQRT(parameters%DLEAF/UC)
-       RB     = MAX(RB,20.0)
-!       RB = 200
+       ! print *, "U RB1 = ", RB !EQUAL HERE
+       ! RB     = MAX(RB,20.0)
+       RB     = MIN(MAX(RB, 5.0),50.0) ! limit RB to 5-50, typically RB<50
+       ! print *, "U_FOOBARS =", RB, TMPRB, parameters%DLEAF, UC, "   MAX", rb, 20.0
+       !       RB = 200
 
   END SUBROUTINE RAGRB
 
@@ -5946,6 +5962,7 @@ ENDIF   ! CROPTYPE == 0
 
 ! evaporation, transpiration, and dew
 
+      ! print *, "FlagFrozenCanopy = ", FROZEN_CANOPY
       IF (.NOT.FROZEN_CANOPY) THEN             ! Barlage: change to frozen_canopy
         ETRAN = MAX( FCTR/HVAP, 0. )
         QEVAC = MAX( FCEV/HVAP, 0. )
@@ -5959,7 +5976,7 @@ ENDIF   ! CROPTYPE == 0
         QSUBC = MAX( FCEV/HSUB, 0. )
         QFROC = ABS( MIN( FCEV/HSUB, 0. ) )
       ENDIF
-
+      ! print *, "ETRAN =", ETRAN, "is",FCTR,"/", HVAP
 ! canopy water balance. for convenience allow dew to bring CANLIQ above
 ! maxh2o or else would have to re-adjust drip
 
@@ -5978,12 +5995,17 @@ ENDIF   ! CROPTYPE == 0
 
 ! wetted fraction of canopy
 
-      IF(CANICE.GT.0.) THEN
+    ! if ( (CanopyIce > 0.0) .and. (CanopyIce >= CanopyLiqWater) ) then
+      IF((CANICE.GT.0.) .and. CANICE .GE. CANLIQ)  THEN
            FWET = MAX(0.,CANICE) / MAX(MAXSNO,1.E-06)
       ELSE
            FWET = MAX(0.,CANLIQ) / MAX(MAXLIQ,1.E-06)
       ENDIF
+    ! CanopyWetFrac    = min(CanopyWetFrac, 1.0) ** 0.667
       FWET = MIN(FWET, 1.) ** 0.667
+    ! CanopyTotalWater = CanopyLiqWater + CanopyIce
+
+
 
 ! phase change
 
@@ -9605,7 +9627,7 @@ CONTAINS
         RC_TABLE(1:NVEG)  = RC(1:NVEG)
      MFSNO_TABLE(1:NVEG)  = MFSNO(1:NVEG)
         XL_TABLE(1:NVEG)  = XL(1:NVEG)
-     CWPVT_TABLE(1:NVEG)  = CWPVT(1:NVEG)
+        CWPVT_TABLE(1:NVEG)  = CWPVT(1:NVEG)
      C3PSN_TABLE(1:NVEG)  = C3PSN(1:NVEG)
       KC25_TABLE(1:NVEG)  = KC25(1:NVEG)
        AKC_TABLE(1:NVEG)  = AKC(1:NVEG)

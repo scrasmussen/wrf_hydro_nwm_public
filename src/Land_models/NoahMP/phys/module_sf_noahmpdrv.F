@@ -679,6 +679,16 @@ CONTAINS
 
 !-----------------------------------------------------------------------
    ILOOP : DO I = its, ite
+      print *, "I=",I, "J=",J
+      print*, ""
+      print*, ""
+      print*, ""
+      print*, ""
+      print*, ""
+      print*, ""
+      print*, ""
+      print*, ""
+
       ! Reset GLACR and ICE at the start of every iteration
       GLACR = 0
       ICE   = 0
@@ -834,7 +844,7 @@ CONTAINS
        parameters%scamax = SCAMAX_2D(I,J)         ! maximum fractional snow covered area (0.0-1.0)
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters,iopt_imperv)
-
+       ! FOOBAR: should be called before enery()<-noahmp_sflx for CWPVT to work
        GRAIN = 0.0                ! mass of grain [g/m2]
        GDD   = 0.0                ! growing degree days
        PGS   = 0                  ! crop growth stage
@@ -1020,7 +1030,7 @@ CONTAINS
                                   ! move NOAHMP_GLACIER to after CROCUS
                                   ! for temperatre glacier, set top soil temp to 272
           ZP_TG(1) = 272.0
-          ! Why is this if block here? Not sure top condition would ever trigger  
+          ! Why is this if block here? Not sure top condition would ever trigger
           ! given we are already in an if block requiring ZP_SNOWDZ(1,1) .gt. 0.0. (AD)
           IF (ZP_SNOWDZ(1,1) .eq. 0.0 .and. ZP_SRSNOW(1) .eq. 0.0) THEN
           ELSE
@@ -2176,9 +2186,19 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
 	     lai        (I,J) = max(lai(i,j),0.05)             ! at least start with 0.05 for arbitrary initialization (v3.7)
              xsaixy     (I,J) = max(0.1*lai(I,J),0.05)         ! MB: arbitrarily initialize SAI using input LAI (v3.7)
              masslai = 1000. / max(SLA_TABLE(IVGTYP(I,J)),1.0) ! conversion from lai to mass  (v3.7)
-             lfmassxy   (I,J) = lai(i,j)*masslai               ! use LAI to initialize (v3.7)
+             lfmassxy   (I,J) = lai(i,j)*1000. / &
+                  max(SLA_TABLE(IVGTYP(I,J)),1.0) ! conversion from lai to mass  (v3.7)               ! use LAI to initialize (v3.7)
+             ! if (i==5 .and. j==1) then
+             !    print*, "LFMASSXY(I,J) =", LFMASSXY(I,J)
+             !    print *, "1:", LAI(I,J)
+             !    print *, "1:", max(SLA_TABLE(IVGTYP(I,J)),1.0)
+             !    print *, "1:", SLA_TABLE(IVGTYP(I,J))
+             !    print *, "1:", IVGTYP(I,J)
+             !    stop "HERE"
+             ! end if
              masssai = 1000. / 3.0                             ! conversion from lai to mass (v3.7)
-             stmassxy   (I,J) = xsaixy(i,j)*masssai            ! use SAI to initialize (v3.7)
+             ! stmassxy   (I,J) = xsaixy(i,j)*masssai            ! use SAI to initialize (v3.7)
+             stmassxy   (I,J) = xsaixy(i,j)* 1000.0 / 3.0            ! use SAI to initialize (v3.7)
              rtmassxy   (I,J) = 500.0                          ! these are all arbitrary and probably should be
              woodxy     (I,J) = 500.0                          ! in the table or read from initialization
              stblcpxy   (I,J) = 1000.0                         !
