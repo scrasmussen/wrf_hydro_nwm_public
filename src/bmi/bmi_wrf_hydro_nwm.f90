@@ -9,6 +9,7 @@ submodule (bmi_wrf_hydro_nwm_mod) bmi_wrf_hydro_nwm_smod
 
 contains
 
+  ! Get the name of the model.
   module procedure wrf_hydro_component_name
     character(len=128), target :: model_name
     model_name = "WRF-HYDRO v5.3.x"
