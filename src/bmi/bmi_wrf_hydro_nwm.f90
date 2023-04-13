@@ -11,8 +11,9 @@ contains
 
   ! Get the name of the model.
   module procedure wrf_hydro_component_name
-    character(len=128), target :: model_name
-    model_name = "WRF-HYDRO v5.3.x"
+    use module_version, only : get_model_version
+    character(len=1024), target :: model_name
+    model_name = get_model_version()
     name => model_name
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_component_name
@@ -24,8 +25,11 @@ contains
 
   ! Perform startup tasks for the model.
   module procedure wrf_hydro_initialize
-  ! this%model = wrf_hydro_model()
-    call init_from_defaults(this%model)
+    use orchestrator_base, only : orchestrator
+    use module_noahmp_hrldas_driver, only: land_driver_ini
+    call orchestrator%init()
+    this%orchestrator = orchestrator
+    ! call land_driver_ini(NTIME, state)
   end procedure ! wrf_hydro_initialize
 
   ! Advance the model one time step.

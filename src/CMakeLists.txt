@@ -61,6 +61,8 @@ add_dependencies(hydro_data_rec hydro_routing_subsurface)
 #add_dependencies(hydro_data_rec hydro_routing_groundwater_nhd)
 add_dependencies(hydro_data_rec hydro_routing_reservoirs)
 
+add_library(wrfhydro_lib INTERFACE)
+
 
 if (HYDRO_LSM MATCHES "NoahMP")
     message ("-- Building NoahMP LSM")
@@ -71,40 +73,50 @@ if (HYDRO_LSM MATCHES "NoahMP")
     add_dependencies(hydro_noahmp_cpl hydro_mpp )
     add_dependencies(hydro_noahmp_cpl hydro_driver )
 
+    add_library(module_NoahMP_hrldas
+        Land_models/NoahMP/IO_code/module_hrldas_netcdf_io.F
+        Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.F)
 
     add_executable(wrfhydro.exe
-        Land_models/NoahMP/IO_code/main_hrldas_driver.F
-        Land_models/NoahMP/IO_code/module_hrldas_netcdf_io.F
-        Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.F
-    )
+        Land_models/NoahMP/IO_code/main_hrldas_driver.F)
 
     target_include_directories(wrfhydro.exe BEFORE PUBLIC ${PROJECT_BINARY_DIR}/mods)
 
-    target_link_libraries(wrfhydro.exe hydro_utils)
-    target_link_libraries(wrfhydro.exe hydro_mpp)
-    target_link_libraries(wrfhydro.exe hydro_debug_utils)
-    target_link_libraries(wrfhydro.exe hydro_routing_overland)
-    target_link_libraries(wrfhydro.exe hydro_routing_subsurface)
-    #target_link_libraries(wrfhydro.exe hydro_routing_groundwater)
-    #target_link_libraries(wrfhydro.exe hydro_routing_groundwater_bucket)
-    #target_link_libraries(wrfhydro.exe hydro_routing_groundwater_nhd)
-    #target_link_libraries(wrfhydro.exe hydro_routing_groundwater_simple)
-    target_link_libraries(wrfhydro.exe hydro_data_rec)
-    target_link_libraries(wrfhydro.exe hydro_routing)
-    target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_levelpool)
-    target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_hybrid)
-    target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_rfc)
-    target_link_libraries(wrfhydro.exe hydro_routing_reservoirs)
-    target_link_libraries(wrfhydro.exe hydro_driver)
-    target_link_libraries(wrfhydro.exe noahmp_util)
-    target_link_libraries(wrfhydro.exe noahmp_phys)
-    target_link_libraries(wrfhydro.exe noahmp_data)
-    target_link_libraries(wrfhydro.exe hydro_noahmp_cpl)
-    target_link_libraries(wrfhydro.exe ${NETCDF_LIBRARIES})
+    target_link_libraries(wrfhydro_lib INTERFACE
+        hydro_utils
+        hydro_mpp
+        hydro_debug_utils
+        hydro_routing_overland
+        hydro_routing_subsurface
+        # hydro_routing_groundwater
+        # hydro_routing_groundwater_bucket
+        # hydro_routing_groundwater_nhd
+        # hydro_routing_groundwater_simple
+        hydro_data_rec
+        hydro_routing
+        hydro_routing_reservoirs_levelpool
+        hydro_routing_reservoirs_hybrid
+        hydro_routing_reservoirs_rfc
+        hydro_routing_reservoirs
+        hydro_driver
+        noahmp_util
+        noahmp_phys
+        noahmp_data
+        hydro_noahmp_cpl
+        ${NETCDF_LIBRARIES})
+
+    add_dependencies(wrfhydro.exe wrf_hydro_bmi.exe)
+
+    target_link_libraries(module_NoahMP_hrldas
+        wrfhydro_lib)
+
+    target_link_libraries(wrfhydro.exe
+        wrfhydro_lib
+        module_NoahMP_hrldas)
 
     if (WRF_HYDRO_NUDGING STREQUAL "1")
         target_link_libraries(wrfhydro.exe hydro_nudging)
-         add_dependencies(wrfhydro.exe hydro_nudging)
+        add_dependencies(wrfhydro.exe hydro_nudging)
     endif (WRF_HYDRO_NUDGING STREQUAL "1")
 
     add_custom_command(TARGET wrfhydro.exe POST_BUILD
@@ -118,6 +130,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
         COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
         COMMAND ln -s wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
         COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
+	COMMAND cp ${PROJECT_BINARY_DIR}/src/bmi/wrf_hydro_bmi.exe ${CMAKE_BINARY_DIR}/Run/
     )
 
 elseif(HYDRO_LSM MATCHES "Noah")
@@ -129,33 +142,44 @@ elseif(HYDRO_LSM MATCHES "Noah")
         add_dependencies(hydro_noah_cpl hydro_mpp )
         add_dependencies(hydro_noah_cpl hydro_driver )
 
-        add_executable(wrfhydro.exe
-                Land_models/Noah/IO_code/module_hrldas_netcdf_io.F
-                Land_models/Noah/IO_code/Noah_hrldas_driver.F
-        )
+	add_library(module_Noah_hrldas
+            Land_models/Noah/IO_code/module_hrldas_netcdf_io.F)
+
+	add_executable(wrfhydro.exe
+            Land_models/Noah/IO_code/Noah_hrldas_driver.F)
 
         target_include_directories(wrfhydro.exe BEFORE PUBLIC ${PROJECT_BINARY_DIR}/mods)
 
-        target_link_libraries(wrfhydro.exe hydro_utils)
-        target_link_libraries(wrfhydro.exe hydro_mpp)
-        target_link_libraries(wrfhydro.exe hydro_debug_utils)
-        target_link_libraries(wrfhydro.exe hydro_routing_overland)
-        target_link_libraries(wrfhydro.exe hydro_routing_subsurface)
-        #target_link_libraries(wrfhydro.exe hydro_routing_groundwater)
-        #target_link_libraries(wrfhydro.exe hydro_routing_groundwater_bucket)
-        #target_link_libraries(wrfhydro.exe hydro_routing_groundwater_nhd)
-        #target_link_libraries(wrfhydro.exe hydro_routing_groundwater_simple)
-        target_link_libraries(wrfhydro.exe hydro_data_rec)
-        target_link_libraries(wrfhydro.exe hydro_routing)
-        target_link_libraries(wrfhydro.exe hydro_driver)
-        target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_levelpool)
-        target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_hybrid)
-        target_link_libraries(wrfhydro.exe hydro_routing_reservoirs_rfc)
-        target_link_libraries(wrfhydro.exe hydro_routing_reservoirs)
-        target_link_libraries(wrfhydro.exe noah_util)
-        target_link_libraries(wrfhydro.exe noah)
-        target_link_libraries(wrfhydro.exe hydro_noah_cpl)
-        target_link_libraries(wrfhydro.exe ${NETCDF_LIBRARIES} ${MPI_Fortran_LIBRARIES})
+	target_link_libraries(wrfhydro_lib INTERFACE
+            hydro_utils
+            hydro_mpp
+            hydro_debug_utils
+            hydro_routing_overland
+            hydro_routing_subsurface
+            # hydro_routing_groundwater
+            # hydro_routing_groundwater_bucket
+            # hydro_routing_groundwater_nhd
+            # hydro_routing_groundwater_simple
+            hydro_data_rec
+            hydro_routing
+            hydro_driver
+            hydro_routing_reservoirs_levelpool
+            hydro_routing_reservoirs_hybrid
+            hydro_routing_reservoirs_rfc
+            hydro_routing_reservoirs
+            noah_util
+            noah
+            hydro_noah_cpl
+            ${NETCDF_LIBRARIES} ${MPI_Fortran_LIBRARIES})
+
+	add_dependencies(wrfhydro.exe wrf_hydro_bmi.exe)
+
+	target_link_libraries(module_Noah_hrldas
+	    wrfhydro_lib)
+
+	target_link_libraries(wrfhydro.exe
+  	    wrfhydro_lib
+	    module_Noah_hrldas)
 
         if (WRF_HYDRO_NUDGING STREQUAL "1")
             target_link_libraries(wrfhydro.exe hydro_nudging)
