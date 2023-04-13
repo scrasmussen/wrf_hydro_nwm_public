@@ -17,3 +17,6 @@ add_library(hydro_utils STATIC
 	module_version.F
 	module_hydro_stop.F
 )
+
+target_link_libraries(hydro_utils
+  hydro_mpp)

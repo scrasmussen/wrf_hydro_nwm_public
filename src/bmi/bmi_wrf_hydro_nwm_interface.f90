@@ -1,12 +1,14 @@
 module bmi_wrf_hydro_nwm_mod
   use bmif_2_0
-  use wrf_hydro_model_mod
+  use orchestrator_base, only : orchestrator_
+  use state_module, only: wrf_hydro_model => state_type
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
   implicit none
 
   type, extends(bmi) :: bmi_wrf_hydro_nwm
      private
      type (wrf_hydro_model) :: model
+     type (orchestrator_) :: orchestrator
    contains
      procedure :: get_component_name => wrf_hydro_component_name
      procedure :: get_input_item_count => wrf_hydro_input_item_count
