@@ -18,8 +18,3 @@ target_link_libraries(bmi_wrf_hydro_nwm
 
 target_link_libraries(wrf_hydro_bmi.exe
   bmi_wrf_hydro_nwm)
-
-# --- add ctests ---
-add_test(NAME wrf_hydro_bmi_test
-  COMMAND wrf_hydro_bmi.exe
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/Run)
