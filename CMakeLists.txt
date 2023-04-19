@@ -253,3 +253,4 @@ include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
 
 add_subdirectory("src")
 add_subdirectory("tests/ctests")
+add_subdirectory("tests")

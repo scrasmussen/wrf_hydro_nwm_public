@@ -166,6 +166,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 COMMAND cp ${PROJECT_BINARY_DIR}/src/bmi/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
                 COMMAND ln -sf ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
                 COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro
+                COMMAND cp ${PROJECT_BINARY_DIR}/src/bmi/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
         )
         if(WRF_HYDRO_CREATE_EXE_SYMLINK)
                 add_custom_command(TARGET wrfhydro POST_BUILD

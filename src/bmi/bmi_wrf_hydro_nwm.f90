@@ -18,34 +18,79 @@ contains
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_component_name
 
+  ! Perform startup tasks for the model.
+  module procedure wrf_hydro_initialize
+    use orchestrator_base, only : orchestrator
+    use module_noahmp_hrldas_driver, only: land_driver_ini
+    integer :: res, end_time
+    double precision :: start_time
+    call orchestrator%init()
+    this%orchestrator = orchestrator
+    call land_driver_ini(end_time, this%model)
+
+    ! initialize time step values
+    res = this%get_start_time(start_time)
+    this%model%itimestep = int(start_time)
+    this%model%ntime = end_time
+    this%model%timestep = 1
+  end procedure ! wrf_hydro_initialize
+
+  ! Advance the model one time step.
+  module procedure wrf_hydro_update
+    use module_noahmp_hrldas_driver, only: land_driver_exe
+    integer :: res
+    double precision :: current_time, time_step
+    res = this%get_current_time(current_time)
+    res = this%get_time_step(time_step)
+    call land_driver_exe(int(current_time), this%model)
+    this%model%itimestep = this%model%itimestep + int(time_step)
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_update
+
+  !---------------------------------------------------------------------
+  ! Should update how this is handeled in main_hrldas_driver
+  !---------------------------------------------------------------------
+  ! Start time of the model.
+  module procedure wrf_hydro_start_time
+    time = 1.0
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_start_time
+
+  ! End time of the model.
+  module procedure wrf_hydro_end_time
+    time = dble(this%model%ntime)
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_end_time
+
+  ! Time step of the model.
+  module procedure wrf_hydro_time_step
+    time_step = dble(this%model%timestep)
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_time_step
+
+  ! Current time of the model.
+  module procedure wrf_hydro_current_time
+    time = dble(this%model%itimestep)
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_current_time
+
+
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
   !---------------------------------------------------------------------
 
-  ! Perform startup tasks for the model.
-  module procedure wrf_hydro_initialize
-    use orchestrator_base, only : orchestrator
-    use module_noahmp_hrldas_driver, only: land_driver_ini
-    call orchestrator%init()
-    this%orchestrator = orchestrator
-    ! call land_driver_ini(NTIME, state)
-  end procedure ! wrf_hydro_initialize
-
-  ! Advance the model one time step.
-  module procedure wrf_hydro_update
+  ! Perform teardown tasks for the model.
+  module procedure wrf_hydro_finalize
+    ! use module_hydro_drv!, only : hydro_finish
+    call hydro_finish()
     bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_update
+  end procedure ! wrf_hydro_finalize
 
   ! Advance the model until the given time.
   module procedure wrf_hydro_update_until
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_update_until
-
-  ! Perform teardown tasks for the model.
-  module procedure wrf_hydro_finalize
-    bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_finalize
 
   ! Count a model's input variables.
   module procedure wrf_hydro_input_item_count
@@ -105,35 +150,11 @@ contains
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_var_location
 
-  ! Current time of the model.
-  module procedure wrf_hydro_current_time
-    time = STUB_D
-    bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_current_time
-
-  ! Start time of the model.
-  module procedure wrf_hydro_start_time
-    time = STUB_D
-    bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_start_time
-
-  ! End time of the model.
-  module procedure wrf_hydro_end_time
-    time = STUB_D
-    bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_end_time
-
   ! Time units of the model.
   module procedure wrf_hydro_time_units
     units = STUB_C
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_time_units
-
-  ! Time step of the model.
-  module procedure wrf_hydro_time_step
-    time_step = STUB_D
-    bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_time_step
 
   ! Get a copy of values (flattened!) of the given integer variable.
   module procedure wrf_hydro_get_int
