@@ -28,6 +28,9 @@ if(${PROJECT_NAME} STREQUAL "WRF")
 endif()
 add_subdirectory("bmi")
 
+# add Basic Module Interface (BMI)
+add_subdirectory("CPL/BMI_cpl")
+
 if (WRF_HYDRO_NUDGING STREQUAL "1")
         add_subdirectory("nudging")
         add_dependencies(hydro_routing hydro_nudging)
@@ -166,14 +169,13 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 COMMAND cp ${PROJECT_BINARY_DIR}/src/bmi/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
                 COMMAND ln -sf ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
                 COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro
-                COMMAND cp ${PROJECT_BINARY_DIR}/src/bmi/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
+                COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
         )
         if(WRF_HYDRO_CREATE_EXE_SYMLINK)
                 add_custom_command(TARGET wrfhydro POST_BUILD
                         COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
                 )
         endif()
-
 
 elseif (HYDRO_LSM MATCHES "Noah")
         message("-- Building Noah LSM")
