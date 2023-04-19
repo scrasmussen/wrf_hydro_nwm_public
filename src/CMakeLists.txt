@@ -11,7 +11,9 @@ add_subdirectory("Routing/Reservoirs")
 add_subdirectory("Data_Rec")
 add_subdirectory("Routing")
 add_subdirectory("HYDRO_drv")
-add_subdirectory("bmi")
+
+# add Basic Module Interface (BMI)
+add_subdirectory("CPL/BMI_cpl")
 
 if (WRF_HYDRO_NUDGING STREQUAL "1")
     add_subdirectory("nudging")
@@ -132,7 +134,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
         COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
         COMMAND ln -s wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
         COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
-	COMMAND cp ${PROJECT_BINARY_DIR}/src/bmi/wrf_hydro_bmi.exe ${CMAKE_BINARY_DIR}/Run/
+	COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi.exe ${CMAKE_BINARY_DIR}/Run/
     )
 
 elseif(HYDRO_LSM MATCHES "Noah")
