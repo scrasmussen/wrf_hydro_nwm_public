@@ -223,3 +223,4 @@ include_directories(AFTER ${NETCDF_INCLUDES})
 include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
 
 add_subdirectory("src")
+add_subdirectory("tests")
