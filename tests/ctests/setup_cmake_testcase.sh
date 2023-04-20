@@ -5,9 +5,9 @@
 # can run wrf_hydro.exe
 
 # setup directory variables in script
-build_dir=${1}
-test_file_dir=${build_dir}/tests
-run_dir=${build_dir}/Run
+binary_dir=${1}
+test_file_dir=${binary_dir}/tests
+run_dir=${binary_dir}/Run
 
 # download testcase if not present
 croton_tarball=croton_NY_training_example_v5.2.tar.gz
