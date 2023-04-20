@@ -22,14 +22,15 @@ contains
   module procedure wrf_hydro_initialize
     use orchestrator_base, only : orchestrator
     use module_noahmp_hrldas_driver, only: land_driver_ini
-    integer :: res, end_time
+    integer :: end_time
     double precision :: start_time
+    bmi_status = BMI_SUCCESS
     call orchestrator%init()
     this%orchestrator = orchestrator
     call land_driver_ini(end_time, this%model)
 
     ! initialize time step values
-    res = this%get_start_time(start_time)
+    call stat_check(this%get_start_time(start_time), bmi_status)
     this%model%itimestep = int(start_time)
     this%model%ntime = end_time
     this%model%timestep = 1
@@ -38,13 +39,12 @@ contains
   ! Advance the model one time step.
   module procedure wrf_hydro_update
     use module_noahmp_hrldas_driver, only: land_driver_exe
-    integer :: res
     double precision :: current_time, time_step
-    res = this%get_current_time(current_time)
-    res = this%get_time_step(time_step)
+    bmi_status = BMI_SUCCESS
+    call stat_check(this%get_current_time(current_time), bmi_status)
+    call stat_check(this%get_time_step(time_step), bmi_status)
     call land_driver_exe(int(current_time), this%model)
     this%model%itimestep = this%model%itimestep + int(time_step)
-    bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_update
 
   !---------------------------------------------------------------------
@@ -89,7 +89,13 @@ contains
 
   ! Advance the model until the given time.
   module procedure wrf_hydro_update_until
+    double precision :: current_time
     bmi_status = BMI_SUCCESS
+    call stat_check(this%get_current_time(current_time), bmi_status)
+    do while (current_time < time)
+       call stat_check(this%update(), bmi_status)
+       call stat_check(this%get_current_time(current_time), bmi_status)
+    end do
   end procedure ! wrf_hydro_update_until
 
   ! Count a model's input variables.
@@ -327,8 +333,19 @@ contains
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_grid_nodes_per_face
 
-  ! A non-BMI procedure for model introspection.
+
+  ! ------------------------------------
+  ! Non-BMI procedures
+  ! ------------------------------------
+
+  ! Model introspection.
   module procedure print_model_info
   end procedure ! print_model_info
 
+  ! Check the status and update bmi_status if necessary
+  module procedure stat_check
+    if (status .ne. BMI_SUCCESS) then
+       bmi_status = BMI_FAILURE
+    end if
+  end procedure
 end submodule bmi_wrf_hydro_nwm_smod

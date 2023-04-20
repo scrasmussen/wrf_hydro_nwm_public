@@ -495,10 +495,19 @@ module bmi_wrf_hydro_nwm_mod
       integer :: bmi_status
     end function wrf_hydro_grid_nodes_per_face
 
-    ! A non-BMI procedure for model introspection.
+    ! ------------------------------------
+    ! Non-BMI procedures
+    ! ------------------------------------
+
+    ! Model introspection.
     module subroutine print_model_info(this)
       class (bmi_wrf_hydro_nwm), intent(in) :: this
     end subroutine print_model_info
 
+    ! Check the status and update bmi_status if necessary
+    module subroutine stat_check(status, bmi_status)
+      integer, intent(in) :: status
+      integer, intent(inout) :: bmi_status
+    end subroutine stat_check
   end interface
 end module bmi_wrf_hydro_nwm_mod
