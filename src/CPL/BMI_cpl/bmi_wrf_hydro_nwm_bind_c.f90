@@ -21,74 +21,55 @@ contains
 
   ! Perform startup tasks for the model.
   module procedure wrf_hydro_initialize_c
-    use module_noahmp_hrldas_driver, only: land_driver_ini
-    integer(c_int) :: end_time
-    real(c_double) :: start_time
-    bmi_status = BMI_SUCCESS
-    call orchestrator%init()
-    call land_driver_ini(end_time, model)
-
-    ! initialize time step values
-    call stat_check_c(wrf_hydro_start_time_c(start_time), bmi_status)
-    model%itimestep = int(start_time)
-    model%ntime = end_time
-    model%timestep = 1
+    bmi_status = wrf_hydro%initialize("no config file")
   end procedure ! wrf_hydro_initialize
 
   ! Advance the model one time step.
   module procedure wrf_hydro_update_c
-    use module_noahmp_hrldas_driver, only: land_driver_exe
-    real(c_double) :: current_time, time_step
-    bmi_status = BMI_SUCCESS
-    call stat_check_c(wrf_hydro_current_time_c(current_time), bmi_status)
-    call stat_check_c(wrf_hydro_time_step_c(time_step), bmi_status)
-    call land_driver_exe(int(current_time), model)
-    model%itimestep = model%itimestep + int(time_step)
+    bmi_status = wrf_hydro%update()
   end procedure ! wrf_hydro_update
 
   ! Perform teardown tasks for the model.
   module procedure wrf_hydro_finalize_c
-    ! use module_hydro_drv!, only : hydro_finish
-    call hydro_finish()
-    bmi_status = BMI_SUCCESS
+    bmi_status = wrf_hydro%finalize()
   end procedure ! wrf_hydro_finalize
 
   ! Advance the model until the given time.
   module procedure wrf_hydro_update_until_c
-    real(c_double) :: current_time
-    bmi_status = BMI_SUCCESS
-    call stat_check_c(wrf_hydro_current_time_c(current_time), bmi_status)
-    do while (current_time < time)
-       call stat_check_c(wrf_hydro_update_c(), bmi_status)
-       call stat_check_c(wrf_hydro_current_time_c(current_time), bmi_status)
-    end do
+    bmi_status = wrf_hydro%update_until(time)
   end procedure ! wrf_hydro_update_until
+
+  ! Count a model's input variables.
+  module procedure wrf_hydro_input_item_count_c
+    bmi_status = wrf_hydro%get_input_item_count(count)
+  end procedure ! wrf_hydro_input_item_count
+
+  ! Count a model's output variables.
+  module procedure wrf_hydro_output_item_count_c
+    bmi_status = wrf_hydro%get_output_item_count(count)
+  end procedure ! wrf_hydro_output_item_count
 
   !---------------------------------------------------------------------
   ! Should update how this is handeled in main_hrldas_driver
   !---------------------------------------------------------------------
   ! Start time of the model.
   module procedure wrf_hydro_start_time_c
-    time = 1.0
-    bmi_status = BMI_SUCCESS
+    bmi_status = wrf_hydro%get_start_time(time)
   end procedure ! wrf_hydro_start_time
 
   ! End time of the model.
   module procedure wrf_hydro_end_time_c
-    time = dble(model%ntime)
-    bmi_status = BMI_SUCCESS
+    bmi_status = wrf_hydro%get_end_time(time)
   end procedure ! wrf_hydro_end_time
 
   ! Time step of the model.
   module procedure wrf_hydro_time_step_c
-    time_step = dble(model%timestep)
-    bmi_status = BMI_SUCCESS
+    bmi_status = wrf_hydro%get_end_time(time_step)
   end procedure ! wrf_hydro_time_step
 
   ! Current time of the model.
   module procedure wrf_hydro_current_time_c
-    time = dble(model%itimestep)
-    bmi_status = BMI_SUCCESS
+    bmi_status = wrf_hydro%get_current_time(time)
   end procedure ! wrf_hydro_current_time
 
 
@@ -96,18 +77,6 @@ contains
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
   !---------------------------------------------------------------------
-
-  ! Count a model's input variables.
-  module procedure wrf_hydro_input_item_count_c
-    count = STUB_I
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_input_item_count
-
-  ! Count a model's output variables.
-  module procedure wrf_hydro_output_item_count_c
-    count = STUB_I
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_output_item_count
 
   ! List a model's input variables.
   module procedure wrf_hydro_input_var_names_c

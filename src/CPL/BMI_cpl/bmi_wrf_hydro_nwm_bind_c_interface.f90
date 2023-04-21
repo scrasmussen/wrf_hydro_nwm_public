@@ -1,5 +1,6 @@
 module bmi_wrf_hydro_nwm_bind_c_mod
   ! use bmif_2_0
+  use bmi_wrf_hydro_nwm_mod, only: bmi_wrf_hydro_nwm
   use orchestrator_base, only : orchestrator_
   use state_module, only: wrf_hydro_model => state_type
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer, c_int, &
@@ -15,8 +16,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
   integer(c_int), parameter :: BMI_SUCCESS = 0
   character(256) :: name = ""
 
-  type (wrf_hydro_model) :: model
-  type (orchestrator_) :: orchestrator
+  type (bmi_wrf_hydro_nwm) :: wrf_hydro
 
   interface
 
