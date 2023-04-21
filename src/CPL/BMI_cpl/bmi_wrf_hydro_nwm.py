@@ -1,7 +1,12 @@
 import ctypes as ct
-bind_c_lib_path='../../../../build/lib/libbmi_wrf_hydro_nwm_bind_c.so'
+bind_c_lib_path_1='../../../../build/lib/libbmi_wrf_hydro_nwm_bind_c.so'
+bind_c_lib_path_2='../lib/libbmi_wrf_hydro_nwm_bind_c.so'
 def symbols_init():
-    wrf_h = ct.CDLL(bind_c_lib_path)
+    # this needs to be fixed so script can run from anywhere
+    try:
+        wrf_h = ct.CDLL(bind_c_lib_path_1)
+    except:
+        wrf_h = ct.CDLL(bind_c_lib_path_2)
     # wrf_h.initialize.argtypes = [] # need to work on character strings
     wrf_h.initialize.restype = ct.c_int
 
