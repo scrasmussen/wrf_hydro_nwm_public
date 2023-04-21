@@ -122,10 +122,16 @@ if (HYDRO_LSM MATCHES "NoahMP")
     endif (WRF_HYDRO_NUDGING STREQUAL "1")
 
     add_custom_command(TARGET wrfhydro.exe POST_BUILD
-        COMMAND mkdir -p ${CMAKE_BINARY_DIR}/Run
-	# Run can have directories after running CTest, running more specific rm commands
-        COMMAND rm -rf ${CMAKE_BINARY_DIR}/Run/example_case
-        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/*
+        # Run can have directories after running CTest, running more specific rm commands
+        # COMMAND rm -rf ${CMAKE_BINARY_DIR}/Run/example_case
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP.exe
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/*.exe
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/*.TBL
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/hydro.namelist
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/namelist.hrldas
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/2011*
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/diag_hydro.*
+
         COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP.exe
         COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/NoahMP/* ${CMAKE_BINARY_DIR}/Run
         COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
@@ -191,7 +197,6 @@ elseif(HYDRO_LSM MATCHES "Noah")
         endif (WRF_HYDRO_NUDGING STREQUAL "1")
 
         add_custom_command(TARGET wrfhydro.exe POST_BUILD
-            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/Run
             COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/*
             COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro_Noah.exe
             COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/Noah/* ${CMAKE_BINARY_DIR}/Run
