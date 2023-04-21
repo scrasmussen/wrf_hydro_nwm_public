@@ -21,7 +21,9 @@ add_library(bmi_wrf_hydro_nwm_bind_c SHARED
 target_link_libraries(bmi_wrf_hydro_nwm_bind_c
   bmi_interface
   noahmp_data
-  wrfhydro_lib)
+  wrfhydro_lib
+  bmi_wrf_hydro_nwm
+  )
 
 target_link_libraries(bmi_wrf_hydro_nwm_bind_c
   wrfhydro_lib
