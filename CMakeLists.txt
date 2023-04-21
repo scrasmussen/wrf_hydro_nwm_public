@@ -27,6 +27,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 # enable ctests
 enable_testing()
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 #message("-- MPI Include directories: " ${MPI_INCLUDE_PATH} )
 #message("-- MPI C COMPILER : " ${MPI_C_COMPILER} )
