@@ -253,5 +253,8 @@ include_directories(AFTER ${NETCDF_INCLUDES_F77})
 include_directories(AFTER ${NETCDF_INCLUDES_F90})
 include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
 
+# make an if statement
+enable_language(CXX)
+
 add_subdirectory("src")
 add_subdirectory("tests/ctests")
