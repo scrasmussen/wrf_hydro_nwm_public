@@ -41,3 +41,10 @@ file(CREATE_LINK
   "${CMAKE_CURRENT_SOURCE_DIR}/wrf_hydro_nwm_bmi_driver.py"
   "${CMAKE_BINARY_DIR}/Run/wrf_hydro_bmi.py"
   SYMBOLIC)
+
+# setup WRF-Hydro BMI C++ driver
+add_executable(wrf_hydro_bmi_cpp.exe
+  wrf_hydro_nwm_bmi_driver.cpp)
+
+target_link_libraries(wrf_hydro_bmi_cpp.exe
+  bmi_wrf_hydro_nwm_bind_c)
