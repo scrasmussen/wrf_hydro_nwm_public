@@ -227,11 +227,11 @@ else ()
     message ("CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
     message ("Fortran compiler: " ${Fortran_COMPILER_NAME})
     message ("No optimized Fortran compiler flags are known, we just try -O2...")
-    set (CMAKE_Fortran_FLAGS "-cpp")
-    set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
-    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
-endif ()
-message ("-- CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
+    set (CMAKE_Fortran_FLAGS_RELEASE "-cpp -O2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-cpp -O0 -g")
+    set (CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+    set (CMAKE_EXE_LINKER_FLAGS "-g")
+endif ( CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*" )
 
 #set output directories for libraries binaries and fortran .mod files
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
@@ -245,6 +245,9 @@ include_directories(AFTER ${PROJECT_BINARY_DIR}/mods)
 include_directories(AFTER ${MPI_INCLUDE_PATH})
 include_directories(AFTER ${NETCDF_INCLUDES})
 include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
+
+# make an if statement
+enable_language(CXX)
 
 add_subdirectory("src")
 add_subdirectory("tests/ctests")
