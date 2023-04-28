@@ -121,6 +121,9 @@ if (HYDRO_LSM MATCHES "NoahMP")
         add_dependencies(wrfhydro.exe hydro_nudging)
     endif (WRF_HYDRO_NUDGING STREQUAL "1")
 
+    add_dependencies(wrfhydro.exe
+      wrf_hydro_bmi_cpp.exe)
+
     add_custom_command(TARGET wrfhydro.exe POST_BUILD
         # Run can have directories after running CTest, running more specific rm commands
         # COMMAND rm -rf ${CMAKE_BINARY_DIR}/Run/example_case
@@ -141,6 +144,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
         COMMAND ln -s wrf_hydro_NoahMP.exe ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
         COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro.exe
 	COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi.exe ${CMAKE_BINARY_DIR}/Run/
+	COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi_cpp.exe ${CMAKE_BINARY_DIR}/Run/
     )
 
 elseif(HYDRO_LSM MATCHES "Noah")
