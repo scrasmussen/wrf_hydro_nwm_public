@@ -2,8 +2,25 @@ module bmi_wrf_hydro_nwm_mod
   use bmif_2_0
   use orchestrator_base, only : orchestrator_
   use state_module, only: wrf_hydro_model => state_type
+  use module_NWM_io_dict, only: numLdasVars, ldasMeta
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
   implicit none
+
+  ! integer,parameter  :: output_item_countfoo = 2
+  ! character(len=BMI_MAX_VAR_NAME) :: output_item_listfoo(output_item_countfoo)
+  integer, parameter :: input_item_count = 2
+  integer, parameter :: output_item_count = numLdasVars
+  character(len=BMI_MAX_VAR_NAME), parameter :: input_item_list(input_item_count) = &
+    ["ACCPRCP", "ACCECAN"]
+  ! character(len=BMI_MAX_VAR_NAME), parameter :: output_item_list(output_item_count) = &
+  !   ["ACCPRCP", "ACCECAN"]
+
+  character(len=64), target :: output_item_list(output_item_count)
+  ! future, currently smaller
+  ! character(len=BMI_MAX_VAR_NAME), target :: output_item_list(output_item_count)
+
+  type(ldasMeta) :: ldasOutDict
+
 
   type, extends(bmi) :: bmi_wrf_hydro_nwm
      private
@@ -510,4 +527,12 @@ module bmi_wrf_hydro_nwm_mod
       integer, intent(inout) :: bmi_status
     end subroutine stat_check
   end interface
+
+  interface wrf_hydro_nwm
+     module procedure constructor
+  end interface wrf_hydro_nwm
+contains
+  function constructor() result(this)
+    type(bmi_wrf_hydro_nwm) :: this
+  end function constructor
 end module bmi_wrf_hydro_nwm_mod
