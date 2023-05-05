@@ -207,9 +207,9 @@ contains
     bmi_status = BMI_SUCCESS
     shape = get_grid_shape(grid)
     ! convert from 'xy' indexing to 'ij' indexing
-    shape = cshift(shape,1)
+    shape = cshift(shape, 1)
     if (size(shape) == 3) then
-       shape(1:2) = cshift(shape(1:2),1)
+       shape(1:2) = cshift(shape(1:2), 1)
     end if
     if (shape(0) == 0) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_shape
@@ -356,7 +356,26 @@ contains
 
   ! Get a reference to the given real variable.
   module procedure wrf_hydro_get_ptr_float
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    type (c_ptr) :: src
+    ! WRF-Hydro internal variables are not targets and currently cannot
+    ! support this function
+    dest_ptr => NULL()
     bmi_status = BMI_FAILURE
+    select case(name)
+    case("Fortran indexing starts at 1")
+       dest_ptr => NULL()
+    case("IVGTYP")
+       ! src = c_loc(IVGTYP) ! VARIABLE TO A TARGET
+       ! call c_f_pointer(src, dest_ptr, [n_elements])
+    case("ISLTYP")
+    case default
+       dest_ptr => NULL()
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: variable ptr ", trim(name), " not found"
+    end select
+
+  bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_ptr_float
 
   ! Get a reference to the given double variable.
@@ -371,7 +390,33 @@ contains
 
   ! Get real values at particular (one-dimensional) indices.
   module procedure wrf_hydro_get_at_indices_float
-    bmi_status = BMI_FAILURE
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    real, allocatable ::  pack_data(:), ind_data(:)
+    integer :: n, i
+    logical :: unpack
+    unpack = .true.
+    bmi_status = BMI_SUCCESS
+
+    select case(name)
+    case("IVGTYP")
+       pack_data = pack(IVGTYP, .true.)
+    case("ISLTYP")
+       pack_data = pack(ISLTYP, .true.)
+    case default
+       unpack = .false.
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+
+    ! if data found, unpack data
+    if (unpack .eqv. .true.) then
+       n = size(inds)
+       allocate(ind_data(n))
+       do i=1,n
+          ind_data(i) = pack_data(inds(i))
+       end do
+       dest = ind_data
+    end if
   end procedure ! wrf_hydro_get_at_indices_float
 
   ! Get double values at particular (one-dimensional) indices.
