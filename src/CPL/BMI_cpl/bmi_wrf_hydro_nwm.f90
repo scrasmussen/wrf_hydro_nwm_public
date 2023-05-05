@@ -155,6 +155,61 @@ contains
     if (nbytes == 0) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_var_nbytes
 
+  ! this function is need so that there isn't an object clash between the
+  ! variable rank and the intrinsic function rank
+  function get_grid_rank(grid) result(var_rank)
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer, intent(in) :: grid
+    integer :: var_rank
+    select case(grid)
+    case(0)
+       var_rank = -1
+    case(1) ! "IVGTYP"
+       var_rank = rank(IVGTYP)
+    case(2) ! "ISLTYP"
+       var_rank = rank(ISLTYP)
+    case default
+       var_rank = -1
+       print *, "WARNING: variable ", grid, " not found, rank set to -1"
+    end select
+  end function get_grid_rank
+
+  ! Get number of dimensions of the computational grid.
+  module procedure wrf_hydro_grid_rank
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    bmi_status = BMI_SUCCESS
+    rank = get_grid_rank(grid)
+    if (rank == -1) bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_grid_rank
+
+    ! this function is need so that there isn't an object clash between the
+  ! variable shape and the intrinsic function shape
+  function get_grid_shape(grid) result(grid_shape)
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer, intent(in) :: grid
+    integer, dimension(:), allocatable :: grid_shape
+    select case(grid)
+    case(0)
+       grid_shape = [0]
+    case(1) ! "IVGTYP"
+       grid_shape = shape(IVGTYP)
+    case(2) ! "ISLTYP"
+       grid_shape = shape(ISLTYP)
+    case default
+       grid_shape = [0]
+       print *, "WARNING: grid", grid, " was not found"
+    end select
+  end function get_grid_shape
+
+  ! Get the dimensions of the computational grid.
+  module procedure wrf_hydro_grid_shape
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer, dimension(:), allocatable :: grid_shape, shapes
+    bmi_status = BMI_SUCCESS
+    shape = get_grid_shape(grid)
+    if (shape(0) == 0) bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_grid_shape
+
   !---------------------------------------------------------------------
   ! Implemented but should be improved
   !---------------------------------------------------------------------
@@ -170,9 +225,9 @@ contains
   ! Get the data type of the given variable as a string.
   module procedure wrf_hydro_var_type
     integer :: grid, res
-    character(:), allocatable :: var_type
+    character(BMI_MAX_TYPE_NAME) :: var_type
     res = this%get_var_grid(name, grid)
-    var_type = get_unit_str(ldasOutDict%var_type(grid))
+    res = this%get_grid_type(grid, var_type)
     type = var_type
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_var_type
@@ -212,7 +267,6 @@ contains
        var_size = 0
     case(1) ! "IVGTYP"
        var_size = size(IVGTYP)
-       print *, "-------", size(IVGTYP), "|",shape(IVGTYP)
     case(2) ! "ISLTYP"
        var_size = size(ISLTYP)
     case default
@@ -228,6 +282,11 @@ contains
     if (size == 0) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_size
 
+  ! Get the grid type as a string.
+  module procedure wrf_hydro_grid_type
+    type = get_unit_str(ldasOutDict%var_type(grid))
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_grid_type
 
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
@@ -345,24 +404,6 @@ contains
   module procedure wrf_hydro_set_at_indices_double
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_set_at_indices_double
-
-  ! Get number of dimensions of the computational grid.
-  module procedure wrf_hydro_grid_rank
-    rank = STUB_I
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_grid_rank
-
-  ! Get the grid type as a string.
-  module procedure wrf_hydro_grid_type
-    type = STUB_C
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_grid_type
-
-  ! Get the dimensions of the computational grid.
-  module procedure wrf_hydro_grid_shape
-    shape = STUB_1D_I
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_grid_shape
 
   ! Get distance between nodes of the computational grid.
   module procedure wrf_hydro_grid_spacing
