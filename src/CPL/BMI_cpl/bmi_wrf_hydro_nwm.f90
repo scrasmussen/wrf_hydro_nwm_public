@@ -204,9 +204,13 @@ contains
   ! Get the dimensions of the computational grid.
   module procedure wrf_hydro_grid_shape
     use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
-    integer, dimension(:), allocatable :: grid_shape, shapes
     bmi_status = BMI_SUCCESS
     shape = get_grid_shape(grid)
+    ! convert from 'xy' indexing to 'ij' indexing
+    shape = cshift(shape,1)
+    if (size(shape) == 3) then
+       shape(1:2) = cshift(shape(1:2),1)
+    end if
     if (shape(0) == 0) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_shape
 
