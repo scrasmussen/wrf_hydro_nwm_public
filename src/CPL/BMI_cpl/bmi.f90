@@ -443,7 +443,7 @@ module bmif_2_0
       import :: bmi
       class(bmi), intent(in) :: this
       integer, intent(in) :: grid
-      integer, dimension(:), intent(out) :: shape
+      integer, dimension(:), intent(out), allocatable :: shape
       integer :: bmi_status
     end function bmif_get_grid_shape
 

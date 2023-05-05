@@ -408,7 +408,7 @@ module bmi_wrf_hydro_nwm_mod
     module function wrf_hydro_grid_shape(this, grid, shape) result(bmi_status)
       class(bmi_wrf_hydro_nwm), intent(in) :: this
       integer, intent(in) :: grid
-      integer, dimension(:), intent(out) :: shape
+      integer, dimension(:), intent(out), allocatable :: shape
       integer :: bmi_status
     end function wrf_hydro_grid_shape
 
