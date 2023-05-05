@@ -143,6 +143,18 @@ contains
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_current_time
 
+  ! Get size of the given variable, in bytes.
+  module procedure wrf_hydro_var_nbytes
+    integer :: res, grid, var_size, var_rank, i
+    integer :: item_size, grid_size
+    bmi_status = BMI_SUCCESS
+    res = this%get_var_grid(name, grid)
+    res = this%get_var_itemsize(name, item_size)
+    res = this%get_grid_size(grid, grid_size)
+    nbytes = item_size * grid_size
+    if (nbytes == 0) bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_var_nbytes
+
   !---------------------------------------------------------------------
   ! Implemented but should be improved
   !---------------------------------------------------------------------
@@ -198,9 +210,10 @@ contains
     select case(grid)
     case(0)
        var_size = 0
-    case(1) !"IVGTYP")
+    case(1) ! "IVGTYP"
        var_size = size(IVGTYP)
-    case(2) !"ISLTYP")
+       print *, "-------", size(IVGTYP), "|",shape(IVGTYP)
+    case(2) ! "ISLTYP"
        var_size = size(ISLTYP)
     case default
        var_size = 0
@@ -230,18 +243,6 @@ contains
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_input_var_names
 
-  ! Get size of the given variable, in bytes.
-  module procedure wrf_hydro_var_nbytes
-    integer :: res, grid, var_size, var_rank, i
-    integer :: item_size, grid_size
-    bmi_status = BMI_SUCCESS
-    res = this%get_var_grid(name, grid)
-    res = this%get_var_itemsize(name, item_size)
-    res = this%get_grid_size(grid, grid_size)
-    nbytes = item_size * grid_size
-    if (nbytes == 0) bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_var_nbytes
-
   ! Describe where a variable is located: node, edge, or face.
   module procedure wrf_hydro_var_location
     location = STUB_C
@@ -255,6 +256,28 @@ contains
 
   ! Get a copy of values (flattened!) of the given real variable.
   module procedure wrf_hydro_get_float
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer :: res, grid, size
+    real, allocatable ::  var_data(:)
+    res = this%get_var_grid(name, grid)
+    select case(grid)
+    case(0)
+       ! dest =
+    case(1) ! "IVGTYP"
+       ! if (allocated(dest)) then
+       !    var_data = pack(IVGTYP, .true.)
+       ! else
+       !    stop error "dest is not allocated"
+       ! end if
+       ! var_data
+       dest = pack(IVGTYP, .true.)
+    case(2) ! "ISLTYP"
+       var_data = pack(ISLTYP, .true.)
+       dest = var_data
+    case default
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_float
 
