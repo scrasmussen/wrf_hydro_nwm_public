@@ -292,30 +292,57 @@ contains
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_grid_type
 
+  ! Get real values at particular (one-dimensional) indices.
+  module procedure wrf_hydro_get_at_indices_float
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    real, allocatable ::  pack_data(:), ind_data(:)
+    integer :: n, i
+    logical :: unpack
+    unpack = .true.
+    bmi_status = BMI_SUCCESS
+
+    ! TODO: packing is easy but unefficient way of doing this
+    select case(name)
+    case("IVGTYP")
+       pack_data = pack(IVGTYP, .true.)
+    case("ISLTYP")
+       pack_data = pack(ISLTYP, .true.)
+    case default
+       unpack = .false.
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+
+    ! if data found, unpack data
+    if (unpack .eqv. .true.) then
+       n = size(inds)
+       allocate(ind_data(n))
+       do i=1,n
+          ind_data(i) = pack_data(inds(i))
+       end do
+       dest = ind_data
+    end if
+  end procedure ! wrf_hydro_get_at_indices_float
+
+  ! Set new values for a real model variable.
+  module procedure wrf_hydro_set_float
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    bmi_status = BMI_SUCCESS
+    select case(name)
+    case("IVGTYP")
+       IVGTYP = reshape(src, shape(IVGTYP))
+    case("ISLTYP")
+       ISLTYP = reshape(src, shape(ISLTYP))
+    case default
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+  end procedure ! wrf_hydro_set_float
+
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
   !---------------------------------------------------------------------
-
-  ! List a model's input variables.
-  module procedure wrf_hydro_input_var_names
-    allocate(names(2))
-    names(1) = output_item_list(1)
-    names(2) = output_item_list(2)
-    ! names => input_item_list
-    bmi_status = BMI_SUCCESS
-  end procedure ! wrf_hydro_input_var_names
-
-  ! Describe where a variable is located: node, edge, or face.
-  module procedure wrf_hydro_var_location
-    location = STUB_C
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_var_location
-
-  ! Get a copy of values (flattened!) of the given integer variable.
-  module procedure wrf_hydro_get_int
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_get_int
 
   ! Get a copy of values (flattened!) of the given real variable.
   module procedure wrf_hydro_get_float
@@ -344,16 +371,6 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_float
 
-  ! Get a copy of values (flattened!) of the given double variable.
-  module procedure wrf_hydro_get_double
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_get_double
-
-  ! Get a reference to the given integer variable.
-  module procedure wrf_hydro_get_ptr_int
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_get_ptr_int
-
   ! Get a reference to the given real variable.
   module procedure wrf_hydro_get_ptr_float
     use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
@@ -375,8 +392,38 @@ contains
        print *, "WARNING: variable ptr ", trim(name), " not found"
     end select
 
-  bmi_status = BMI_FAILURE
+    bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_ptr_float
+
+  ! List a model's input variables.
+  module procedure wrf_hydro_input_var_names
+    allocate(names(2))
+    names(1) = output_item_list(1)
+    names(2) = output_item_list(2)
+    ! names => input_item_list
+    bmi_status = BMI_SUCCESS
+  end procedure ! wrf_hydro_input_var_names
+
+  ! Describe where a variable is located: node, edge, or face.
+  module procedure wrf_hydro_var_location
+    location = STUB_C
+    bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_var_location
+
+  ! Get a copy of values (flattened!) of the given integer variable.
+  module procedure wrf_hydro_get_int
+    bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_get_int
+
+  ! Get a copy of values (flattened!) of the given double variable.
+  module procedure wrf_hydro_get_double
+    bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_get_double
+
+  ! Get a reference to the given integer variable.
+  module procedure wrf_hydro_get_ptr_int
+    bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_get_ptr_int
 
   ! Get a reference to the given double variable.
   module procedure wrf_hydro_get_ptr_double
@@ -388,37 +435,6 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_at_indices_int
 
-  ! Get real values at particular (one-dimensional) indices.
-  module procedure wrf_hydro_get_at_indices_float
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
-    real, allocatable ::  pack_data(:), ind_data(:)
-    integer :: n, i
-    logical :: unpack
-    unpack = .true.
-    bmi_status = BMI_SUCCESS
-
-    select case(name)
-    case("IVGTYP")
-       pack_data = pack(IVGTYP, .true.)
-    case("ISLTYP")
-       pack_data = pack(ISLTYP, .true.)
-    case default
-       unpack = .false.
-       bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
-    end select
-
-    ! if data found, unpack data
-    if (unpack .eqv. .true.) then
-       n = size(inds)
-       allocate(ind_data(n))
-       do i=1,n
-          ind_data(i) = pack_data(inds(i))
-       end do
-       dest = ind_data
-    end if
-  end procedure ! wrf_hydro_get_at_indices_float
-
   ! Get double values at particular (one-dimensional) indices.
   module procedure wrf_hydro_get_at_indices_double
     bmi_status = BMI_FAILURE
@@ -428,11 +444,6 @@ contains
   module procedure wrf_hydro_set_int
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_set_int
-
-  ! Set new values for a real model variable.
-  module procedure wrf_hydro_set_float
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_set_float
 
   ! Set new values for a double model variable.
   module procedure wrf_hydro_set_double
