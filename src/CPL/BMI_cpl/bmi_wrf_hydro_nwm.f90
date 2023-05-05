@@ -92,7 +92,7 @@ contains
     real :: real_var
     double precision :: double_var
     logical :: logical_var
-    character(:), allocatable :: var_type
+    character(BMI_MAX_TYPE_NAME) :: var_type
     bmi_status = BMI_SUCCESS
     res = this%get_var_type(name, var_type)
     select case(var_type)
@@ -189,6 +189,33 @@ contains
     end select
   end procedure ! wrf_hydro_var_grid
 
+  ! this function is need so that there isn't an object clash between the
+  ! variable size and the intrinsic function size
+  function get_var_size(grid) result(var_size)
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer, intent(in) :: grid
+    integer :: var_size
+    select case(grid)
+    case(0)
+       var_size = 0
+    case(1) !"IVGTYP")
+       var_size = size(IVGTYP)
+    case(2) !"ISLTYP")
+       var_size = size(ISLTYP)
+    case default
+       var_size = 0
+       print *, "WARNING: variable ", grid, " not found"
+    end select
+  end function get_var_size
+
+  ! Get the total number of elements in the computational grid.
+  module procedure wrf_hydro_grid_size
+    bmi_status = BMI_SUCCESS
+    size = get_var_size(grid)
+    if (size == 0) bmi_status = BMI_FAILURE
+  end procedure ! wrf_hydro_grid_size
+
+
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
@@ -205,20 +232,14 @@ contains
 
   ! Get size of the given variable, in bytes.
   module procedure wrf_hydro_var_nbytes
-    integer :: res, var_size, var_rank, i
-    res =  this%wrf_hydro_var_itemsize(name, size)
-    ! get_variable of var_name
-    var_rank = 0
-    ! var_rank = rank(var_name)
-    ! nbytes = size
-    ! if (var_rank > 0) then
-    !    do i = 1,var_rank
-    !       nbytes = nbytes * size(var_name, i)
-    !    end do
-    ! end if
-
-    nbytes = STUB_I
-    bmi_status = BMI_FAILURE
+    integer :: res, grid, var_size, var_rank, i
+    integer :: item_size, grid_size
+    bmi_status = BMI_SUCCESS
+    res = this%get_var_grid(name, grid)
+    res = this%get_var_itemsize(name, item_size)
+    res = this%get_grid_size(grid, grid_size)
+    nbytes = item_size * grid_size
+    if (nbytes == 0) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_var_nbytes
 
   ! Describe where a variable is located: node, edge, or face.
@@ -307,12 +328,6 @@ contains
     rank = STUB_I
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_rank
-
-  ! Get the total number of elements in the computational grid.
-  module procedure wrf_hydro_grid_size
-    size = STUB_I
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_grid_size
 
   ! Get the grid type as a string.
   module procedure wrf_hydro_grid_type
@@ -416,7 +431,8 @@ contains
 
   function get_unit_str(key) result(val)
     integer, intent(in) ::  key
-    character(BMI_MAX_TYPE_NAME) :: val
+    ! character(BMI_MAX_TYPE_NAME) :: val
+    character(:), allocatable :: val ! TODO: more efficient?
     if (key == 1) then
        val = "integer"
     else if (key == 2) then
