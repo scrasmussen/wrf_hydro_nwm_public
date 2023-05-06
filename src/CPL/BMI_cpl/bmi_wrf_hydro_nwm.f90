@@ -1,12 +1,24 @@
 submodule (bmi_wrf_hydro_nwm_mod) bmi_wrf_hydro_nwm_smod
   implicit none
-
   integer, parameter :: STUB_I = -1
   integer, dimension(1), parameter :: STUB_1D_I = [-1]
   double precision, parameter :: STUB_D = -1.0
   double precision, dimension(1), parameter :: STUB_1D_D = [-1.0]
   character(len=11), parameter :: STUB_C = "STUB RESULT"
 
+  interface set_var_at_indices
+     module procedure :: set_2d_var_at_indices_int
+     module procedure :: set_3d_var_at_indices_int
+     module procedure :: set_2d_var_at_indices_float
+     module procedure :: set_3d_var_at_indices_float
+     module procedure :: set_2d_var_at_indices_double
+     module procedure :: set_3d_var_at_indices_double
+  end interface set_var_at_indices
+
+  interface index_to_multidim
+     module procedure :: index_to_multidim_2d
+     module procedure :: index_to_multidim_3d
+  end interface index_to_multidim
 contains
 
   ! --- BMI Function Implementation ---
@@ -158,7 +170,7 @@ contains
   ! this function is need so that there isn't an object clash between the
   ! variable rank and the intrinsic function rank
   function get_grid_rank(grid) result(var_rank)
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, GLACT
     integer, intent(in) :: grid
     integer :: var_rank
     select case(grid)
@@ -168,6 +180,8 @@ contains
        var_rank = rank(IVGTYP)
     case(2) ! "ISLTYP"
        var_rank = rank(ISLTYP)
+    case(4) ! GLACT
+       var_rank = rank(GLACT)
     case default
        var_rank = -1
        print *, "WARNING: variable ", grid, " not found, rank set to -1"
@@ -182,10 +196,10 @@ contains
     if (rank == -1) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_rank
 
-    ! this function is need so that there isn't an object clash between the
+  ! this function is need so that there isn't an object clash between the
   ! variable shape and the intrinsic function shape
   function get_grid_shape(grid) result(grid_shape)
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, GLACT
     integer, intent(in) :: grid
     integer, dimension(:), allocatable :: grid_shape
     select case(grid)
@@ -195,6 +209,8 @@ contains
        grid_shape = shape(IVGTYP)
     case(2) ! "ISLTYP"
        grid_shape = shape(ISLTYP)
+    case(4) ! GLACT
+       grid_shape = shape(GLACT)
     case default
        grid_shape = [0]
        print *, "WARNING: grid", grid, " was not found"
@@ -211,7 +227,8 @@ contains
     if (size(shape) == 3) then
        shape(1:2) = cshift(shape(1:2), 1)
     end if
-    if (shape(0) == 0) bmi_status = BMI_FAILURE
+    print *, "SHAPE HERE IS ", shape, "|", size(shape)
+    if (shape(1) == 0) bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_shape
 
   !---------------------------------------------------------------------
@@ -253,6 +270,8 @@ contains
        grid = 1
     case("ISLTYP")
        grid = 2
+    case("GLACT")
+       grid = 4
     case default
        grid = -1
        bmi_status = BMI_FAILURE
@@ -294,7 +313,7 @@ contains
 
   ! Get real values at particular (one-dimensional) indices.
   module procedure wrf_hydro_get_at_indices_float
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    use module_NoahMP_hrldas_driver, only : GLACT
     real, allocatable ::  pack_data(:), ind_data(:)
     integer :: n, i
     logical :: unpack
@@ -302,11 +321,10 @@ contains
     bmi_status = BMI_SUCCESS
 
     ! TODO: packing is easy but unefficient way of doing this
+    print *, "WARNING: PACKING IS UNEFFICIENT"
     select case(name)
-    case("IVGTYP")
-       pack_data = pack(IVGTYP, .true.)
-    case("ISLTYP")
-       pack_data = pack(ISLTYP, .true.)
+    case("GLACT")
+       pack_data = pack(GLACT, .true.)
     case default
        unpack = .false.
        bmi_status = BMI_FAILURE
@@ -324,8 +342,8 @@ contains
     end if
   end procedure ! wrf_hydro_get_at_indices_float
 
-  ! Set new values for a real model variable.
-  module procedure wrf_hydro_set_float
+  ! Set new values for an integer model variable.
+  module procedure wrf_hydro_set_int
     use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
     bmi_status = BMI_SUCCESS
     select case(name)
@@ -337,22 +355,46 @@ contains
        bmi_status = BMI_FAILURE
        print *, "WARNING: ", trim(name), " data not found"
     end select
+  end procedure ! wrf_hydro_set_int
+
+  ! Set new values for a real model variable.
+  module procedure wrf_hydro_set_float
+    use module_NoahMP_hrldas_driver, only : GLACT
+    bmi_status = BMI_SUCCESS
+    select case(name)
+    case("GLACT")
+       GLACT = reshape(src, shape(GLACT))
+    case default
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
   end procedure ! wrf_hydro_set_float
+
+  ! Set new values for a double model variable.
+  module procedure wrf_hydro_set_double
+    bmi_status = BMI_SUCCESS
+    select case(name)
+    case default
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+  end procedure ! wrf_hydro_set_double
+
+
 
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
   !---------------------------------------------------------------------
 
-  ! Get a copy of values (flattened!) of the given real variable.
-  module procedure wrf_hydro_get_float
+  ! Get a copy of values (flattened!) of the given integer variable.
+  module procedure wrf_hydro_get_int
     use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
     integer :: res, grid, size
-    real, allocatable ::  var_data(:)
+    integer, allocatable ::  var_data(:)
+    bmi_status = BMI_SUCCESS
     res = this%get_var_grid(name, grid)
     select case(grid)
-    case(0)
-       ! dest =
     case(1) ! "IVGTYP"
        ! if (allocated(dest)) then
        !    var_data = pack(IVGTYP, .true.)
@@ -366,10 +408,38 @@ contains
        dest = var_data
     case default
        print *, "WARNING: ", trim(name), " data not found"
+       bmi_status = BMI_FAILURE
     end select
+  end procedure ! wrf_hydro_get_int
 
-    bmi_status = BMI_FAILURE
+  ! Get a copy of values (flattened!) of the given real variable.
+  module procedure wrf_hydro_get_float
+    use module_NoahMP_hrldas_driver, only : GLACT
+    integer :: res, grid, size
+    real, allocatable ::  var_data(:)
+    bmi_status = BMI_SUCCESS
+    res = this%get_var_grid(name, grid)
+    select case(grid)
+    case(4) ! GLACT
+       dest = pack(GLACT, .true.)
+    case default
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
   end procedure ! wrf_hydro_get_float
+
+  ! Get a copy of values (flattened!) of the given double variable.
+  module procedure wrf_hydro_get_double
+    integer :: res, grid, size
+    double precision, allocatable ::  var_data(:)
+    bmi_status = BMI_SUCCESS
+    res = this%get_var_grid(name, grid)
+    select case(grid)
+    ! case(X) ! future_var
+    !    dest = pack(future_var, .true.)
+    case default
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+  end procedure ! wrf_hydro_get_double
 
   ! Get a reference to the given real variable.
   module procedure wrf_hydro_get_ptr_float
@@ -395,6 +465,84 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_ptr_float
 
+  ! Get integer values at particular (one-dimensional) indices.
+  module procedure wrf_hydro_get_at_indices_int
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer, allocatable ::  pack_data(:), ind_data(:)
+    integer :: n, i
+    logical :: unpack
+    unpack = .true.
+    bmi_status = BMI_SUCCESS
+
+    ! TODO: packing is easy but unefficient way of doing this
+    print *, "WARNING: PACKING IS UNEFFICIENT"
+    select case(name)
+    case("IVGTYP")
+       pack_data = pack(IVGTYP, .true.)
+    case("ISLTYP")
+       pack_data = pack(ISLTYP, .true.)
+    case default
+       unpack = .false.
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+
+    ! if data found, unpack data
+    if (unpack .eqv. .true.) then
+       n = size(inds)
+       allocate(ind_data(n))
+       do i=1,n
+          ind_data(i) = pack_data(inds(i))
+       end do
+       dest = ind_data
+    end if
+  end procedure ! wrf_hydro_get_at_indices_int
+
+  ! Set integer values at particular (one-dimensional) indices.
+  module procedure wrf_hydro_set_at_indices_int
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP
+    integer, allocatable :: var_shape(:)
+    bmi_status = BMI_SUCCESS
+    select case(name)
+    case("IVGTYP")
+       call set_var_at_indices(IVGTYP, inds, src)
+    case("ISLTYP")
+       var_shape = shape(ISLTYP)
+       ! ISLTYP =
+    case default
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+  end procedure ! wrf_hydro_set_at_indices_int
+
+  ! Set real values at particular (one-dimensional) indices.
+  module procedure wrf_hydro_set_at_indices_float
+    use module_NoahMP_hrldas_driver, only : GLACT
+    real, allocatable :: var_shape(:)
+    bmi_status = BMI_SUCCESS
+    select case(name)
+    case("GLACT")
+       call set_var_at_indices(GLACT, inds, src)
+    case default
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+  end procedure ! wrf_hydro_set_at_indices_float
+
+  ! Set double values at particular (one-dimensional) indices.
+  module procedure wrf_hydro_set_at_indices_double
+    use module_NoahMP_hrldas_driver, only : GLACT
+    double precision, allocatable :: var_shape(:)
+    bmi_status = BMI_SUCCESS
+    select case(name)
+    ! case("future_var")
+    !    call set_var_at_indices(future_var, inds, src)
+    case default
+       bmi_status = BMI_FAILURE
+       print *, "WARNING: ", trim(name), " data not found"
+    end select
+  end procedure ! wrf_hydro_set_at_indices_double
+
   ! List a model's input variables.
   module procedure wrf_hydro_input_var_names
     allocate(names(2))
@@ -408,17 +556,7 @@ contains
   module procedure wrf_hydro_var_location
     location = STUB_C
     bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_var_location
-
-  ! Get a copy of values (flattened!) of the given integer variable.
-  module procedure wrf_hydro_get_int
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_get_int
-
-  ! Get a copy of values (flattened!) of the given double variable.
-  module procedure wrf_hydro_get_double
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_get_double
+  end procedure ! wrf_hydro_var_locatio
 
   ! Get a reference to the given integer variable.
   module procedure wrf_hydro_get_ptr_int
@@ -430,40 +568,10 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_ptr_double
 
-  ! Get integer values at particular (one-dimensional) indices.
-  module procedure wrf_hydro_get_at_indices_int
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_get_at_indices_int
-
   ! Get double values at particular (one-dimensional) indices.
   module procedure wrf_hydro_get_at_indices_double
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_get_at_indices_double
-
-  ! Set new values for an integer model variable.
-  module procedure wrf_hydro_set_int
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_set_int
-
-  ! Set new values for a double model variable.
-  module procedure wrf_hydro_set_double
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_set_double
-
-  ! Set integer values at particular (one-dimensional) indices.
-  module procedure wrf_hydro_set_at_indices_int
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_set_at_indices_int
-
-  ! Set real values at particular (one-dimensional) indices.
-  module procedure wrf_hydro_set_at_indices_float
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_set_at_indices_float
-
-  ! Set double values at particular (one-dimensional) indices.
-  module procedure wrf_hydro_set_at_indices_double
-    bmi_status = BMI_FAILURE
-  end procedure ! wrf_hydro_set_at_indices_double
 
   ! Get distance between nodes of the computational grid.
   module procedure wrf_hydro_grid_spacing
@@ -537,10 +645,114 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_grid_nodes_per_face
 
-
   ! ------------------------------------
   ! Non-BMI procedures
   ! ------------------------------------
+
+  ! --- following set of subroutines handles the conversion of 1d flat index
+  !     to 2d or 3d dimensions ---
+  subroutine index_to_multidim_3d(index, nx, ny, i, j, k)
+    integer, intent(in) :: index, nx, ny
+    integer, intent(out) :: i,j,k
+    i = modulo(index-1, nx)
+    j = modulo((index-1) / nx, ny)
+    k = (index-1)  / (ny * nx)
+    i = i + 1
+    j = j + 1
+    k = k + 1
+  end subroutine index_to_multidim_3d
+
+  subroutine index_to_multidim_2d(index, nx, i, j)
+    integer, intent(in) :: index, nx
+    integer, intent(out) :: i,j
+    i = modulo(index-1, nx)
+    j = (index-1) / nx
+    i = i + 1
+    j = j + 1
+  end subroutine index_to_multidim_2d
+
+  ! --- following set of subroutines set the indices of a 2d or 3d
+  !     variable for its given type ---
+  subroutine set_2d_var_at_indices_int(var, inds, src)
+    integer, intent(inout) :: var(:,:)
+    integer, intent(in) :: inds(:)
+    integer, intent(in) :: src(:)
+    integer :: index, ii, i, j, var_shape(2), nx
+    var_shape = shape(var)
+    nx = var_shape(1)
+    do ii=1,size(inds)
+       call index_to_multidim(inds(ii), nx, i, j)
+       var(i,j) = src(ii)
+    end do
+  end subroutine set_2d_var_at_indices_int
+
+  subroutine set_3d_var_at_indices_int(var, inds, src)
+    integer, intent(inout) :: var(:,:,:)
+    integer, intent(in) :: inds(:)
+    integer, intent(in) :: src(:)
+    integer :: index, ii, i, j, k, var_shape(3), nx, ny
+    var_shape = shape(var)
+    nx = var_shape(1)
+    ny = var_shape(2)
+    do ii=1,size(inds)
+       call index_to_multidim(inds(ii), nx, ny, i, j, k)
+       var(i,j,k) = src(ii)
+    end do
+  end subroutine set_3d_var_at_indices_int
+
+  subroutine set_2d_var_at_indices_float(var, inds, src)
+    real, intent(inout) :: var(:,:)
+    integer, intent(in) :: inds(:)
+    real, intent(in) :: src(:)
+    integer :: index, ii, i, j, var_shape(2), nx
+    var_shape = shape(var)
+    nx = var_shape(1)
+    do ii=1,size(inds)
+       call index_to_multidim(inds(ii), nx, i, j)
+       var(i,j) = src(ii)
+    end do
+  end subroutine set_2d_var_at_indices_float
+
+  subroutine set_3d_var_at_indices_float(var, inds, src)
+    real, intent(inout) :: var(:,:,:)
+    integer, intent(in) :: inds(:)
+    real, intent(in) :: src(:)
+    integer :: index, ii, i, j, k, var_shape(3), nx, ny
+    var_shape = shape(var)
+    nx = var_shape(1)
+    ny = var_shape(2)
+    do ii=1,size(inds)
+       call index_to_multidim(inds(ii), nx, ny, i, j, k)
+       var(i,j,k) = src(ii)
+    end do
+  end subroutine set_3d_var_at_indices_float
+
+  subroutine set_2d_var_at_indices_double(var, inds, src)
+    double precision, intent(inout) :: var(:,:)
+    integer, intent(in) :: inds(:)
+    double precision, intent(in) :: src(:)
+    integer :: index, ii, i, j, var_shape(2), nx
+    var_shape = shape(var)
+    nx = var_shape(1)
+    do ii=1,size(inds)
+       call index_to_multidim(inds(ii), nx, i, j)
+       var(i,j) = src(ii)
+    end do
+  end subroutine set_2d_var_at_indices_double
+
+  subroutine set_3d_var_at_indices_double(var, inds, src)
+    double precision, intent(inout) :: var(:,:,:)
+    integer, intent(in) :: inds(:)
+    double precision, intent(in) :: src(:)
+    integer :: index, ii, i, j, k, var_shape(3), nx, ny
+    var_shape = shape(var)
+    nx = var_shape(1)
+    ny = var_shape(2)
+    do ii=1,size(inds)
+       call index_to_multidim(inds(ii), nx, ny, i, j, k)
+       var(i,j,k) = src(ii)
+    end do
+  end subroutine set_3d_var_at_indices_double
 
   ! Model introspection.
   module procedure print_model_info
@@ -548,7 +760,9 @@ contains
 
   ! Check the status and update bmi_status if necessary
   module procedure stat_check
+    if (bmi_status == BMI_FAILURE) print *, "WHY??"
     if (status .ne. BMI_SUCCESS) then
+       print *, " --- WARNING!! BMI_STATUS FAILED ---"
        bmi_status = BMI_FAILURE
     end if
   end procedure
