@@ -174,8 +174,6 @@ contains
     integer, intent(in) :: grid
     integer :: var_rank
     select case(grid)
-    case(0)
-       var_rank = -1
     case(1) ! "IVGTYP"
        var_rank = rank(IVGTYP)
     case(2) ! "ISLTYP"
@@ -203,8 +201,6 @@ contains
     integer, intent(in) :: grid
     integer, dimension(:), allocatable :: grid_shape
     select case(grid)
-    case(0)
-       grid_shape = [0]
     case(1) ! "IVGTYP"
        grid_shape = shape(IVGTYP)
     case(2) ! "ISLTYP"
@@ -286,8 +282,6 @@ contains
     integer, intent(in) :: grid
     integer :: var_size
     select case(grid)
-    case(0)
-       var_size = 0
     case(1) ! "IVGTYP"
        var_size = size(IVGTYP)
     case(2) ! "ISLTYP"
@@ -307,8 +301,24 @@ contains
 
   ! Get the grid type as a string.
   module procedure wrf_hydro_grid_type
-    type = get_unit_str(ldasOutDict%var_type(grid))
     bmi_status = BMI_SUCCESS
+    ! options are:
+    !   - "integer"
+    !   - "real"
+    !   - "double precision"
+    !   - "logical"
+    select case(grid)
+    case(1) ! "IVGTYP"
+       type = "integer"
+    case(2) ! "ISLTYP"
+       type = "integer"
+    case(4) ! GLACT
+       type = "real"
+    case default
+       type = ""
+       print *, "WARNING: variable ", grid, " not found"
+       bmi_status = BMI_FAILURE
+    end select
   end procedure ! wrf_hydro_grid_type
 
   ! Get real values at particular (one-dimensional) indices.
@@ -766,20 +776,5 @@ contains
        bmi_status = BMI_FAILURE
     end if
   end procedure
-
-  function get_unit_str(key) result(val)
-    integer, intent(in) ::  key
-    ! character(BMI_MAX_TYPE_NAME) :: val
-    character(:), allocatable :: val ! TODO: more efficient?
-    if (key == 1) then
-       val = "integer"
-    else if (key == 2) then
-       val = "real"
-    else if (key == 3) then
-       val = "double precision"
-    else if (key == 4) then
-       val = "logical"
-    end if
-  end function get_unit_str
 
 end submodule bmi_wrf_hydro_nwm_smod
