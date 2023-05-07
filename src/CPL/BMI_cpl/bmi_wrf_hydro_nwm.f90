@@ -330,8 +330,8 @@ contains
     unpack = .true.
     bmi_status = BMI_SUCCESS
 
-    ! TODO: packing is easy but unefficient way of doing this
-    print *, "WARNING: PACKING IS UNEFFICIENT"
+    ! TODO: packing is easy but inefficient way of doing this
+    print *, "WARNING: PACKING IS INEFFICIENT"
     select case(name)
     case("GLACT")
        pack_data = pack(GLACT, .true.)
@@ -484,8 +484,8 @@ contains
     unpack = .true.
     bmi_status = BMI_SUCCESS
 
-    ! TODO: packing is easy but unefficient way of doing this
-    print *, "WARNING: PACKING IS UNEFFICIENT"
+    ! TODO: packing is easy but inefficient way of doing this
+    print *, "WARNING: PACKING IS INEFFICIENT"
     select case(name)
     case("IVGTYP")
        pack_data = pack(IVGTYP, .true.)
