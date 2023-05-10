@@ -13,9 +13,9 @@ contains
   ! Get the name of the model.
   module procedure wrf_hydro_component_name_c
     use module_version, only : get_model_version
-    character(len=1024), target :: model_name
+    character(len=BMI_MAX_COMPONENT_NAME), target :: model_name
     model_name = get_model_version()
-    name(1:STUB_C_LEN) = STUB_C
+    name(1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(model_name)
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_component_name
 
@@ -49,9 +49,6 @@ contains
     bmi_status = wrf_hydro%get_output_item_count(count)
   end procedure ! wrf_hydro_output_item_count
 
-  !---------------------------------------------------------------------
-  ! Should update how this is handeled in main_hrldas_driver
-  !---------------------------------------------------------------------
   ! Start time of the model.
   module procedure wrf_hydro_start_time_c
     bmi_status = wrf_hydro%get_start_time(time)
@@ -72,7 +69,6 @@ contains
     bmi_status = wrf_hydro%get_current_time(time)
   end procedure ! wrf_hydro_current_time
 
-
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
@@ -80,6 +76,11 @@ contains
 
   ! List a model's input variables.
   module procedure wrf_hydro_input_var_names_c
+    character(len=BMI_MAX_VAR_NAME), pointer :: var_name(:)
+    ! character(len=BMI_MAX_COMPONENT_NAME), target :: var_name
+    bmi_status = wrf_hydro%get_input_var_names(var_name)
+    ! -----TODO-----
+    ! names(1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(var_names)
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_input_var_names
 
@@ -90,8 +91,14 @@ contains
 
   ! Get the grid identifier for the given variable.
   module procedure wrf_hydro_var_grid_c
-    grid = STUB_I
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_VAR_NAME), pointer :: var_name(:)
+    ! character(len=BMI_MAX_VAR_NAME), allocatable :: var_name(:)
+    bmi_status = BMI_SUCCESS
+    var_name = name(1:BMI_MAX_VAR_NAME)
+    ! -----TODO-----
+    ! bmi_status = wrf_hydro%get_var_grid(var_name, grid)
+    ! print*, "F name", name(1:4)
+    grid = 8
   end procedure ! wrf_hydro_var_grid
 
   ! Get the data type of the given variable as a string.
@@ -132,7 +139,9 @@ contains
 
   ! Get a copy of values (flattened!) of the given integer variable.
   module procedure wrf_hydro_get_int_c
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    f_str = c_to_f_str(name)
+    bmi_status = wrf_hydro%get_value_int(f_str, dest)
   end procedure ! wrf_hydro_get_int
 
   ! Get a copy of values (flattened!) of the given real variable.
@@ -207,14 +216,12 @@ contains
 
   ! Get number of dimensions of the computational grid.
   module procedure wrf_hydro_grid_rank_c
-    rank = STUB_I
-    bmi_status = BMI_FAILURE
+    bmi_status = wrf_hydro%get_grid_rank(grid, rank)
   end procedure ! wrf_hydro_grid_rank
 
   ! Get the total number of elements in the computational grid.
   module procedure wrf_hydro_grid_size_c
-    size = STUB_I
-    bmi_status = BMI_FAILURE
+    bmi_status = wrf_hydro%get_grid_size(grid, size)
   end procedure ! wrf_hydro_grid_size
 
   ! Get the grid type as a string.
@@ -225,8 +232,9 @@ contains
 
   ! Get the dimensions of the computational grid.
   module procedure wrf_hydro_grid_shape_c
-    shape = STUB_1D_I
-    bmi_status = BMI_FAILURE
+    integer, allocatable :: grid_shape(:)
+    bmi_status = wrf_hydro%get_grid_shape(grid, grid_shape)
+    shape = grid_shape
   end procedure ! wrf_hydro_grid_shape
 
   ! Get distance between nodes of the computational grid.
@@ -306,6 +314,32 @@ contains
   ! Non-BMI procedures
   ! ------------------------------------
 
+  ! convert Fortran character array to C character array
+  function f_to_c_str(f_str) result(c_str)
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    character(c_char) :: c_str(BMI_MAX_COMPONENT_NAME)
+    integer :: i, name_len
+    name_len = len(trim(f_str))
+    do i=1,name_len
+       c_str(i) = f_str(i:i)
+    end do
+    c_str(name_len+1) = C_NULL_CHAR
+  end function f_to_c_str
+
+  ! TODO: look at wrf_hydro_get_int_c
+  ! convert Fortran character array to C character array
+  function c_to_f_str(c_str) result(f_str)
+    character(c_char) :: c_str(BMI_MAX_COMPONENT_NAME)
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    integer :: i, name_len
+    ! name_len = index(c_str, C_NULL_CHAR)
+    name_len = 0!index(c_str, C_NULL_CHAR)
+    ! print *, "name_len" , name_len, "|", index(c_str, C_NULL_CHAR)
+    do i=1,name_len
+       f_str(i:i) = c_str(i)
+    end do
+  end function c_to_f_str
+
   ! Model introspection.
   module procedure print_model_info_c
   end procedure ! print_model_info
@@ -316,4 +350,5 @@ contains
        bmi_status = BMI_FAILURE
     end if
   end procedure
+
 end submodule bmi_wrf_hydro_nwm_smod
