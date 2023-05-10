@@ -37,3 +37,7 @@ Each new variable will need a grid rank,
    - `wrf_hydro_set_at_indices_{int,float,double}`
    - `wrf_hydro_get_at_indices_{int,float,double}`
 3. Add variable name to this README's "List variables exposed to the BMI" table
+
+
+## License
+BMI is open source software released under the [MIT License](LICENSE.txt).
