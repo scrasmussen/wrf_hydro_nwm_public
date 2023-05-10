@@ -4,7 +4,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
   use orchestrator_base, only : orchestrator_
   use state_module, only: wrf_hydro_model => state_type
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer, c_int, &
-       c_double, c_char
+       c_double, c_char, c_null_char
   implicit none
 
   integer(c_int), parameter :: BMI_MAX_COMPONENT_NAME = 2048
@@ -50,7 +50,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
       integer(c_int) :: bmi_status
     end function wrf_hydro_finalize_c
 
-     ! Get the name of the model.
+    ! Get the name of the model.
     module function wrf_hydro_component_name_c(name) &
          result(bmi_status) &
          bind(c, name="get_component_name")
