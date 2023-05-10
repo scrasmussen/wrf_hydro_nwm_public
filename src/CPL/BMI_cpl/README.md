@@ -1,4 +1,4 @@
-# BMI Coupling README
+# WRF-Hydro BMI Coupling
 The [Basic Model Interface](https://bmi.readthedocs.io/en/stable/) ([BMI](https://github.com/csdms/bmi)) is a standardized set of control and query functions.
 This allows for different models to use the BMI functions to couple and interact together.
 
