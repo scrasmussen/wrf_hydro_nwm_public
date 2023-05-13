@@ -99,7 +99,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
     target_link_libraries(wrfhydro.exe noahmp_phys)
     target_link_libraries(wrfhydro.exe noahmp_data)
     target_link_libraries(wrfhydro.exe hydro_noahmp_cpl)
-    target_link_libraries(wrfhydro.exe ${NETCDF_LIBRARIES})
+    target_link_libraries(wrfhydro.exe netcdff)
 
     if (WRF_HYDRO_NUDGING STREQUAL "1")
         target_link_libraries(wrfhydro.exe hydro_nudging)

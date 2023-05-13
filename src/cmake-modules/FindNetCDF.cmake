@@ -86,3 +86,13 @@ include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (NetCDF DEFAULT_MSG NETCDF_LIBRARIES NETCDF_INCLUDES NetCDF_has_interfaces)
 
 mark_as_advanced (NETCDF_LIBRARIES NETCDF_INCLUDES)
+
+# --- WRF-Hydro project additions ---
+# check to make sure netcdff is in NETCDF_LIBRARIES_F90 variable, fix if not
+cmake_path(HAS_EXTENSION NETCDF_LIBRARIES_F90 has_netcdf_librarary_extension)
+if (NOT has_netcdf_library_extension)
+  set(NETCDF_LIBRARIES_F90 "${NETCDF_LIBRARIES_F90}/libnetcdff.so")
+endif()
+# handle link and include directories NetCDF
+link_directories(${NETCDF_LIBRARIES} ${NETCDF_LIBRARIES_F90} )
+include_directories(${NETCDF_INCLUDES} ${NETCDF_INCLUDES_F90})

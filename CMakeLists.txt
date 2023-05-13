@@ -39,9 +39,12 @@ set (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/src/cmake-modules)
 
 # try to find the installed NETCDF library
 set (NETCDF_F90 "YES")
-set (NETCDF_F77 "YES")
 find_package(NetCDF REQUIRED)
 message("-- NetCDF Include Dir: ${NETCDF_INCLUDES}")
+
+# create Fortran Netcdff target to link to,
+add_library(netcdff SHARED IMPORTED)
+set_target_properties(netcdff PROPERTIES IMPORTED_LOCATION ${NETCDF_LIBRARIES_F90})
 
 # set user controled enviorment variables
 set (HYDRO_LSM $ENV{HYDRO_LSM} CACHE STRING "Name of the Land Surface Model to Use")
