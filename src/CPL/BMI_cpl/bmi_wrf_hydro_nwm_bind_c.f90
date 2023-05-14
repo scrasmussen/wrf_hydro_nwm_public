@@ -91,14 +91,12 @@ contains
 
   ! Get the grid identifier for the given variable.
   module procedure wrf_hydro_var_grid_c
-    character(len=BMI_MAX_VAR_NAME), pointer :: var_name(:)
-    ! character(len=BMI_MAX_VAR_NAME), allocatable :: var_name(:)
+    character(len=BMI_MAX_VAR_NAME) :: var_name
+    integer :: end
     bmi_status = BMI_SUCCESS
-    var_name = name(1:BMI_MAX_VAR_NAME)
-    ! -----TODO-----
-    ! bmi_status = wrf_hydro%get_var_grid(var_name, grid)
-    ! print*, "F name", name(1:4)
-    grid = 8
+    var_name = transfer(name(1:BMI_MAX_VAR_NAME), var_name)
+    end =  index(var_name, C_NULL_CHAR) - 1
+    bmi_status = wrf_hydro%get_var_grid(var_name(1:end), grid)
   end procedure ! wrf_hydro_var_grid
 
   ! Get the data type of the given variable as a string.
