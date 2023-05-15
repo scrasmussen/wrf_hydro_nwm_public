@@ -69,6 +69,15 @@ contains
     bmi_status = wrf_hydro%get_current_time(time)
   end procedure ! wrf_hydro_current_time
 
+  ! Get the grid identifier for the given variable.
+  module procedure wrf_hydro_var_grid_c
+    character(len=BMI_MAX_VAR_NAME) :: var_name
+    integer :: end
+    bmi_status = BMI_SUCCESS
+    call c_to_f_str(name, var_name, end)
+    bmi_status = wrf_hydro%get_var_grid(var_name(1:end), grid)
+  end procedure ! wrf_hydro_var_grid
+
   !---------------------------------------------------------------------
   ! STUBS: Section consists of stubs to allow building and testing.
   !        Move above when implemented.
@@ -76,11 +85,18 @@ contains
 
   ! List a model's input variables.
   module procedure wrf_hydro_input_var_names_c
-    character(len=BMI_MAX_VAR_NAME), pointer :: var_name(:)
-    ! character(len=BMI_MAX_COMPONENT_NAME), target :: var_name
-    bmi_status = wrf_hydro%get_input_var_names(var_name)
-    ! -----TODO-----
-    ! names(1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(var_names)
+    character(len=BMI_MAX_VAR_NAME), pointer :: f_names(:)
+    character(c_char) :: c_names(BMI_MAX_VAR_NAME*input_item_count)
+    integer :: i
+    ! ! allocate(names(input_item_count))
+    ! bmi_status = wrf_hydro%get_input_var_names(f_names)
+    ! ! -----TODO-----
+    ! do i=0,input_item_count-1
+    !    print *, i, "name is: ", trim(f_names(i+1))
+    !    c_names(i*BMI_MAX_COMPONENT_NAME:(i+1)*BMI_MAX_COMPONENT_NAME) = &
+    !         f_to_c_str(f_names(i+1)) ! , 1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(f_names)
+    ! end do
+    ! ! names(1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(var_names)
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_input_var_names
 
@@ -89,38 +105,42 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! wrf_hydro_output_var_names
 
-  ! Get the grid identifier for the given variable.
-  module procedure wrf_hydro_var_grid_c
-    character(len=BMI_MAX_VAR_NAME) :: var_name
-    integer :: end
-    bmi_status = BMI_SUCCESS
-    var_name = transfer(name(1:BMI_MAX_VAR_NAME), var_name)
-    end =  index(var_name, C_NULL_CHAR) - 1
-    bmi_status = wrf_hydro%get_var_grid(var_name(1:end), grid)
-  end procedure ! wrf_hydro_var_grid
+  ! ----- working on these -----
 
   ! Get the data type of the given variable as a string.
   module procedure wrf_hydro_var_type_c
-    type(1:STUB_C_LEN) = STUB_C
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_VAR_NAME) :: var_name
+    character(len=BMI_MAX_TYPE_NAME), target :: var_type
+    integer :: end
+    call c_to_f_str(name, var_name, end)
+    bmi_status = wrf_hydro%get_var_type(var_name(1:end), var_type)
+    type(1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(var_type)
   end procedure ! wrf_hydro_var_type
 
   ! Get the units of the given variable.
   module procedure wrf_hydro_var_units_c
-    units(1:STUB_C_LEN) = STUB_C
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_VAR_NAME) :: var_name
+    character(len=BMI_MAX_UNITS_NAME), target :: var_units
+    integer :: end
+    call c_to_f_str(name, var_name, end)
+    bmi_status = wrf_hydro%get_var_units(var_name(1:end), var_units)
+    units(1:BMI_MAX_UNITS_NAME) = f_to_c_str(var_units)
   end procedure ! wrf_hydro_var_units
 
   ! Get memory use per array element, in bytes.
   module procedure wrf_hydro_var_itemsize_c
-    size = STUB_I
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_VAR_NAME) :: var_name
+    integer :: end
+    call c_to_f_str(name, var_name, end)
+    bmi_status = wrf_hydro%get_var_itemsize(var_name(1:end), size)
   end procedure ! wrf_hydro_var_itemsize
 
   ! Get size of the given variable, in bytes.
   module procedure wrf_hydro_var_nbytes_c
-    nbytes = STUB_I
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_VAR_NAME) :: var_name
+    integer :: end
+    call c_to_f_str(name, var_name, end)
+    bmi_status = wrf_hydro%get_var_nbytes(var_name(1:end), nbytes)
   end procedure ! wrf_hydro_var_nbytes
 
   ! Describe where a variable is located: node, edge, or face.
@@ -131,15 +151,17 @@ contains
 
   ! Time units of the model.
   module procedure wrf_hydro_time_units_c
-    units(1:STUB_C_LEN) = STUB_C
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_UNITS_NAME), target :: units_name
+    bmi_status = wrf_hydro%get_time_units(units_name)
+    units(1:BMI_MAX_UNITS_NAME) = f_to_c_str(units_name)
   end procedure ! wrf_hydro_time_units
 
   ! Get a copy of values (flattened!) of the given integer variable.
   module procedure wrf_hydro_get_int_c
     character(len=BMI_MAX_COMPONENT_NAME) :: f_str
-    f_str = c_to_f_str(name)
-    bmi_status = wrf_hydro%get_value_int(f_str, dest)
+    integer :: end
+    call c_to_f_str(name, f_str, end)
+    bmi_status = wrf_hydro%get_value_int(f_str(1:end), dest)
   end procedure ! wrf_hydro_get_int
 
   ! Get a copy of values (flattened!) of the given real variable.
@@ -313,6 +335,7 @@ contains
   ! ------------------------------------
 
   ! convert Fortran character array to C character array
+  ! TODO: this can likely be improved, see c_to_f_str
   function f_to_c_str(f_str) result(c_str)
     character(len=BMI_MAX_COMPONENT_NAME) :: f_str
     character(c_char) :: c_str(BMI_MAX_COMPONENT_NAME)
@@ -324,19 +347,14 @@ contains
     c_str(name_len+1) = C_NULL_CHAR
   end function f_to_c_str
 
-  ! TODO: look at wrf_hydro_get_int_c
   ! convert Fortran character array to C character array
-  function c_to_f_str(c_str) result(f_str)
-    character(c_char) :: c_str(BMI_MAX_COMPONENT_NAME)
-    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
-    integer :: i, name_len
-    ! name_len = index(c_str, C_NULL_CHAR)
-    name_len = 0!index(c_str, C_NULL_CHAR)
-    ! print *, "name_len" , name_len, "|", index(c_str, C_NULL_CHAR)
-    do i=1,name_len
-       f_str(i:i) = c_str(i)
-    end do
-  end function c_to_f_str
+  subroutine c_to_f_str(c_str, f_str, end)
+    character(c_char), intent(in) :: c_str(BMI_MAX_COMPONENT_NAME)
+    character(len=BMI_MAX_COMPONENT_NAME), intent(out) :: f_str
+    integer, intent(out) :: end
+    f_str = transfer(c_str(1:BMI_MAX_VAR_NAME), f_str)
+    end =  index(f_str, C_NULL_CHAR) - 1
+  end subroutine c_to_f_str
 
   ! Model introspection.
   module procedure print_model_info_c
