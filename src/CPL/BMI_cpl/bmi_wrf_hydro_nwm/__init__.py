@@ -1,5 +1,6 @@
 from . import bmi
 import ctypes as ct
+import numpy as np
 import sys
 bind_c_lib_path_1='../../../../build/lib/libbmi_wrf_hydro_nwm_bind_c.so'
 bind_c_lib_path_2='../lib/libbmi_wrf_hydro_nwm_bind_c.so'
@@ -8,6 +9,16 @@ try:
 except:
     wrf_h = ct.CDLL(bind_c_lib_path_2)
 
+def show_details(arr: np.ndarray):
+    first_col_width = 20
+    details = f"{'array':<{first_col_width}s}: {np.array_str(arr).replace(chr(10),',')}\n"\
+             +f"{'flags':<{first_col_width}s}: {arr.flags.f_contiguous = }, {arr.flags.c_contiguous = }\n"\
+             +f"{'array interface':<{first_col_width}s}: {arr.__array_interface__}\n" \
+             +f"{'strides':<{first_col_width}s}: {arr.strides}\n" \
+             +f"{'datatype':<{first_col_width}s}: {arr.dtype}\n" \
+             +f"{'base':<{first_col_width}s}: {np.array_str(arr.base).replace(chr(10),',') if arr.base is not None else '-'}\n"\
+             +f"{'base flags':<{first_col_width}s}: " + (f"{arr.base.flags.f_contiguous = }, {arr.base.flags.c_contiguous = }\n" if arr.base is not None else "-")
+    return details
 
 # ---------------------------------
 # --- Implemented BMI Functions ---
@@ -188,16 +199,16 @@ def get_value(name, array):
 
 # todo: get_value_int
 # Get a copy of values (flattened!) of the given integer variable.
-wrf_h.get_value_int.argtypes = \
-    [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
-     ct.POINTER(ct.c_int)]
 wrf_h.get_value_int.restype = ct.c_int
-def get_value_int(name, array):
-    # var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
-    # var_name.value = name.encode()
-    # get_grid_size(name, grid_size)
-    # array = ct.
-    # wrf_h.get_value_int(ct.byref(var_name), ct.byref(array))
+def get_value_int(name, array: np.ndarray):
+    var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
+    var_name.value = name.encode()
+    grid = get_var_grid(name)
+    grid_size = get_grid_size(grid)
+    wrf_h.get_value_int.argtypes = \
+        [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
+         ct.POINTER(ct.c_int * grid_size)]
+    wrf_h.get_value_int(ct.byref(var_name), array.ctypes.data_as(ct.POINTER(ct.c_int*grid_size)))
     return array
 
 # todo: get_value_float

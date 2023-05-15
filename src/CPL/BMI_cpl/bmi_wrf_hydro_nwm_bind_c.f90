@@ -159,19 +159,50 @@ contains
   ! Get a copy of values (flattened!) of the given integer variable.
   module procedure wrf_hydro_get_int_c
     character(len=BMI_MAX_COMPONENT_NAME) :: f_str
-    integer :: end
+    integer, allocatable :: f_dest(:)
+    integer :: i, end, res, grid, size
     call c_to_f_str(name, f_str, end)
-    bmi_status = wrf_hydro%get_value_int(f_str(1:end), dest)
+    res = wrf_hydro%get_var_grid(f_str(1:end), grid)
+    res = wrf_hydro%get_grid_size(grid, size)
+    allocate(f_dest(1:size))
+    res =  wrf_hydro%get_value_int(f_str(1:end), f_dest)
+    if (res .eq. BMI_FAILURE) return
+    do i=1,size
+       dest(i) = f_dest(i)
+    end do
+    bmi_status = res
   end procedure ! wrf_hydro_get_int
 
   ! Get a copy of values (flattened!) of the given real variable.
   module procedure wrf_hydro_get_float_c
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    real, allocatable :: f_dest(:)
+    integer :: i, end, res, grid, size
+    call c_to_f_str(name, f_str, end)
+    res = wrf_hydro%get_var_grid(f_str(1:end), grid)
+    res = wrf_hydro%get_grid_size(grid, size)
+    allocate(f_dest(1:size))
+    res =  wrf_hydro%get_value_float(f_str(1:end), f_dest)
+    do i=1,size
+       dest(i) = f_dest(i)
+    end do
+    bmi_status = res
   end procedure ! wrf_hydro_get_float
 
   ! Get a copy of values (flattened!) of the given double variable.
   module procedure wrf_hydro_get_double_c
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    double precision, allocatable :: f_dest(:)
+    integer :: i, end, res, grid, size
+    call c_to_f_str(name, f_str, end)
+    res = wrf_hydro%get_var_grid(f_str(1:end), grid)
+    res = wrf_hydro%get_grid_size(grid, size)
+    allocate(f_dest(1:size))
+    res =  wrf_hydro%get_value_double(f_str(1:end), f_dest)
+    do i=1,size
+       dest(i) = f_dest(i)
+    end do
+    bmi_status = res
   end procedure ! wrf_hydro_get_double
 
   ! Get a reference to the given integer variable.
