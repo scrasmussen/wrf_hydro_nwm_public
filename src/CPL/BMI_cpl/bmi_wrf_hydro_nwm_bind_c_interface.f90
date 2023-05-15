@@ -1,6 +1,7 @@
 module bmi_wrf_hydro_nwm_bind_c_mod
   ! use bmif_2_0
-  use bmi_wrf_hydro_nwm_mod, only: bmi_wrf_hydro_nwm
+  use bmi_wrf_hydro_nwm_mod, only: bmi_wrf_hydro_nwm, input_item_count, &
+       output_item_count
   use orchestrator_base, only : orchestrator_
   use state_module, only: wrf_hydro_model => state_type
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer, c_int, &
