@@ -190,7 +190,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
          result(bmi_status) &
          bind(c, name="get_value_int")
       character(c_char), intent(in) :: name(*)
-      integer(c_int), intent(inout) :: dest(:)
+      integer(c_int), intent(inout) :: dest(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_get_int_c
 
@@ -199,7 +199,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
          result(bmi_status) &
          bind(c, name="get_value_float")
       character(c_char), intent(in) :: name(*)
-      real, intent(inout) :: dest(:)
+      real, intent(inout) :: dest(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_get_float_c
 
@@ -208,7 +208,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
          result(bmi_status) &
          bind(c, name="get_value_double")
       character(c_char), intent(in) :: name(*)
-      real(c_double), intent(inout) :: dest(:)
+      real(c_double), intent(inout) :: dest(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_get_double_c
 
