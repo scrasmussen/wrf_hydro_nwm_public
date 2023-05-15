@@ -153,6 +153,27 @@ def get_time_units():
     wrf_h.get_time_units(ct.byref(var_units))
     return var_units.value.decode()
 
+# Get number of dimensions of the computational grid.
+wrf_h.get_grid_rank.argtypes = \
+    [ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
+wrf_h.get_grid_rank.restype = ct.c_int
+def get_grid_rank(grid):
+    var_grid = ct.c_int(grid)
+    rank = ct.c_int()
+    wrf_h.get_grid_rank(ct.byref(var_grid), ct.byref(rank))
+    return rank.value
+
+# Get the grid type as a string.
+wrf_h.get_grid_type.argtypes = \
+    [ct.POINTER(ct.c_int),
+     ct.POINTER(ct.c_char * bmi.BMI_MAX_TYPE_NAME)]
+wrf_h.get_grid_type.restype = ct.c_int
+def get_grid_type(grid):
+    var_grid = ct.c_int(grid)
+    grid_type = ct.create_string_buffer(bmi.BMI_MAX_TYPE_NAME)
+    wrf_h.get_grid_type(ct.byref(var_grid), ct.byref(grid_type))
+    return grid_type.value.decode()
+
 
 # -------------------------------
 # --- Working On Implementing ---
@@ -180,7 +201,7 @@ def get_value(name, array):
 wrf_h.get_value = get_value
 
 
-# List a model's input variables.
+# list a model's input variables.
 wrf_h.get_input_var_names.restype = ct.c_int
 def get_input_var_names():
     # input items is input_item_count long, have to define func argtype after
@@ -205,10 +226,12 @@ def get_input_var_names():
 
 # ------
 
-
+# Template for BMI Python C function definitions
+# wrf_h..argtypes = [ct.POINTER(ct.)]
+# wrf_h..restype = ct.c_int
 
 
 
 # Template for BMI Python C function definitions
-# wrf_h..argtypes = []
+# wrf_h..argtypes = [ct.POINTER(ct.)]
 # wrf_h..restype = ct.c_int
