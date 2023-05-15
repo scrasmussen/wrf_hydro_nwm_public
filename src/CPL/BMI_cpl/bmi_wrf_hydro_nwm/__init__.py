@@ -13,6 +13,27 @@ except:
 # --- Implemented BMI Functions ---
 # ---------------------------------
 
+# Perform startup tasks for the model.
+wrf_h.initialize.argtypes = [] # need to work on character strings
+wrf_h.initialize.restype = ct.c_int
+def initialize():
+    wrf_h.initialize()
+
+# Advance the model one time step.
+wrf_h.update.argtypes = []
+wrf_h.update.restype = ct.c_int
+def update():
+    wrf_h.update()
+
+# Advance the model until the given time.
+wrf_h.update_until.argtypes = [ct.POINTER(ct.c_double)]
+wrf_h.update_until.restype = ct.c_int
+def update_until(time):
+    time = ct.c_double(time)
+    wrf_h.update_until(time)
+
+# todo: finalize, need to debug
+
 # Get the name of the model.
 wrf_h.get_component_name.argtypes = \
     [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME)]
@@ -21,28 +42,6 @@ def get_component_name():
     model_name = (ct.c_char * bmi.BMI_MAX_COMPONENT_NAME)()
     wrf_h.get_component_name(ct.byref(model_name))
     return model_name.value
-
-# Perform startup tasks for the model.
-wrf_h.initialize.argtypes = [] # need to work on character strings
-wrf_h.initialize.restype = ct.c_int
-def initialize():
-    wrf_h.initialize()
-
-# Start time of the model.
-wrf_h.get_start_time.argtypes = [ct.POINTER(ct.c_double)]
-wrf_h.get_start_time.restype = ct.c_int
-def get_start_time():
-    current_time = ct.c_double()
-    wrf_h.get_start_time(ct.byref(current_time))
-    return current_time.value
-
-# End time of the model.
-wrf_h.get_end_time.argtypes = [ct.POINTER(ct.c_double)]
-wrf_h.get_end_time.restype = ct.c_int
-def get_end_time():
-    end_time = ct.c_double()
-    wrf_h.get_end_time(ct.byref(end_time))
-    return end_time.value
 
 # Count a model's input variables.
 wrf_h.get_input_item_count.argtypes = [ct.POINTER(ct.c_int)]
@@ -60,19 +59,8 @@ def get_output_item_count():
     wrf_h.get_output_item_count(output_item_count)
     return output_item_count.value
 
-# Advance the model one time step.
-wrf_h.update.argtypes = []
-wrf_h.update.restype = ct.c_int
-def update():
-    wrf_h.update()
-
-# Current time of the model.
-wrf_h.get_current_time.argtypes = [ct.POINTER(ct.c_double)]
-wrf_h.get_current_time.restype = ct.c_int
-def get_current_time():
-    current_time = ct.c_double()
-    wrf_h.get_current_time(ct.byref(current_time))
-    return current_time.value
+# todo: get_input_var_names
+# todo: get_output_var_names
 
 # Get the grid identifier for the given variable.
 wrf_h.get_var_grid.argtypes = \
@@ -82,19 +70,9 @@ wrf_h.get_var_grid.restype = ct.c_int
 def get_var_grid(name):
     var_name = (ct.c_char * bmi.BMI_MAX_COMPONENT_NAME)()
     var_name.value = name.encode()
-    grid_num = ct.c_int()
-    wrf_h.get_var_grid(ct.byref(var_name), ct.byref(grid_num))
-    return grid_num.value
-
-# Get the total number of elements in the computational grid.
-wrf_h.get_grid_size.argtypes = \
-    [ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
-wrf_h.get_grid_size.restype = ct.c_int
-def get_grid_size(grid):
-    grid_num = ct.c_int(grid)
-    grid_size = ct.c_int()
-    wrf_h.get_grid_size(ct.byref(grid_num), ct.byref(grid_size))
-    return grid_size.value
+    grid = ct.c_int()
+    wrf_h.get_var_grid(ct.byref(var_name), ct.byref(grid))
+    return grid.value
 
 # Get the data type of the given variable as a string.
 wrf_h.get_var_type.argtypes = \
@@ -116,9 +94,9 @@ wrf_h.get_var_units.restype = ct.c_int
 def get_var_units(name):
     var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
     var_name.value = name.encode()
-    var_units = ct.create_string_buffer(bmi.BMI_MAX_UNITS_NAME)
-    wrf_h.get_var_units(ct.byref(var_name), ct.byref(var_units))
-    return var_units.value.decode()
+    units = ct.create_string_buffer(bmi.BMI_MAX_UNITS_NAME)
+    wrf_h.get_var_units(ct.byref(var_name), ct.byref(units))
+    return units.value.decode()
 
 # Get memory use per array element, in bytes.
 wrf_h.get_var_itemsize.argtypes = \
@@ -144,6 +122,32 @@ def get_var_nbytes(name):
     wrf_h.get_var_nbytes(ct.byref(var_name), ct.byref(nbytes))
     return nbytes.value
 
+# todo: get_var_location
+
+# Current time of the model.
+wrf_h.get_current_time.argtypes = [ct.POINTER(ct.c_double)]
+wrf_h.get_current_time.restype = ct.c_int
+def get_current_time():
+    current_time = ct.c_double()
+    wrf_h.get_current_time(ct.byref(current_time))
+    return current_time.value
+
+# Start time of the model.
+wrf_h.get_start_time.argtypes = [ct.POINTER(ct.c_double)]
+wrf_h.get_start_time.restype = ct.c_int
+def get_start_time():
+    current_time = ct.c_double()
+    wrf_h.get_start_time(ct.byref(current_time))
+    return current_time.value
+
+# End time of the model.
+wrf_h.get_end_time.argtypes = [ct.POINTER(ct.c_double)]
+wrf_h.get_end_time.restype = ct.c_int
+def get_end_time():
+    end_time = ct.c_double()
+    wrf_h.get_end_time(ct.byref(end_time))
+    return end_time.value
+
 # Time units of the model.
 wrf_h.get_time_units.argtypes = \
     [ct.POINTER(ct.c_char * bmi.BMI_MAX_UNITS_NAME)]
@@ -152,6 +156,34 @@ def get_time_units():
     var_units = ct.create_string_buffer(bmi.BMI_MAX_UNITS_NAME)
     wrf_h.get_time_units(ct.byref(var_units))
     return var_units.value.decode()
+
+# Time units of the model.
+wrf_h.get_time_step.argtypes = \
+    [ct.POINTER(ct.c_char * bmi.BMI_MAX_UNITS_NAME)]
+wrf_h.get_time_step.restype = ct.c_int
+def get_time_step():
+    var_units = ct.create_string_buffer(bmi.BMI_MAX_UNITS_NAME)
+    wrf_h.get_time_step(ct.byref(var_units))
+    return var_units.value.decode()
+
+# todo: get_value_int
+# todo: get_value_float
+# todo: get_value_double
+# todo: get_value_ptr_int
+# todo: get_value_ptr_float
+# todo: get_value_ptr_double
+# todo: get_value_at_indices_int
+# todo: get_value_at_indices_float
+# todo: get_value_at_indices_double
+# todo: set_value_int
+# todo: set_value_float
+# todo: set_value_double
+# todo: set_value_ptr_int
+# todo: set_value_ptr_float
+# todo: set_value_ptr_double
+# todo: set_value_at_indices_int
+# todo: set_value_at_indices_float
+# todo: set_value_at_indices_double
 
 # Get number of dimensions of the computational grid.
 wrf_h.get_grid_rank.argtypes = \
@@ -163,6 +195,16 @@ def get_grid_rank(grid):
     wrf_h.get_grid_rank(ct.byref(var_grid), ct.byref(rank))
     return rank.value
 
+# Get the total number of elements in the computational grid.
+wrf_h.get_grid_size.argtypes = \
+    [ct.POINTER(ct.c_int), ct.POINTER(ct.c_int)]
+wrf_h.get_grid_size.restype = ct.c_int
+def get_grid_size(grid):
+    grid = ct.c_int(grid)
+    size = ct.c_int()
+    wrf_h.get_grid_size(ct.byref(grid), ct.byref(size))
+    return size.value
+
 # Get the grid type as a string.
 wrf_h.get_grid_type.argtypes = \
     [ct.POINTER(ct.c_int),
@@ -173,6 +215,19 @@ def get_grid_type(grid):
     grid_type = ct.create_string_buffer(bmi.BMI_MAX_TYPE_NAME)
     wrf_h.get_grid_type(ct.byref(var_grid), ct.byref(grid_type))
     return grid_type.value.decode()
+
+# todo: get_grid_type
+# todo: get_grid_spacing
+# todo: get_grid_origin
+# todo: get_grid_x
+# todo: get_grid_y
+# todo: get_grid_z
+# todo: get_grid_node_count
+# todo: get_grid_edge_count
+# todo: get_grid_face_count
+# todo: get_grid_edge_nodes
+# todo: get_grid_face_nodes
+# todo: get_grid_nodes_per_face
 
 
 # -------------------------------
@@ -225,10 +280,6 @@ def get_input_var_names():
     return a
 
 # ------
-
-# Template for BMI Python C function definitions
-# wrf_h..argtypes = [ct.POINTER(ct.)]
-# wrf_h..restype = ct.c_int
 
 
 
