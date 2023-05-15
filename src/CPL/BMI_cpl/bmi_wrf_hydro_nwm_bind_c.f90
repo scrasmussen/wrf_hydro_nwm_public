@@ -246,8 +246,9 @@ contains
 
   ! Get the grid type as a string.
   module procedure wrf_hydro_grid_type_c
-    type(1:STUB_C_LEN) = trim(STUB_C)
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_TYPE_NAME), target :: var_type
+    bmi_status = wrf_hydro%get_grid_type(grid, var_type)
+    type(1:BMI_MAX_COMPONENT_NAME) = f_to_c_str(var_type)
   end procedure ! wrf_hydro_grid_type
 
   ! Get the dimensions of the computational grid.
