@@ -306,8 +306,7 @@ contains
     do i=1,size
        f_src(i) = src(i)
     end do
-    res =  wrf_hydro%set_value_int(f_str(1:end), f_src)
-    bmi_status = res
+    bmi_status =  wrf_hydro%set_value_int(f_str(1:end), f_src)
   end procedure ! wrf_hydro_set_int
 
   ! Set new values for a real model variable.
@@ -322,8 +321,7 @@ contains
     do i=1,size
        f_src(i) = src(i)
     end do
-    res =  wrf_hydro%set_value_float(f_str(1:end), f_src)
-    bmi_status = res
+    bmi_status =  wrf_hydro%set_value_float(f_str(1:end), f_src)
   end procedure ! wrf_hydro_set_float
 
   ! Set new values for a double model variable.
@@ -338,23 +336,69 @@ contains
     do i=1,size
        f_src(i) = src(i)
     end do
-    res =  wrf_hydro%set_value_double(f_str(1:end), f_src)
-    bmi_status = res
+    bmi_status =  wrf_hydro%set_value_double(f_str(1:end), f_src)
   end procedure ! wrf_hydro_set_double
 
   ! Set integer values at particular (one-dimensional) indices.
   module procedure wrf_hydro_set_at_indices_int_c
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    integer, allocatable :: f_src(:), f_inds(:)
+    integer :: i, end, res, grid, dest_len
+    call c_to_f_str(name, f_str, end)
+    res = wrf_hydro%get_var_grid(f_str(1:end), grid)
+    ! since the Python arrays come in as assumed size the size of the arrays
+    ! has been but in the first index of 'inds'
+    dest_len = inds(1)
+    allocate(f_src(1:dest_len))
+    allocate(f_inds(1:dest_len))
+    do i=1,dest_len
+       f_inds(i) = inds(i+1)
+       f_src(i) = src(i)
+    end do
+
+    bmi_status =  wrf_hydro%set_value_at_indices_int(f_str(1:end), f_inds, f_src)
   end procedure ! wrf_hydro_set_at_indices_int
 
   ! Set real values at particular (one-dimensional) indices.
   module procedure wrf_hydro_set_at_indices_float_c
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    integer, allocatable :: f_inds(:)
+    real, allocatable :: f_src(:)
+    integer :: i, end, res, grid, dest_len
+    call c_to_f_str(name, f_str, end)
+    res = wrf_hydro%get_var_grid(f_str(1:end), grid)
+    ! since the Python arrays come in as assumed size the size of the arrays
+    ! has been but in the first index of 'inds'
+    dest_len = inds(1)
+    allocate(f_src(1:dest_len))
+    allocate(f_inds(1:dest_len))
+    do i=1,dest_len
+       f_inds(i) = inds(i+1)
+       f_src(i) = src(i)
+    end do
+
+    bmi_status =  wrf_hydro%set_value_at_indices_float(f_str(1:end), f_inds, f_src)
   end procedure ! wrf_hydro_set_at_indices_float
 
   ! Set double values at particular (one-dimensional) indices.
   module procedure wrf_hydro_set_at_indices_double_c
-    bmi_status = BMI_FAILURE
+    character(len=BMI_MAX_COMPONENT_NAME) :: f_str
+    integer, allocatable :: f_inds(:)
+    double precision, allocatable :: f_src(:)
+    integer :: i, end, res, grid, dest_len
+    call c_to_f_str(name, f_str, end)
+    res = wrf_hydro%get_var_grid(f_str(1:end), grid)
+    ! since the Python arrays come in as assumed size the size of the arrays
+    ! has been but in the first index of 'inds'
+    dest_len = inds(1)
+    allocate(f_src(1:dest_len))
+    allocate(f_inds(1:dest_len))
+    do i=1,dest_len
+       f_inds(i) = inds(i+1)
+       f_src(i) = src(i)
+    end do
+
+    bmi_status =  wrf_hydro%set_value_at_indices_double(f_str(1:end), f_inds, f_src)
   end procedure ! wrf_hydro_set_at_indices_double
 
   ! Get number of dimensions of the computational grid.
