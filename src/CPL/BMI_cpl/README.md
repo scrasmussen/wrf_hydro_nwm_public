@@ -3,11 +3,13 @@ The [Basic Model Interface](https://bmi.readthedocs.io/en/stable/) ([BMI](https:
 This allows for different models to use the BMI functions to couple and interact together.
 
 
-## Drivers
-WRF-Hydro's driver is implemented using BMI's model control functions in the following languages:
+## Languages
+WRF-Hydro's BMI functionality has been implemented in the following languages:
   - Fortran
   - Python
-  - C++
+  - C
+
+Note: since the `bind c` arrays are passed as assumed size to the `get_value_at_indices` procedures, the size of the arrays must be passed somehow. This is done by putting the size as the first value in the indices array. This is done by a wrapper in Python but needs to be done in C.
 
 
 ## Adding new variables

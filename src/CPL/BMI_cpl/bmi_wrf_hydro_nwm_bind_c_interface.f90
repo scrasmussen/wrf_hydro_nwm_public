@@ -244,8 +244,8 @@ module bmi_wrf_hydro_nwm_bind_c_mod
          result(bmi_status) &
          bind(c, name="get_value_at_indices_int")
       character(c_char), intent(in) :: name(*)
-      integer(c_int), intent(inout) :: dest(:)
-      integer(c_int), intent(in) :: inds(:)
+      integer(c_int), intent(inout) :: dest(*)
+      integer(c_int), intent(in) :: inds(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_get_at_indices_int_c
 
@@ -254,8 +254,8 @@ module bmi_wrf_hydro_nwm_bind_c_mod
          result(bmi_status) &
          bind(c, name="get_value_at_indices_float")
       character(c_char), intent(in) :: name(*)
-      real, intent(inout) :: dest(:)
-      integer(c_int), intent(in) :: inds(:)
+      real, intent(inout) :: dest(*)
+      integer(c_int), intent(in) :: inds(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_get_at_indices_float_c
 
@@ -264,8 +264,8 @@ module bmi_wrf_hydro_nwm_bind_c_mod
          result(bmi_status) &
          bind(c, name="get_value_at_indices_double")
       character(c_char), intent(in) :: name(*)
-      real(c_double), intent(inout) :: dest(:)
-      integer(c_int), intent(in) :: inds(:)
+      real(c_double), intent(inout) :: dest(*)
+      integer(c_int), intent(in) :: inds(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_get_at_indices_double_c
 
@@ -273,7 +273,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
     module function wrf_hydro_set_int_c(name, src) result(bmi_status) &
       bind(c, name="set_value_int")
       character(c_char), intent(in) :: name(*)
-      integer(c_int), intent(in) :: src(:)
+      integer(c_int), intent(in) :: src(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_set_int_c
 
@@ -281,7 +281,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
     module function wrf_hydro_set_float_c(name, src) result(bmi_status) &
       bind(c, name="set_value_float")
       character(c_char), intent(in) :: name(*)
-      real, intent(in) :: src(:)
+      real, intent(in) :: src(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_set_float_c
 
@@ -289,7 +289,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
     module function wrf_hydro_set_double_c(name, src) result(bmi_status) &
       bind(c, name="set_value_double")
       character(c_char), intent(in) :: name(*)
-      real(c_double), intent(in) :: src(:)
+      real(c_double), intent(in) :: src(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_set_double_c
 
