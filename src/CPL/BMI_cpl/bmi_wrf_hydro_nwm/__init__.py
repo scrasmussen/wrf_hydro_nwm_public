@@ -197,7 +197,6 @@ def get_value(name, dest):
         dest = get_value_double(name, dest)
     return dest
 
-# todo: get_value_int
 # Get a copy of values (flattened!) of the given integer variable.
 wrf_h.get_value_int.restype = ct.c_int
 def get_value_int(name, dest: np.ndarray):
@@ -212,7 +211,6 @@ def get_value_int(name, dest: np.ndarray):
     wrf_h.get_value_int(ct.byref(var_name), dest.ctypes.data_as(ct.POINTER(ct.c_int*grid_size)))
     return np.reshape(dest, grid_shape)
 
-# todo: get_value_float
 # Get a copy of values (flattened!) of the given float variable.
 wrf_h.get_value_float.restype = ct.c_int
 def get_value_float(name, dest: np.ndarray):
@@ -227,7 +225,6 @@ def get_value_float(name, dest: np.ndarray):
     wrf_h.get_value_float(ct.byref(var_name), dest.ctypes.data_as(ct.POINTER(ct.c_float*grid_size)))
     return np.reshape(dest, grid_shape)
 
-# todo: get_value_double
 # Get a copy of values (flattened!) of the given double variable.
 wrf_h.get_value_double.restype = ct.c_int
 def get_value_double(name, dest):
@@ -257,48 +254,64 @@ def get_value_at_indices(name, dest, inds):
         dest = get_value_at_indices_double(name, dest, inds)
     return dest
 
-# todo: get_value_at_indices_int
+def create_indes_w_len(inds, ctype):
+    dest_size = inds.size
+    inds_w_len = np.zeros(dest_size+1, dtype=ctype)
+    inds_w_len[0] = dest_size
+    for i in range(dest_size):
+        inds_w_len[i+1] = inds[i]
+    return inds_w_len
+
 # Get a copy of values (flattened!) of the given integer variable.
 wrf_h.get_value_at_indices_int.restype = ct.c_int
 def get_value_at_indices_int(name, dest, inds):
     var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
     var_name.value = name.encode()
     grid = get_var_grid(name)
-    grid_size = dest.size
+    dest_size = dest.size
+    inds_w_len = create_indes_w_len(inds, ct.c_int)
     wrf_h.get_value_at_indices_int.argtypes = \
         [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
-         ct.POINTER(ct.c_int * grid_size)]
+         ct.POINTER(ct.c_int * dest_size),
+         ct.POINTER(ct.c_int * (dest_size+1))]
     wrf_h.get_value_at_indices_int(ct.byref(var_name),
-                                   dest.ctypes.data_as(ct.POINTER(ct.c_int*grid_size)),
-                                   inds.ctypes.data_as(ct.POINTER(ct.c_int*grid_size)))
+                                   dest.ctypes.data_as(ct.POINTER(ct.c_int*dest_size)),
+                                   inds_w_len.ctypes.data_as(ct.POINTER(ct.c_int*(dest_size+1))))
     return dest
 
-# todo: get_value_at_indices_float
 # Get a copy of values (flattened!) of the given float variable.
-wrf_h.get_value_at_indices_float.argtypes = \
-    [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
-     ct.POINTER(ct.c_float)]
 wrf_h.get_value_at_indices_float.restype = ct.c_int
 def get_value_at_indices_float(name, dest, inds):
-    # var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
-    # var_name.value = name.encode()
-    # get_grid_size(name, grid_size)
-    # dest = ct.
-    # wrf_h.get_value_at_indices_float(ct.byref(var_name), ct.byref(dest))
+    var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
+    var_name.value = name.encode()
+    grid = get_var_grid(name)
+    dest_size = dest.size
+    inds_w_len = create_indes_w_len(inds, ct.c_float)
+    wrf_h.get_value_at_indices_float.argtypes = \
+        [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
+         ct.POINTER(ct.c_float * dest_size),
+         ct.POINTER(ct.c_int * (dest_size+1))]
+    wrf_h.get_value_at_indices_float(ct.byref(var_name),
+                                   dest.ctypes.data_as(ct.POINTER(ct.c_float*dest_size)),
+                                   inds_w_len.ctypes.data_as(ct.POINTER(ct.c_int*(dest_size+1))))
     return dest
 
-# todo: get_value_at_indices_double
 # Get a copy of values (flattened!) of the given double variable.
-wrf_h.get_value_at_indices_double.argtypes = \
-    [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
-     ct.POINTER(ct.c_double)]
 wrf_h.get_value_at_indices_double.restype = ct.c_int
 def get_value_at_indices_double(name, dest, inds):
-    # var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
-    # var_name.value = name.encode()
-    # get_grid_size(name, grid_size)
-    # dest = ct.
-    # wrf_h.get_value_at_indices_double(ct.byref(var_name), ct.byref(dest))
+    var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
+    var_name.value = name.encode()
+    grid = get_var_grid(name)
+    dest_size = dest.size
+    inds_w_len = create_indes_w_len(inds, ct.c_double)
+    wrf_h.get_value_at_indices_double.argtypes = \
+        [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
+         ct.POINTER(ct.c_double * dest_size),
+         ct.POINTER(ct.c_int * (dest_size+1))]
+    wrf_h.get_value_at_indices_double(ct.byref(var_name),
+                                      dest.ctypes.data_as(ct.POINTER(ct.c_double*dest_size)),
+                                      inds_w_len.ctypes.data_as(ct.POINTER(ct.c_int*(dest_size+1))))
+
     return dest
 
 def set_value(name, dest):
@@ -312,47 +325,44 @@ def set_value(name, dest):
         dest = set_value_double(name, dest)
     return dest
 
-# todo: set_value_int
 # Get a copy of values (flattened!) of the given integer variable.
-wrf_h.set_value_int.argtypes = \
-    [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
-     ct.POINTER(ct.c_int)]
 wrf_h.set_value_int.restype = ct.c_int
 def set_value_int(name, dest):
-    # var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
-    # var_name.value = name.encode()
-    # get_grid_size(name, grid_size)
-    # dest = ct.
-    # wrf_h.set_value_int(ct.byref(var_name), ct.byref(dest))
-    return dest
+    var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
+    var_name.value = name.encode()
+    grid = get_var_grid(name)
+    grid_size = get_grid_size(grid)
+    wrf_h.set_value_int.argtypes = \
+        [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
+         ct.POINTER(ct.c_int * grid_size)]
+    wrf_h.set_value_int(ct.byref(var_name), dest.flatten().ctypes.data_as(ct.POINTER(ct.c_int*grid_size)))
 
-# todo: set_value_float
 # Get a copy of values (flattened!) of the given float variable.
-wrf_h.set_value_float.argtypes = \
-    [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
-     ct.POINTER(ct.c_float)]
 wrf_h.set_value_float.restype = ct.c_int
 def set_value_float(name, dest):
-    # var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
-    # var_name.value = name.encode()
-    # get_grid_size(name, grid_size)
-    # dest = ct.
-    # wrf_h.set_value_float(ct.byref(var_name), ct.byref(dest))
-    return dest
+    var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
+    var_name.value = name.encode()
+    grid = get_var_grid(name)
+    grid_size = get_grid_size(grid)
+    wrf_h.set_value_float.argtypes = \
+        [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
+         ct.POINTER(ct.c_float * grid_size)]
+    wrf_h.set_value_float(ct.byref(var_name), dest.flatten().ctypes.data_as(ct.POINTER(ct.c_float*grid_size)))
 
-# todo: set_value_double
 # Get a copy of values (flattened!) of the given double variable.
 wrf_h.set_value_double.argtypes = \
     [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
      ct.POINTER(ct.c_double)]
 wrf_h.set_value_double.restype = ct.c_int
 def set_value_double(name, dest):
-    # var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
-    # var_name.value = name.encode()
-    # get_grid_size(name, grid_size)
-    # dest = ct.
-    # wrf_h.set_value_double(ct.byref(var_name), ct.byref(dest))
-    return dest
+    var_name = ct.create_string_buffer(bmi.BMI_MAX_VAR_NAME)
+    var_name.value = name.encode()
+    grid = get_var_grid(name)
+    grid_size = get_grid_size(grid)
+    wrf_h.set_value_double.argtypes = \
+        [ct.POINTER(ct.c_char * bmi.BMI_MAX_COMPONENT_NAME),
+         ct.POINTER(ct.c_float * grid_size)]
+    wrf_h.set_value_double(ct.byref(var_name), dest.flatten().ctypes.data_as(ct.POINTER(ct.c_double*grid_size)))
 
 # todo: set_value_ptr_int
 # todo: set_value_ptr_float
@@ -449,7 +459,7 @@ wrf_h.get_grid_shape.argtypes = \
 wrf_h.get_grid_shape.restype = ct.c_int
 def get_grid_shape(grid):  # foobar
     grid = ct.c_int(grid)
-    shape = np.zeros(3, dtype=np.intc)
+    shape = np.zeros(3, dtype=ct.c_int)
     wrf_h.get_grid_shape(ct.byref(grid), shape.ctypes.data_as(ct.POINTER(ct.c_int*3)))
     if shape[2] == 0:
         return shape[:-1]
