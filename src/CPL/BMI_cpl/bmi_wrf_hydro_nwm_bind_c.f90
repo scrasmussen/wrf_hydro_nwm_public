@@ -284,9 +284,14 @@ contains
 
   ! Get the dimensions of the computational grid.
   module procedure wrf_hydro_grid_shape_c
+    integer, allocatable :: f_dest(:)
+    integer :: i, res
     integer, allocatable :: grid_shape(:)
-    bmi_status = wrf_hydro%get_grid_shape(grid, grid_shape)
-    shape = grid_shape
+    res = wrf_hydro%get_grid_shape(grid, grid_shape)
+    do i=1,size(grid_shape)
+       shape(i) = grid_shape(i)
+    end do
+    bmi_status = res
   end procedure ! wrf_hydro_grid_shape
 
   ! Get distance between nodes of the computational grid.

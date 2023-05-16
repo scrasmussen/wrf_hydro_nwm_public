@@ -351,7 +351,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
     module function wrf_hydro_grid_shape_c(grid, shape) result(bmi_status) &
       bind(c, name="get_grid_shape")
       integer(c_int), intent(in) :: grid
-      integer(c_int), dimension(:), intent(out) :: shape
+      integer(c_int), intent(out) :: shape(*)
       integer(c_int) :: bmi_status
     end function wrf_hydro_grid_shape_c
 
