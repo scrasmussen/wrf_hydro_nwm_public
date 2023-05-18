@@ -29,7 +29,17 @@ endif()
 add_subdirectory("bmi")
 
 # add Basic Module Interface (BMI)
-add_subdirectory("CPL/BMI_cpl")
+if (BMI STREQUAL "1" OR MODFLOW STREQUAL "1")
+  add_subdirectory("CPL/BMI_cpl")
+endif()
+# add MODFLOW Coupling
+if (MODFLOW STREQUAL "1")
+  if (NOT DEFINED ENV{MODFLOW_BMI})
+    message(FATAL_ERROR "MODFLOW Coupling requested but MODFLOW_BMI environmental variable not set.")
+  endif()
+  message("Building MODFLOW coupling")
+  add_subdirectory("CPL/MODFLOW_cpl")
+endif()
 
 if (WRF_HYDRO_NUDGING STREQUAL "1")
         add_subdirectory("nudging")
@@ -141,6 +151,9 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 add_dependencies(wrfhydro hydro_routing_diversions)
         endif()
         add_dependencies(wrfhydro wrf_hydro_bmi)
+        add_dependencies(wrfhydro modflow_hello_world)
+        add_dependencies(wrfhydro wrf_hydro_bmi_cpp)
+
         target_link_libraries(module_NoahMP_hrldas
           wrfhydro_lib)
 
@@ -170,6 +183,11 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 COMMAND ln -sf ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
                 COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro
                 COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
+	        COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi_cpp ${CMAKE_BINARY_DIR}/Run/
+	        # COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro_modflow ${CMAKE_BINARY_DIR}/Run/
+	        COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/modflow_hello_world ${CMAKE_BINARY_DIR}/Run/
+
+
         )
         if(WRF_HYDRO_CREATE_EXE_SYMLINK)
                 add_custom_command(TARGET wrfhydro POST_BUILD
