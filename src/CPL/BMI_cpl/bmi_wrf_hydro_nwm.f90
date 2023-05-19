@@ -28,17 +28,21 @@ contains
     bmi_status = BMI_SUCCESS
     ! Note: since Fortran array indexing starts at 1 as the default, that
     !       behavior is replicated here
-    select case(name)
+    select case(trim(name))
     case("IVGTYP")
        grid = 1
     case("ISLTYP")
        grid = 2
     case("GLACT")
        grid = 4
+    case("qlink1")
+       grid = 201
+    case("qlink2")
+       grid = 202
     case default
        grid = -1
        bmi_status = BMI_FAILURE
-       print *, "WARNING: variable ", trim(name), " not found"
+       print *, "WARNING: variable ", trim(name), " not found in wrf_hydro_var_grid"
     end select
   end procedure ! wrf_hydro_var_grid
 
@@ -57,7 +61,7 @@ contains
        var_rank = rank(GLACT)
     case default
        var_rank = -1
-       print *, "WARNING: variable ", grid, " not found, rank set to -1"
+       print *, "WARNING: variable ", grid, " not found in get_grid_rank, rank set to -1"
     end select
   end function get_grid_rank
 
@@ -76,7 +80,7 @@ contains
        grid_shape = shape(GLACT)
     case default
        grid_shape = [0]
-       print *, "WARNING: grid", grid, " was not found"
+       print *, "WARNING: grid", grid, " was not found in get_grid_shape"
     end select
   end function get_grid_shape
 
@@ -84,6 +88,7 @@ contains
   ! variable size and the intrinsic function size
   function get_var_size(grid) result(var_size)
     use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, GLACT
+    use module_RT_data, only : RT_DOMAIN
     integer, intent(in) :: grid
     integer :: var_size
     select case(grid)
@@ -93,9 +98,13 @@ contains
        var_size = size(ISLTYP)
     case(4) ! GLACT
        var_size = size(GLACT)
+    case(201) ! qlink1
+       var_size = size(RT_DOMAIN(1)%qlink(:,1))
+    case(202) ! qlink2
+       var_size = size(RT_DOMAIN(1)%qlink(:,2))
     case default
        var_size = 0
-       print *, "WARNING: variable ", grid, " not found"
+       print *, "WARNING: variable ", grid, " not found in get_var_size"
     end select
   end function get_var_size
 
@@ -103,20 +112,29 @@ contains
   module procedure wrf_hydro_grid_type
     bmi_status = BMI_SUCCESS
     ! options are:
-    !   - "integer"
-    !   - "real"
-    !   - "double precision"
     !   - "logical"
+    !   - "scalar"
+    !   - "points"
+    !   - "vector"
+    !   - "unstructured"
+    !   - "structured_quadrilateral"
+    !   - "rectilinear"
+    !   - "uniform_rectilinear"
+
     select case(grid)
     case(1) ! IVGTYP
-       type = "integer"
+       type = "uniform_rectilinear"
     case(2) ! ISLTYP
-       type = "integer"
+       type = "uniform_rectilinear"
     case(4) ! GLACT
-       type = "real"
+       type = "uniform_rectilinear"
+    case(201) ! qlink1
+       type = "vector"
+    case(202) ! qlink2
+       type = "vector"
     case default
        type = ""
-       print *, "WARNING: variable ", grid, " not found"
+       print *, "WARNING: variable ", grid, " not found in wrf_hydro_grid_type"
        bmi_status = BMI_FAILURE
     end select
   end procedure ! wrf_hydro_grid_type
@@ -132,7 +150,7 @@ contains
        ISLTYP = reshape(src, shape(ISLTYP))
     case default
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found wrf_hydro_set_int"
     end select
   end procedure ! wrf_hydro_set_int
 
@@ -145,7 +163,7 @@ contains
        GLACT = reshape(src, shape(GLACT))
     case default
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_set_float"
     end select
   end procedure ! wrf_hydro_set_float
 
@@ -155,7 +173,7 @@ contains
     select case(name)
     case default
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_set_double"
     end select
   end procedure ! wrf_hydro_set_double
 
@@ -179,7 +197,7 @@ contains
        var_data = pack(ISLTYP, .true.)
        dest = var_data
     case default
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_get_int"
        bmi_status = BMI_FAILURE
     end select
   end procedure ! wrf_hydro_get_int
@@ -195,7 +213,7 @@ contains
     case(4) ! GLACT
        dest = pack(GLACT, .true.)
     case default
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_get_float"
     end select
   end procedure ! wrf_hydro_get_float
 
@@ -209,7 +227,7 @@ contains
     ! case(X) ! future_var
     !    dest = pack(future_var, .true.)
     case default
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_get_double"
     end select
   end procedure ! wrf_hydro_get_double
 
@@ -226,7 +244,7 @@ contains
        ! ISLTYP =
     case default
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_set_at_indices_int"
     end select
   end procedure ! wrf_hydro_set_at_indices_int
 
@@ -240,7 +258,7 @@ contains
        call set_var_at_indices(GLACT, inds, src)
     case default
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_set_at_indices_float"
     end select
   end procedure ! wrf_hydro_set_at_indices_float
 
@@ -254,7 +272,7 @@ contains
     !    call set_var_at_indices(future_var, inds, src)
     case default
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_set_at_indices_double"
     end select
   end procedure ! wrf_hydro_set_at_indices_double
 
@@ -277,7 +295,7 @@ contains
     case default
        unpack = .false.
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_get_at_indices_int"
     end select
 
     ! if data found, unpack data
@@ -308,7 +326,7 @@ contains
     case default
        unpack = .false.
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_get_at_indices_float"
     end select
 
     ! if data found, unpack data
@@ -338,7 +356,7 @@ contains
     case default
        unpack = .false.
        bmi_status = BMI_FAILURE
-       print *, "WARNING: ", trim(name), " data not found"
+       print *, "WARNING: ", trim(name), " data not found in wrf_hydro_get_at_indices_double"
     end select
 
     ! if data found, unpack data
@@ -498,8 +516,27 @@ contains
     integer :: grid, res
     character(BMI_MAX_TYPE_NAME) :: var_type
     res = this%get_var_grid(name, grid)
-    res = this%get_grid_type(grid, var_type)
-    type = var_type
+    ! options are:
+    !   - "integer"
+    !   - "real"
+    !   - "double precision"
+    !   - "logical"
+    select case(grid)
+    case(1) ! IVGTYP
+       type = "integer"
+    case(2) ! ISLTYP
+       type = "integer"
+    case(4) ! GLACT
+       type = "real"
+    case(201) ! qlink1
+       type = "real"
+    case(202) ! qlink1
+       type = "real"
+    case default
+       type = "error"
+       print *, "WARNING: variable ", trim(name), " of grid", grid, " not found in wrf_hydro_var_type"
+       bmi_status = BMI_FAILURE
+    end select
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_var_type
 
@@ -541,11 +578,15 @@ contains
     case("ISLTYP")
        units = "category"
     case("GLACT")
-       units = ""
+       units = "error"
+    case("qlink1")
+       units = "m3/s"
+    case("qlink2")
+       units = "m3/s"
     case default
-       units = ""
+       units = "error"
        bmi_status = BMI_FAILURE
-       print *, "WARNING: variable ", trim(name), " not found"
+       print *, "WARNING: variable ", trim(name), " not found in wrf_hydro_var_units"
     end select
   end procedure ! wrf_hydro_var_units
 
@@ -807,6 +848,7 @@ contains
     case default
        size = 0
        bmi_status = BMI_FAILURE
+       print *, "WARNING: variable ", trim(name), " not found in wrf_hydro_var_itemsize"
     end select
   end procedure ! wrf_hydro_var_itemsize
 
