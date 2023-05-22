@@ -33,6 +33,8 @@ contains
        grid = 1
     case("ISLTYP")
        grid = 2
+    case("soldrain")
+       grid = 3
     case("GLACT")
        grid = 4
     case("qlink1")
@@ -49,7 +51,7 @@ contains
   ! this function is need so that there isn't an object clash between the
   ! variable rank and the intrinsic function rank
   function get_grid_rank(grid) result(var_rank)
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, GLACT
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, soldrain, GLACT
     integer, intent(in) :: grid
     integer :: var_rank
     select case(grid)
@@ -57,6 +59,8 @@ contains
        var_rank = rank(IVGTYP)
     case(2) ! ISLTYP
        var_rank = rank(ISLTYP)
+    case(3) ! soldrain
+       var_rank = rank(soldrain)
     case(4) ! GLACT
        var_rank = rank(GLACT)
     case default
@@ -68,7 +72,7 @@ contains
   ! this function is need so that there isn't an object clash between the
   ! variable shape and the intrinsic function shape
   function get_grid_shape(grid) result(grid_shape)
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, GLACT
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, soldrain, GLACT
     integer, intent(in) :: grid
     integer, dimension(:), allocatable :: grid_shape
     select case(grid)
@@ -76,6 +80,8 @@ contains
        grid_shape = shape(IVGTYP)
     case(2) ! ISLTYP
        grid_shape = shape(ISLTYP)
+    case(3) ! soldrain
+       grid_shape = shape(soldrain)
     case(4) ! GLACT
        grid_shape = shape(GLACT)
     case default
@@ -87,7 +93,7 @@ contains
   ! this function is need so that there isn't an object clash between the
   ! variable size and the intrinsic function size
   function get_var_size(grid) result(var_size)
-    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, GLACT
+    use module_NoahMP_hrldas_driver, only : IVGTYP, ISLTYP, soldrain, GLACT
     use module_RT_data, only : RT_DOMAIN
     integer, intent(in) :: grid
     integer :: var_size
@@ -96,6 +102,8 @@ contains
        var_size = size(IVGTYP)
     case(2) ! ISLTYP
        var_size = size(ISLTYP)
+    case(3) ! soldrain
+       var_size = size(soldrain)
     case(4) ! GLACT
        var_size = size(GLACT)
     case(201) ! qlink1
@@ -125,6 +133,8 @@ contains
     case(1) ! IVGTYP
        type = "uniform_rectilinear"
     case(2) ! ISLTYP
+       type = "uniform_rectilinear"
+    case(3) ! soldrain
        type = "uniform_rectilinear"
     case(4) ! GLACT
        type = "uniform_rectilinear"
@@ -156,9 +166,11 @@ contains
 
   ! Set new values for a real model variable.
   module procedure wrf_hydro_set_float
-    use module_NoahMP_hrldas_driver, only : GLACT
+    use module_NoahMP_hrldas_driver, only : soldrain, GLACT
     bmi_status = BMI_SUCCESS
     select case(name)
+    case("soldrain")
+       soldrain = reshape(src, shape(soldrain))
     case("GLACT")
        GLACT = reshape(src, shape(GLACT))
     case default
@@ -204,12 +216,14 @@ contains
 
   ! Get a copy of values (flattened!) of the given real variable.
   module procedure wrf_hydro_get_float
-    use module_NoahMP_hrldas_driver, only : GLACT
+    use module_NoahMP_hrldas_driver, only : soldrain, GLACT
     integer :: res, grid, size
     real, allocatable ::  var_data(:)
     bmi_status = BMI_SUCCESS
     res = this%get_var_grid(name, grid)
     select case(grid)
+    case(3) ! soldrain
+       dest = pack(soldrain, .true.)
     case(4) ! GLACT
        dest = pack(GLACT, .true.)
     case default
@@ -250,10 +264,12 @@ contains
 
   ! Set real values at particular (one-dimensional) indices.
   module procedure wrf_hydro_set_at_indices_float
-    use module_NoahMP_hrldas_driver, only : GLACT
+    use module_NoahMP_hrldas_driver, only : soldrain, GLACT
     real, allocatable :: var_shape(:)
     bmi_status = BMI_SUCCESS
     select case(name)
+    case("soldrain")
+       call set_var_at_indices(soldrain, inds, src)
     case("GLACT")
        call set_var_at_indices(GLACT, inds, src)
     case default
@@ -311,7 +327,7 @@ contains
 
   ! Get real values at particular (one-dimensional) indices.
   module procedure wrf_hydro_get_at_indices_float
-    use module_NoahMP_hrldas_driver, only : GLACT
+    use module_NoahMP_hrldas_driver, only : soldrain, GLACT
     real, allocatable ::  pack_data(:), ind_data(:)
     integer :: n, i
     logical :: unpack
@@ -321,6 +337,8 @@ contains
     ! TODO: packing is easy but inefficient way of doing this
     print *, "WARNING: PACKING IS INEFFICIENT"
     select case(name)
+    case("soldrain")
+       pack_data = pack(soldrain, .true.)
     case("GLACT")
        pack_data = pack(GLACT, .true.)
     case default
