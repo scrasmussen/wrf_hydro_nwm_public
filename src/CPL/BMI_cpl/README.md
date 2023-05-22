@@ -22,6 +22,7 @@ To add new ones please follow the steps listed in this section.
 | IVGTYP   |
 | ISLTYP   |
 | GLACT    |
+| soldrain |
 
 ### Exposing Additional Variables
 Here are the steps for exposing additional WRF-Hydro variables to BMI.
@@ -33,6 +34,7 @@ Each new variable will need a grid rank,
    - `get_grid_shape`
    - `get_var_size`
    - `wrf_hydro_var_units`
+   - `wrf_hydro_var_type`
    - `wrf_hydro_grid_type`
    - `wrf_hydro_set_{int,float,double}`
    - `wrf_hydro_get_{int,float,double}`
