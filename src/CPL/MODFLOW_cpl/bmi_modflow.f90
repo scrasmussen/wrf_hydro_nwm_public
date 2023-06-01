@@ -59,6 +59,22 @@ contains
     bmi_status = bmi_finalize()
   end procedure ! modflow_finalize
 
+  ! Count a model's input variables.
+  module procedure modflow_input_item_count
+    use mf6bmi, only: get_input_item_count
+    integer(c_int) :: count_c
+    bmi_status = get_input_item_count(count_c)
+    count = count_c
+  end procedure ! modflow_input_item_count
+
+  ! Count a model's output variables.
+  module procedure modflow_output_item_count
+    use mf6bmi, only: get_output_item_count
+    integer(c_int) :: count_c
+    bmi_status = get_output_item_count(count_c)
+    count = count_c
+  end procedure ! modflow_output_item_count
+
   ! --------------------------------------------------------------------
   !  The functions below this need to be implemented
   ! --------------------------------------------------------------------
@@ -162,16 +178,6 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! modflow_update_until
 
-  ! Count a model's input variables.
-  module procedure modflow_input_item_count
-    bmi_status = BMI_FAILURE
-  end procedure ! modflow_input_item_count
-
-  ! Count a model's output variables.
-  module procedure modflow_output_item_count
-    bmi_status = BMI_FAILURE
-  end procedure ! modflow_output_item_count
-
   !---------------------------------------------------------------------
   ! Should update how this is handeled in main_hrldas_driver
   !---------------------------------------------------------------------
@@ -240,6 +246,7 @@ contains
   !       the other parts of the model?
   ! List a model's output variables.
   module procedure modflow_output_var_names
+    ! get_output_var_names
     bmi_status = BMI_FAILURE
   end procedure ! modflow_output_var_names
 
@@ -442,7 +449,7 @@ contains
 
   ! Check the status and update bmi_status if necessary
   module procedure stat_check
-    if (bmi_status == BMI_FAILURE) print *, "WHY??"
+    if (bmi_status == BMI_FAILURE) print *, "MODFLOW WHY??"
     if (status .ne. BMI_SUCCESS) then
        print *, " --- WARNING!! BMI_STATUS FAILED ---"
        bmi_status = BMI_FAILURE

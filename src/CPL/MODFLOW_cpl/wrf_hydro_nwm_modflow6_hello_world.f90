@@ -21,6 +21,8 @@ program wrf_hydro_nwm_bmi_driver
   integer, allocatable :: ind_data(:), indices_data(:), indices(:)
   integer, pointer ::  ptr_data(:)
   real, allocatable :: foo_data(:)
+  integer :: mf_input_count, mf_output_count
+
   stat = BMI_SUCCESS
 
   wrf_hydro = wrf_hydro_nwm()
@@ -30,36 +32,43 @@ program wrf_hydro_nwm_bmi_driver
 
   print * , "--- Starting ", trim(model_name), " and ", trim(mf_model_name), " ---"
 
+  ! initialize model
   call stat_check(wrf_hydro%initialize("no config file"), stat)
   call stat_check(modflow%initialize(""), stat)
 
+  ! get timing components
   call stat_check(wrf_hydro%get_start_time(current_time), stat)
   call stat_check(wrf_hydro%get_end_time(end_time), stat)
-
   call stat_check(wrf_hydro%get_time_step(time_step), stat)
   call stat_check(modflow%get_time_step(mf_time_step), stat)
-
+  print *, "TIME STEPS:", time_step, mf_time_step
   call stat_check(wrf_hydro%get_time_units(time_unit), stat)
   call stat_check(modflow%get_time_units(mf_time_unit), stat)
   print *, "end time:", end_time, "current time:", current_time
 
+  call stat_check(modflow%get_input_item_count(mf_input_count), stat)
+  call stat_check(modflow%get_output_item_count(mf_output_count), stat)
+  print *, "MODFLOW: input count", mf_input_count, "output count", mf_output_count
+
+
   do while (current_time < end_time)
      ! update models
      call stat_check(wrf_hydro%update(), stat)
-     if (mod(current_time, mf_time_step) == 0) then
-        call stat_check(modflow%update(), stat)
-     end if
+     call stat_check(modflow%update(), stat)
+     ! if (mod(current_time, mf_time_step) == 0) then
+     !    call stat_check(modflow%update(), stat)
+     ! end if
 
      ! transfer variables
-     call stat_check(modflow%get_value("foo", foo_data), stat)
-     call stat_check(wrf_hydro%set_value("soldrain", foo_data), stat)
+     ! call stat_check(modflow%get_value("foo", foo_data), stat)
+     ! call stat_check(wrf_hydro%set_value("soldrain", foo_data), stat)
 
      call stat_check(wrf_hydro%get_current_time(current_time), stat)
   end do
 
 
   call stat_check(wrf_hydro%finalize(), stat)
-  ! call stat_check(modflow%finalize(), stat)
+  call stat_check(modflow%finalize(), stat)
   print *, "--- FIN ---"
 
 end program wrf_hydro_nwm_bmi_driver
