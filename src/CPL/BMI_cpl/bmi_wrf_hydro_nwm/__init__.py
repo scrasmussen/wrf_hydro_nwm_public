@@ -2,6 +2,9 @@ from . import bmi
 import ctypes as ct
 import numpy as np
 import sys
+if sys.version_info.major == 2:
+    raise RuntimeError("BMI WRF-Hydro/NWM requires Python 3 or higher.")
+
 bind_c_lib_path_1='../../../../build/lib/libbmi_wrf_hydro_nwm_bind_c.so'
 bind_c_lib_path_2='../lib/libbmi_wrf_hydro_nwm_bind_c.so'
 try:
