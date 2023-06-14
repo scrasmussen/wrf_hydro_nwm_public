@@ -1,7 +1,8 @@
 module bmi_modflow_mod
   use bmif_2_0
   use mf6bmi, only: BMI_LENCOMPONENTNAME
-  use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer, c_int
+  use mf6bmiUtil, only: BMI_LENVARADDRESS
+  use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer, c_int, c_char
   implicit none
 
   integer, parameter :: input_item_count = 2

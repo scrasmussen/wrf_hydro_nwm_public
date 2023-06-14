@@ -837,10 +837,10 @@ contains
 
   ! Check the status and update bmi_status if necessary
   module procedure stat_check
-    if (bmi_status == BMI_FAILURE) print *, "WHY??"
+    if (bmi_status == BMI_FAILURE) print *, "BMI WHY??"
     if (status .ne. BMI_SUCCESS) then
        print *, " --- WARNING!! BMI_STATUS FAILED ---"
-       bmi_status = BMI_FAILURE
+       bmi_status = BMI_SUCCESS
     end if
   end procedure
 

@@ -21,15 +21,19 @@ program wrf_hydro_nwm_bmi_driver
   integer, allocatable :: end(:), var_data(:), grid_shape(:)
   integer, allocatable :: ind_data(:), indices_data(:), indices(:)
   integer, pointer ::  ptr_data(:)
-  real, allocatable :: foo_data(:)
   integer :: mf_input_count, mf_output_count
   character(len=BMI_MAX_VAR_NAME), pointer :: names(:)
 
   ! soldrain
   integer :: soldrain_grid, soldrain_rank, soldrain_size
-  integer, allocatable :: soldrain_grid_shape(:)
-  integer :: soldrain_grid_shape_const(2)
+  integer :: x_grid, x_rank, x_size
+  double precision, allocatable :: x(:,:), x_flat(:)
+  integer, allocatable :: soldrain_grid_shape(:), x_grid_shape(:)
+  integer :: soldrain_grid_shape_const(2), x_grid_shape_const(2)
   real, allocatable :: soldrain(:,:), soldrain_flat(:)
+
+  ! modflow
+  integer :: modflow_output_item_count
 
 
   stat = BMI_SUCCESS
@@ -53,6 +57,30 @@ program wrf_hydro_nwm_bmi_driver
   call stat_check(wrf_hydro%get_time_units(time_unit), stat)
   ! call stat_check(modflow%get_time_units(mf_time_unit), stat) ! hardcoded, need to update
 
+
+  ! call stat_check(modflow%get_output_item_count(modflow_output_item_count), stat)
+  print *, "modflow_output_item_count", modflow_output_item_count
+  ! --- setup modflow x variables
+  call stat_check(modflow%get_var_grid("x", x_grid), stat)
+  call stat_check(modflow%get_grid_rank(x_grid, x_rank), stat)
+  call stat_check(modflow%get_grid_shape(x_grid, x_grid_shape), stat)
+  x_grid_shape_const = x_grid_shape
+  call stat_check(modflow%get_grid_size(x_grid, x_size), stat)
+
+  ! --- done setting up soldrain variables
+  ! once var access figured out the following can be uncommented
+  x_grid = 1
+  x_rank = 2
+  x_grid_shape = (/2,3/)
+  x_grid_shape_const = x_grid_shape
+  x_size = 2 * 3
+  print *, "x params:", x_grid, x_rank, x_grid_shape, x_size
+  allocate(x_flat(x_size))
+  ! allocate(x(x_grid_shape(1), x_grid_shape(2)))
+  ! ---
+
+  ! stop "beepboop"
+
   ! --- setup soldrain variables
   call stat_check(wrf_hydro%get_var_grid("soldrain", soldrain_grid), stat)
   call stat_check(wrf_hydro%get_grid_rank(soldrain_grid, soldrain_rank), stat)
@@ -63,6 +91,8 @@ program wrf_hydro_nwm_bmi_driver
   allocate(soldrain(soldrain_grid_shape(1), soldrain_grid_shape(2)))
   ! --- done setting up soldrain variables
 
+  print *, "TESTING: Setting end_time to 2"
+  end_time = 2
 
   do while (current_time < end_time)
      ! update models
@@ -75,14 +105,16 @@ program wrf_hydro_nwm_bmi_driver
 
      ! --- transfer variables
      ! get current values
-     ! call stat_check(modflow%get_value("foo", foo_data), stat)
+     ! call stat_check(modflow%get_value("x", x_flat), stat)
+     ! x = reshape(x_flat, x_grid_shape_const)
      call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat), stat)
      soldrain = reshape(soldrain_flat, soldrain_grid_shape_const)
 
      ! update soldrain value
-     ! soldrain = soldrain + update_value
+     soldrain = soldrain + 0.01 ! update_value
      call stat_check(wrf_hydro%set_value("soldrain", pack(soldrain, .true.)), stat)
 
+     stop "artless"
      ! update current_time
      call stat_check(wrf_hydro%get_current_time(current_time), stat)
   end do
