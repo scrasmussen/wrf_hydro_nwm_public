@@ -30,13 +30,13 @@ target_include_directories(bmi_modflow
 
 
 
-add_executable(wrf_hydro_modflow.exe
-  wrf_hydro_nwm_modflow6.f90)
-target_link_libraries(wrf_hydro_modflow.exe
-  bmi_wrf_hydro_nwm
-  bmi_modflow
-  modflow
-  ${CMAKE_THREAD_LIBS_INIT})
+# add_executable(wrf_hydro_modflow.exe
+#   wrf_hydro_nwm_modflow6.f90)
+# target_link_libraries(wrf_hydro_modflow.exe
+#   bmi_wrf_hydro_nwm
+#   bmi_modflow
+#   modflow
+#   ${CMAKE_THREAD_LIBS_INIT})
 
 
 
