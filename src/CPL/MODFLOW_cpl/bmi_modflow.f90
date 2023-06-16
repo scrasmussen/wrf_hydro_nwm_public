@@ -28,7 +28,6 @@ contains
   ! Get the name of the model.
   module procedure modflow_component_name
     use mf6bmi, only: bmi_get_component_name
-    use iso_c_binding, only: c_char, c_null_char
     implicit none
     character(c_char) :: model_name(BMI_MAX_COMPONENT_NAME)
     character(len=256), allocatable, target :: f_name
@@ -83,7 +82,7 @@ contains
   module procedure modflow_var_grid
     bmi_status = BMI_SUCCESS
     select case(trim(name))
-    case("x")
+    case("X")
        grid = 1
     case("head")
        grid = 2
@@ -153,17 +152,18 @@ contains
     use mf6bmi, only: get_value_double
     character(c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
     type(c_ptr) :: c_var_ptr
-    double precision, pointer, dimension(:,:) :: f_var_ptr
-    double precision, target, allocatable, dimension(:,:) :: f_var
+    double precision, pointer :: f_var_ptr(:)
+    double precision, target, allocatable, dimension(:) :: f_var
     integer, allocatable :: grid_shape(:)
-    integer :: grid
+    integer :: grid, grid_size
     bmi_status = this%get_var_grid(name, grid)
     bmi_status = get_modflow_var_address(c_var_address, grid)
-    bmi_status = get_value_double(c_var_address, c_var_ptr)
-    bmi_status = this%get_grid_shape(grid, grid_shape)
-    call c_f_pointer(c_var_ptr, f_var_ptr, grid_shape)
-    allocate(f_var(grid_shape(1), grid_shape(2)))
+    bmi_status = this%get_grid_size(grid, grid_size)
+    allocate(f_var(grid_size))
     f_var_ptr => f_var
+    c_var_ptr = c_loc(f_var_ptr)
+
+    bmi_status = get_value_double(c_var_address, c_var_ptr)
     dest = pack(f_var, .true.)
   end procedure ! modflow_get_double
 
@@ -241,24 +241,13 @@ contains
   module procedure modflow_grid_rank
     use mf6xmi, only: get_var_rank
     character(kind=c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
-    integer(c_int) :: var_size, var_rank
-
+    integer(c_int) :: var_rank
     bmi_status = BMI_SUCCESS
-    var_size = 0
     bmi_status = get_modflow_var_address(c_var_address, grid)
     bmi_status = get_var_rank(c_var_address, var_rank)
     rank = var_rank
     if (bmi_status .ne. BMI_SUCCESS) &
          print *, "modflow get_var_rank call unsuccessful"
-    print *, "BMI STATUS", bmi_status, "var_rank", var_rank
-
-
-    ! head_tag = mf6.get_var_address("X", "LIBGWF_EVT01")
-
-    ! head = mf6.get_value_ptr(head_tag)
-    ! print *,"head = ", head
-    ! mf6.set_value(head_tag, head)
-    ! rank =
   end procedure ! modflow_grid_rank
 
   ! Get the dimensions of the computational grid.
@@ -266,7 +255,7 @@ contains
     use mf6bmi, only: get_var_shape
     character(kind=c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
     integer :: grid_rank
-    integer(c_int) :: var_size, var_rank
+    integer(c_int) :: var_rank
     integer(c_int), allocatable :: c_var_shape(:)
 
     bmi_status = get_modflow_var_address(c_var_address, grid)
@@ -282,21 +271,22 @@ contains
     bmi_status = BMI_FAILURE
   end procedure ! modflow_var_type
 
-  function get_grid_size(grid_shape) result(size_i)
+  function calc_grid_size(grid_shape) result(size_i)
     integer, intent(in) :: grid_shape(:)
     integer :: size_i
     integer :: i
+    size_i = 1
     do i=1,size(shape(grid_shape))
        size_i = size_i * grid_shape(i)
     end do
-  end function get_grid_size
+  end function calc_grid_size
 
   ! Get the total number of elements in the computational grid.
   module procedure modflow_grid_size
     integer, allocatable :: grid_shape(:)
     integer :: i
     bmi_status = this%get_grid_shape(grid, grid_shape)
-    size = get_grid_size(grid_shape)
+    size = calc_grid_size(grid_shape)
   end procedure ! modflow_grid_size
 
   !---------------------------------------------------------------------
@@ -312,7 +302,6 @@ contains
   !       the other parts of the model?
   ! List a model's output variables.
   module procedure modflow_output_var_names
-    use iso_c_binding, only : c_int, c_char, c_null_char
     use mf6bmi, only: get_output_var_names
     use mf6bmiUtil, only:  BMI_LENVARADDRESS
     ! ! get_output_var_names
@@ -593,7 +582,6 @@ contains
     ! end select
   end procedure ! modflow_var_itemsize
   function f_to_c_str(f_str) result(c_str)
-    use iso_c_binding, only: c_char, C_NULL_CHAR
     character(len=BMI_MAX_COMPONENT_NAME) :: f_str
     character(c_char) :: c_str(BMI_MAX_COMPONENT_NAME)
     integer :: i, name_len
@@ -618,19 +606,21 @@ contains
     character(len=:), allocatable :: f_var_name
     integer, dimension(:), allocatable :: s_end
     if (grid == 1) then
-       allocate(character(len("LIBGWF_EVT01")) :: f_component_name)
-       allocate(character(len("")) :: f_subcomponent_name)
-       allocate(character(len("X")) :: f_var_name)
-       f_component_name = "LIBGWF_EVT01"
-       f_subcomponent_name = ""
-       f_var_name = "X"
+       allocate(character(len("EX-GWF-FHB")+1) :: f_component_name)
+       ! allocate(character(len("MODFLOW_SUBSET")+1) :: f_component_name)
+       allocate(character(len("")+1) :: f_subcomponent_name)
+       allocate(character(len("X")+1) :: f_var_name)
+       f_component_name = "EX-GWF-FHB"//c_null_char
+       ! f_component_name = "MODFLOW_SUBSET"//c_null_char
+       f_subcomponent_name = ""//c_null_char
+       f_var_name = "X"//c_null_char
     else if (grid == 2) then
-       allocate(character(len("h1_2_1")) :: f_component_name)
-       allocate(character(len("")) :: f_subcomponent_name)
-       allocate(character(len("head")) :: f_var_name)
-       f_component_name = "h1_2_1"
-       f_subcomponent_name = ""
-       f_var_name = "head"
+       allocate(character(len("h1_2_1")+1) :: f_component_name)
+       allocate(character(len("")+1) :: f_subcomponent_name)
+       allocate(character(len("head")+1) :: f_var_name)
+       f_component_name = "h1_2_1"//c_null_char
+       f_subcomponent_name = ""//c_null_char
+       f_var_name = "head"//c_null_char
     end if
 
     c_component_name = f_to_c_str(f_component_name )

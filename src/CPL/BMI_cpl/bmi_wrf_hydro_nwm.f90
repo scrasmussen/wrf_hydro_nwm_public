@@ -839,7 +839,8 @@ contains
   module procedure stat_check
     if (bmi_status == BMI_FAILURE) print *, "BMI WHY??"
     if (status .ne. BMI_SUCCESS) then
-       print *, " --- WARNING!! BMI_STATUS FAILED ---"
+       print *, "- WARNING BMI_FAILURE: calling backtrace"
+       call backtrace
        bmi_status = BMI_SUCCESS
     end if
   end procedure
