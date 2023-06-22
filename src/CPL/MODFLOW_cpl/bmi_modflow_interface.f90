@@ -14,6 +14,12 @@ module bmi_modflow_mod
   character(len=BMI_MAX_VAR_NAME), target :: output_item_list(output_item_count)
   ! type(ldasMeta) :: ldasOutDict
 
+  ! component names for get_modflow_var_address()
+  character(len=:), allocatable :: f_component_name
+  character(len=:), allocatable :: f_subcomponent_name
+  character(c_char), allocatable :: c_component_name(:)
+  character(c_char), allocatable :: c_subcomponent_name(:)
+
   type, extends(bmi) :: bmi_modflow
      private
      ! type (modflow_model) :: model

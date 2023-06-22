@@ -4,7 +4,7 @@ add_library(modflow SHARED IMPORTED)
 set(modflow_lib_dir "$ENV{MODFLOW_BMI}")
 set(modflow_lib "${modflow_lib_dir}/libmf6.so")
 set_target_properties(modflow PROPERTIES IMPORTED_LOCATION "${modflow_lib}")
-include_directories(${modflow_lib_dir}/libmf6.so.p)
+# include_directories(${modflow_lib_dir}/libmf6.so.p) # remove this?
 
 # add local MODFLOW BMI wrapper layer
 add_library(bmi_modflow
@@ -24,7 +24,9 @@ target_link_libraries(modflow_hello_world.exe
   ${CMAKE_THREAD_LIBS_INIT})
 
 target_include_directories(bmi_modflow
-  PUBLIC ${modflow_lib_dir}/libmf6.so.p/)
+  PUBLIC ${modflow_lib_dir}/libmf6.so.p/
+  ${modflow_lib_dir}/../src/libmf6core.a.p/
+  )
 # target_include_directories(wrf_hydro_modflow.exe
 #   PUBLIC ${modflow_lib_dir}/libmf6.so.p/)
 
