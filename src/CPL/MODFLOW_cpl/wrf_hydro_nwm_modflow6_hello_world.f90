@@ -10,31 +10,27 @@ program wrf_hydro_nwm_bmi_driver
 
   type(bmi_wrf_hydro_nwm) :: wrf_hydro
   type(bmi_modflow) :: modflow
-  integer :: i, bmi_status
 
   character(len=BMI_MAX_COMPONENT_NAME), pointer :: model_name
   character(len=256), pointer :: mf_model_name
-
   character(len=BMI_MAX_VAR_NAME) :: time_unit
   character(len=BMI_MAX_VAR_NAME) :: mf_time_unit
   double precision :: end_time, current_time, mf_current_time
   double precision :: time_step, mf_time_step, time_step_conv
-  integer, allocatable :: end(:), var_data(:), grid_shape(:)
-  integer, allocatable :: ind_data(:), indices_data(:), indices(:)
-  integer, pointer ::  ptr_data(:)
-  integer :: mf_input_count, mf_output_count
-  character(len=BMI_MAX_VAR_NAME), pointer :: names(:)
+  integer :: i, bmi_status
 
   ! soldrain
   integer :: soldrain_grid, soldrain_rank, soldrain_size
-  integer :: x_grid, x_rank, x_size
-  double precision, allocatable :: x(:,:), x_flat(:)
-  integer, allocatable :: soldrain_grid_shape(:), x_grid_shape(:)
-  integer :: soldrain_grid_shape_const(2), x_grid_shape_const(1)
   real, allocatable :: soldrain(:,:), soldrain_flat(:)
+  integer, allocatable :: soldrain_grid_shape(:)
+  integer :: soldrain_grid_shape_const(2)
 
   ! modflow
   integer :: modflow_output_item_count
+  integer :: x_grid, x_rank, x_size
+  integer, allocatable :: x_grid_shape(:)
+  integer :: x_grid_shape_const(1)
+  double precision, allocatable :: x(:,:), x_flat(:)
 
 
   wrf_hydro = wrf_hydro_nwm()
@@ -94,13 +90,12 @@ program wrf_hydro_nwm_bmi_driver
      call stat_check(modflow%get_time_step(mf_time_step))
      time_step_conv = time_step / mf_time_step
 
-     ! --- transfer variables
+
 
      ! get current values
      call stat_check(modflow%get_value("X", x_flat))
      ! x = reshape(x_flat, x_grid_shape_const)
 
-     print *, "SHAPES X", size(x_flat), "soldrain", size(soldrain)
      do while (current_time < mf_current_time .and. &
           current_time < end_time)
         call stat_check(wrf_hydro%get_current_time(current_time))
@@ -112,13 +107,14 @@ program wrf_hydro_nwm_bmi_driver
 
         call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
         soldrain = reshape(soldrain_flat, soldrain_grid_shape_const)
-        ! update soldrain value
-        soldrain = soldrain + 0.01 ! update_value
+
+        ! --- update soldrain value
+        ! soldrain = x_flat * time_step_conv
+        soldrain = soldrain + 0.01 ! test update_value
         call stat_check(wrf_hydro%set_value("soldrain", pack(soldrain, .true.)))
 
-
-        call stat_check(wrf_hydro%update())
         ! update current_time
+        call stat_check(wrf_hydro%update())
      end do
 
   end do
