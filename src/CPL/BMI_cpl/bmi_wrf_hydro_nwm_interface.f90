@@ -6,6 +6,7 @@ module bmi_wrf_hydro_nwm_mod
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
   implicit none
 
+  logical, parameter :: PROCEED = .true.
   integer, parameter :: input_item_count = 2
   integer, parameter :: output_item_count = numLdasVars
   ! Two way of handeling input/output variable names
@@ -514,9 +515,9 @@ module bmi_wrf_hydro_nwm_mod
     end subroutine print_model_info
 
     ! Check the status and update bmi_status if necessary
-    module subroutine stat_check(status, bmi_status)
-      integer, intent(in) :: status
-      integer, intent(inout) :: bmi_status
+    module subroutine stat_check(bmi_status, advance)
+      integer, intent(in) :: bmi_status
+      logical, intent(in), optional :: advance
     end subroutine stat_check
   end interface
 

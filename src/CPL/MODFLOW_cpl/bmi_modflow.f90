@@ -43,7 +43,59 @@ contains
   ! Perform startup tasks for the model.
   module procedure modflow_initialize
     use mf6bmi, only: bmi_initialize
+    use SimVariablesModule, only: simfile
+    integer :: unit, err
+    logical :: found
+    character(len=256) :: line
+    character(len=64) :: foo
+    integer :: s_start, s_end, s_len
     bmi_status = bmi_initialize()
+
+    ! GOALZ :: get third
+    !   gwf6  ex-gwf-fhb.nam  ex-gwf-fhb
+    !   gwf6  modflow_subset.nam  modflow_subset
+
+    ! read simfile to extract component name
+    open(newunit=unit, file=simfile, status='old', action='read', iostat=err)
+    if (err .ne. 0) then
+       print *, 'Error opening file: ', trim(simfile), " error:", err
+       error stop 1
+    end if
+
+    found = .false.
+    do
+        read(unit, '(A)', iostat=err) line
+        if (err .ne. 0) exit
+
+        ! Check for "BEGIN models" line
+        if (line == 'BEGIN models') then
+           found = .true.
+           exit
+        end if
+    end do
+
+    if (found .eqv. .false.) then
+       print *, "ERROR: Did not find 'BEGIN models' in", simfile
+       error stop 1
+    end if
+    read(unit, '(A)', iostat=err) line
+    close(unit)
+
+    ! handle component name
+    s_end = len(trim(line))
+    s_start = index(trim(line), " ", back=.true.)
+    s_start = s_start + 1
+    s_len = s_end-s_start + 1
+    allocate(character(s_len) :: f_component_name)
+    f_component_name = line(s_start:s_end)//c_null_char
+    call capitalize_f_str(f_component_name, s_len)
+    ! f_component_name = "EX-GWF-FHB"//c_null_char
+    c_component_name = f_to_c_str(f_component_name )
+
+    ! handle subcomponent, same for all
+    allocate(character(len("")+1) :: f_subcomponent_name)
+    f_subcomponent_name = ""//c_null_char
+    c_subcomponent_name = f_to_c_str(f_subcomponent_name )
   end procedure ! modflow_initialize
 
   ! Advance the model one time step.
@@ -217,8 +269,8 @@ contains
 
   ! Time step of the model.
   module procedure modflow_time_step
-    time_step = 24.0
-    bmi_status = BMI_FAILURE
+    use mf6bmi, only: get_time_step
+    bmi_status = get_time_step(time_step)
   end procedure ! modflow_time_step
 
   ! Time units of the model.
@@ -229,7 +281,8 @@ contains
 
   ! Current time of the model.
   module procedure modflow_current_time
-    bmi_status = BMI_FAILURE
+    use mf6bmi, only: get_current_time
+    bmi_status = get_current_time(time)
   end procedure ! modflow_current_time
 
   ! Get size of the given variable, in bytes.
@@ -581,6 +634,7 @@ contains
     !    bmi_status = BMI_FAILURE
     ! end select
   end procedure ! modflow_var_itemsize
+
   function f_to_c_str(f_str) result(c_str)
     character(len=BMI_MAX_COMPONENT_NAME) :: f_str
     character(c_char) :: c_str(BMI_MAX_COMPONENT_NAME)
@@ -592,44 +646,44 @@ contains
     c_str(name_len+1) = C_NULL_CHAR
   end function f_to_c_str
 
+  subroutine capitalize_f_str(f_str, length)
+    character(len=BMI_MAX_COMPONENT_NAME), intent(inout) :: f_str
+    integer, intent(in) :: length
+    character :: a
+    integer :: i, str_len
+    do i = 1, length
+       a = f_str(i:i)
+       if (a >= 'a' .and. a <= 'z') then
+          f_str(i:i) = achar(iachar(a) - 32)
+       end if
+    end do
+  end subroutine capitalize_f_str
+
   ! components and variables are hardcoded right now for testing purposes
   function get_modflow_var_address(c_var_address, grid) result(bmi_status)
     use mf6xmi, only: get_var_address
     character(c_char), dimension(BMI_LENVARADDRESS), intent(out) :: c_var_address
     integer, intent(in) :: grid
     integer :: bmi_status
-    character(c_char), allocatable :: c_component_name(:)
-    character(c_char), allocatable :: c_subcomponent_name(:)
     character(c_char), allocatable :: c_var_name(:)
-    character(len=:), allocatable :: f_component_name
-    character(len=:), allocatable :: f_subcomponent_name
     character(len=:), allocatable :: f_var_name
     integer, dimension(:), allocatable :: s_end
     if (grid == 1) then
-       allocate(character(len("EX-GWF-FHB")+1) :: f_component_name)
-       ! allocate(character(len("MODFLOW_SUBSET")+1) :: f_component_name)
-       allocate(character(len("")+1) :: f_subcomponent_name)
        allocate(character(len("X")+1) :: f_var_name)
-       f_component_name = "EX-GWF-FHB"//c_null_char
-       ! f_component_name = "MODFLOW_SUBSET"//c_null_char
-       f_subcomponent_name = ""//c_null_char
        f_var_name = "X"//c_null_char
     else if (grid == 2) then
-       allocate(character(len("h1_2_1")+1) :: f_component_name)
-       allocate(character(len("")+1) :: f_subcomponent_name)
        allocate(character(len("head")+1) :: f_var_name)
-       f_component_name = "h1_2_1"//c_null_char
-       f_subcomponent_name = ""//c_null_char
        f_var_name = "head"//c_null_char
+    else
+       print *, "ERROR: grid", grid, "was not found"
+       error stop "grid is not found"
     end if
-
-    c_component_name = f_to_c_str(f_component_name )
-    c_subcomponent_name = f_to_c_str(f_subcomponent_name )
     c_var_name = f_to_c_str(f_var_name )
+
     bmi_status = get_var_address(&
-         c_component_name(1:len(f_component_name)+1), &
-         c_subcomponent_name(1:len(f_subcomponent_name)+1), &
-         c_var_name(1:len(f_var_name)+1), &
+         c_component_name(1:len(f_component_name)), &
+         c_subcomponent_name(1:len(f_subcomponent_name)), &
+         c_var_name(1:len(f_var_name)), &
          c_var_address)
   end function
 end submodule bmi_modflow_smod
