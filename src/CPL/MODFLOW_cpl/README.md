@@ -13,7 +13,7 @@ In addition to the WRF-Hydro dependencies the following is needed to build and c
 Make sure to first load the set of modules that are used to build WRF-Hydro.
 
 ```
-$ cd [user_conda_env_path]/envs
+$ cd [user_conda_env_path]
 $ conda create --prefix ./envs
 $ conda activate [user_conda_env_path]/envs
 $ conda install meson
