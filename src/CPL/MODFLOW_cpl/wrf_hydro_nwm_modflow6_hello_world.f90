@@ -120,8 +120,8 @@ program wrf_hydro_nwm_bmi_driver
   end do
 
 
-  ! call stat_check(wrf_hydro%finalize())
-  ! call stat_check(modflow%finalize())
+  call stat_check(modflow%finalize())
+  call stat_check(wrf_hydro%finalize())
   print *, "--- FIN ---"
 
 end program wrf_hydro_nwm_bmi_driver
