@@ -271,7 +271,7 @@ module WRFHydro_NUOPC
 
   private
 
-  public SetServices
+  public SetVM, SetServices
 
   CHARACTER(LEN=*), PARAMETER :: label_InternalState = 'InternalState'
 
@@ -316,6 +316,14 @@ module WRFHydro_NUOPC
   !-----------------------------------------------------------------------------
   contains
   !-----------------------------------------------------------------------------
+  ! subroutine SetVM(gcomp, rc)
+  !   use ESMF
+  !   ! use , only: parflow_nuopc => SetVM
+  !   type(ESMF_GridComp) :: gcomp
+  !   integer, intent(out) :: rc
+  !   call SetVMModule(gcomp, rc)
+  !   if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+  ! end subroutine
 
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
@@ -392,7 +400,11 @@ module WRFHydro_NUOPC
     character(len=64)          :: value
     type(type_InternalState)   :: is
     integer                    :: stat
-
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
     rc = ESMF_SUCCESS
 
     ! Query component for name, verbosity, and diagnostic values
@@ -404,14 +416,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -784,6 +796,12 @@ module WRFHydro_NUOPC
     type(ESMF_VM)               :: vm
     integer                     :: fIndex
     integer                     :: ntime
+    character(len=9)            :: nStr
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -796,14 +814,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -894,6 +912,12 @@ module WRFHydro_NUOPC
     type(ESMF_Field)           :: field
     logical                    :: importConnected, exportConnected
     integer                    :: fIndex
+    character(len=9)           :: nStr
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -906,14 +930,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -996,6 +1020,11 @@ module WRFHydro_NUOPC
     logical                                :: exportUpdated
     character(len=32)                      :: initTypeStr
     integer                                :: stat
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -1008,14 +1037,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -1193,6 +1222,11 @@ module WRFHydro_NUOPC
     type(ESMF_TimeInterval)    :: modelTimeStep
     character(len=19)          :: startTimeStr
     logical                    :: checkStartTime
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -1205,14 +1239,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -1243,11 +1277,11 @@ module WRFHydro_NUOPC
 #endif
 
     ! Set WRFHYDRO start time
-    read (startTimeStr(1:4),"(I)")   nlst(is%wrap%did)%START_YEAR
-    read (startTimeStr(6:7),"(I)")   nlst(is%wrap%did)%START_MONTH
-    read (startTimeStr(9:10),"(I)")  nlst(is%wrap%did)%START_DAY
-    read (startTimeStr(12:13),"(I)") nlst(is%wrap%did)%START_HOUR
-    read (startTimeStr(15:16),"(I)") nlst(is%wrap%did)%START_MIN
+    read (startTimeStr(1:4),"(I4)")   nlst(is%wrap%did)%START_YEAR
+    read (startTimeStr(6:7),"(I2)")   nlst(is%wrap%did)%START_MONTH
+    read (startTimeStr(9:10),"(I2)")  nlst(is%wrap%did)%START_DAY
+    read (startTimeStr(12:13),"(I2)") nlst(is%wrap%did)%START_HOUR
+    read (startTimeStr(15:16),"(I2)") nlst(is%wrap%did)%START_MIN
     nlst(is%wrap%did)%startdate(1:19) = startTimeStr(1:19)
     nlst(is%wrap%did)%olddate(1:19)   = startTimeStr(1:19)
     cpl_outdate = startTimeStr(1:19)
@@ -1320,7 +1354,11 @@ module WRFHydro_NUOPC
     type(ESMF_Time)             :: modelCurrTime
     type(ESMF_TimeInterval)     :: timeStep
     character(len=19)           :: currTimeStr
-
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
     rc = ESMF_SUCCESS
 
     ! Query component for name, verbosity, and diagnostic values
@@ -1332,14 +1370,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -1420,6 +1458,11 @@ module WRFHydro_NUOPC
     type(ESMF_Clock)            :: modelClock
     type(ESMF_Time)             :: modelCurrTime
     logical                     :: allCurrTime
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -1432,14 +1475,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -1488,6 +1531,11 @@ module WRFHydro_NUOPC
     type(ESMF_TimeInterval)     :: timeStep
     integer(ESMF_KIND_I8)       :: advanceCount
     character(len=16)           :: misgValTypeStr
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -1500,14 +1548,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
@@ -1663,6 +1711,12 @@ module WRFHydro_NUOPC
     type(ESMF_Clock)           :: modelClock
     type(ESMF_Time)            :: currTime
     character(len=32)          :: currTimeStr
+    character(len=9)           :: nStr
+    character(len=6) :: specialStringList_arg(4)
+    specialStringList_arg(1) = "min"
+    specialStringList_arg(2) = "max"
+    specialStringList_arg(3) = "bit16"
+    specialStringList_arg(4) = "maxplus"
 
     rc = ESMF_SUCCESS
 
@@ -1675,14 +1729,14 @@ module WRFHydro_NUOPC
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=(/"min","max","bit16","maxplus"/), &
+      specialStringList=specialStringList_arg, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
 
