@@ -56,10 +56,10 @@ $ make install
 
 ### Hypre Option
 ``` bash
-$ wget https://github.com/hypre-space/hypre/archive/refs/tags/V2-9-0b.tar.gz
-$ tar zxf V2-9-0b.tar.gz
-$ cd hypre-2-9-0b
-$ ./configure --enable-fortran --prefix=/path/to/install/hypre/2.9.0b
+$ wget https://github.com/hypre-space/hypre/archive/refs/tags/v2.29.0.tar.gz
+$ tar zxf v2.29.0.tar.gz
+$ cd hypre-2.29.0/src
+$ ./configure --enable-fortran --prefix=/path/to/install/hypre/2.29.0
 $ make -j 4
 $ make install
 ```
