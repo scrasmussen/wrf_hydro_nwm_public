@@ -88,6 +88,8 @@ components:
     source_dir: parflow
     fort_module: parflow_nuopc.mod
     libraries: parflow_nuopc pfsimulator amps pfkinsol cjson pfclm
+    link_libraries: HYPRE silo
+    link_paths: $ENV{HYPRE_ROOT} $ENV{SILO_ROOT}
     build_args: -DPARFLOW_ENABLE_NUOPC=ON -DPARFLOW_AMPS_LAYER=mpi1 -DPARFLOW_HAVE_CLM=ON -DPARFLOW_ENABLE_HYPRE=ON -DPARFLOW_ENABLE_SILO=ON -DPARFLOW_ENABLE_NETCDF=ON
 
   wrfhydro:
