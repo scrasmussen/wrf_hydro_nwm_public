@@ -600,7 +600,6 @@ CONTAINS
     REAL         :: SNDPTHH
     REAL         :: SNEQVOH
     CHARACTER(3) :: HSNOWMETAMO, HSNOWRAD
-    REAL, PARAMETER:: LVH2O = 2.501000E+6 ! Latent heat for evapo for water
 
     REAL,   DIMENSION( 1:NSOIL)    :: liq_frac
 
@@ -1027,7 +1026,7 @@ CONTAINS
                                   ! move NOAHMP_GLACIER to after CROCUS
                                   ! for temperatre glacier, set top soil temp to 272
           ZP_TG(1) = 272.0
-          ! Why is this if block here? Not sure top condition would ever trigger  
+          ! Why is this if block here? Not sure top condition would ever trigger
           ! given we are already in an if block requiring ZP_SNOWDZ(1,1) .gt. 0.0. (AD)
           IF (ZP_SNOWDZ(1,1) .eq. 0.0 .and. ZP_SRSNOW(1) .eq. 0.0) THEN
           ELSE
@@ -1364,9 +1363,9 @@ CONTAINS
 
 #endif
 ! OUTPUT for PARFLOW
-            WTRFLX(i,1,j)   = (QINSUR*1000) - ((ESOIL + ETRANI(1))/LVH2O)
+            WTRFLX(i,1,j) = (QINSUR * 1000) - (ESOIL + ETRANI(1))
             do k=2, NSOIL
-              WTRFLX(i,k,j) = (ETRANI(k)/LVH2O)
+              WTRFLX(i,k,j) = ETRANI(k)
             enddo
 
 
