@@ -43,13 +43,18 @@ list(APPEND wrfhydro_nuopc_linklibs
 if (WRF_HYDRO_NUOPC_LSM STREQUAL "1")
   if(HYDRO_LSM MATCHES "NoahMP")
     list(APPEND wrfhydro_nuopc_defs NOAHMP)
-    list(APPEND wrfhydro_nuopc_deps hydro_noahmp_cpl)
+    list(APPEND wrfhydro_nuopc_deps
+      hydro_noahmp_cpl
+      noahmp_hrldas
+    )
     list(APPEND wrfhydro_nuopc_linklibs
       noahmp_util
       noahmp_phys
       crocus_surfex
       noahmp_data
       hydro_noahmp_cpl
+      noahmp_hrldas
+      snowcro
     )
   elseif(HYDRO_LSM MATCHES "Noah")
     list(APPEND wrfhydro_nuopc_defs NOAH)
@@ -92,4 +97,3 @@ install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
 install(EXPORT wrfhydro-config
   DESTINATION lib/cmake
 )
-

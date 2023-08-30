@@ -69,6 +69,7 @@ set (WRF_HYDRO_NUDGING $ENV{WRF_HYDRO_NUDGING} CACHE STRING "Streamflow nudging 
 set (OUTPUT_CHAN_CONN $ENV{OUTPUT_CHAN_CONN} CACHE STRING "Output channel connections")
 set (PRECIP_DOUBLE $ENV{PRECIP_DOUBLE} CACHE STRING "Precipitation as double")
 set (WRF_HYDRO_NUOPC $ENV{WRF_HYDRO_NUOPC} CACHE STRING "NUOPC library 0=off 1=on")
+set (WRF_HYDRO_NUOPC_LSM $ENV{WRF_HYDRO_NUOPC_LSM} CACHE STRING "NUOPC LSM 0=off 1=on")
 
 #set default values for env variables
 if (WRF_HYDRO STREQUAL "")
@@ -118,6 +119,10 @@ endif (PRECIP_DOUBLE STREQUAL "")
 if (WRF_HYDRO_NUOPC STREQUAL "")
         set (WRF_HYDRO_NUOPC "0" CACHE STRING "NUOPC library 0=off, 1=on" FORCE)
 endif (WRF_HYDRO_NUOPC STREQUAL "")
+
+# if (WRF_HYDRO_NUOPC_LSM STREQUAL "")
+#         set (WRF_HYDRO_NUOPC_LSM "0" CACHE STRING "NUOPC library 0=off, 1=on" FORCE)
+# endif (WRF_HYDRO_NUOPC_LSM STREQUAL "")
 
 # add preprocessor defines using env variables
 
@@ -191,6 +196,7 @@ endif (PRECIP_DOUBLE STREQUAL "1")
 message ("WRF_HYDRO_NUOPC = " ${WRF_HYDRO_NUOPC} )
 if (WRF_HYDRO_NUOPC STREQUAL "1" )
         add_definitions(-DWRF_HYDRO_NUOPC)
+	add_definitions(-DNOAHMP)
 endif (WRF_HYDRO_NUOPC STREQUAL "1")
 
 option(BUILD_CROCUS "Build Crocus" ON)
