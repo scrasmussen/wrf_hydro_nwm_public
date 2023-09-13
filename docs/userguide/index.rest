@@ -1,7 +1,7 @@
 .. vim: syntax=rst
 
 ===
-WRF
+WRF-Hydro v5.3
 ===
 
 .. toctree::

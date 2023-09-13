@@ -1,6 +1,6 @@
 SPHINXOPTS  = -c .
 SPHINXBLD   = sphinx-build
-SPHINXPROJ  = sample
+SPHINXPROJ  = wrfhydro
 DOCDIR      = doc/
 DOCBACK     = ../
 DCXFROMDOC  = ../

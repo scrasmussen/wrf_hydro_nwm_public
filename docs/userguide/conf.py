@@ -1,8 +1,8 @@
-project = 'sample'
-author = project+' Project Team'
-copyright = '2019, '+author
-version = '1.0'
-release = '1.0.0'
+project = 'WRF-Hydro Modeling System'
+author = 'WRF-Hydro Team'
+copyright = '2023, '+author
+version = '5.3'
+release = '5.3.0'
 try:
     import sphinx_bootstrap_theme
     html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
@@ -20,4 +20,4 @@ default_role = 'math'
 pygments_style = 'sphinx'
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 master_doc = 'index'
-html_extra_path=['doc/_traceability_file.svg'] #relative to 
+html_extra_path=['doc/_traceability_file.svg'] #relative to
