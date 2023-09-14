@@ -4,9 +4,9 @@ copyright = '2023, '+author
 version = '5.3'
 release = '5.3.0'
 try:
-    import sphinx_bootstrap_theme
-    html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
-    html_theme = 'bootstrap'
+    import sphinx_rtd_theme
+    html_theme_path = sphinx_rtd_theme.get_html_theme_path()
+    html_theme = 'sphinx_rtd_theme'
 except:
     pass
 #these are enforced by rstdoc, but keep them for sphinx-build
@@ -20,4 +20,3 @@ default_role = 'math'
 pygments_style = 'sphinx'
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 master_doc = 'index'
-html_extra_path=['doc/_traceability_file.svg'] #relative to

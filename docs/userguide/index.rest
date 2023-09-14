@@ -1,8 +1,6 @@
-.. vim: syntax=rst
-
-===
-WRF-Hydro v5.3
-===
+===============================================
+WRF-Hydro Model Technical Description
+===============================================
 
 .. toctree::
     WRF-HydroV5.2.0TechnicalDescription.rest
