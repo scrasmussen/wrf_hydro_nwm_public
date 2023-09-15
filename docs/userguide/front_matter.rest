@@ -92,195 +92,6 @@ National Aeronautics and Space Administration (NASA)
 National Oceanic and Atmospheric Administration (NOAA) Office of Water
 Prediction (OWP)
 
-**(Table of Contents** (click on a section title)
-
-`1. Introduction <#introduction>`__ **5**
-
-   `1.1 Brief History <#brief-history>`__ 5
-
-   `1.2 Model Description <#model-description>`__ 6
-
-`2. Model Code and Configuration
-Description <#model-code-and-configuration-description>`__ **10**
-
-   `2.1 Brief code overview <#brief-code-overview>`__ 10
-
-   `2.2 Driver level description <#driver-level-description>`__ 10
-
-   `2.3 Parallelization strategy <#parallelization-strategy>`__ 11
-
-   `2.4 Directory Structures <#directory-structures>`__ 13
-
-   `2.5 Model Sequence of Operations <#model-sequence-of-operations>`__
-   15
-
-   `2.6 WRF-Hydro compile-time
-   options <#wrf-hydro-compile-time-options>`__ 17
-
-   `2.7 WRF-Hydro run time options <#wrf-hydro-run-time-options>`__ 18
-
-`3. Model Physics Description <#model-physics-description>`__ **19**
-
-   `3.1 Physics Overview <#physics-overview>`__ 19
-
-   `3.2 Land model description: The community Noah and Noah-MP land
-   surface
-   models <#land-model-description-the-community-noah-and-noah-mp-land-surface-models>`__
-   21
-
-   `3.3 Spatial Transformations <#spatial-transformations>`__ 22
-
-   `3.3.1 Subgrid
-   disaggregation-aggregation <#subgrid-disaggregation-aggregation>`__
-   23
-
-   `3.3.2 User-Defined Mapping <#user-defined-mapping>`__ 25
-
-   `3.3.3 Data Remapping for Hydrological
-   Applications <#data-remapping-for-hydrological-applications>`__ 25
-
-   `3.4 Subsurface Routing <#subsurface-routing>`__ 26
-
-   `3.5 Surface Overland Flow
-   Routing <#surface-overland-flow-routing>`__ 29
-
-   `3.6 Channel and Lake Routing <#channel-and-lake-routing>`__ 32
-
-   `3.6.1. Gridded Routing using Diffusive
-   Wave <#gridded-routing-using-diffusive-wave>`__ 33
-
-   `3.6.2. Linked Routing using Muskingum and
-   Muskingum-Cunge <#linked-routing-using-muskingum-and-muskingum-cunge>`__
-   35
-
-   `3.6.3 Compound
-   Channel <#compound-channel-currently-only-functional-in-nwm>`__ 37
-
-   `3.7 Lake and Reservoir routing
-   description <#lake-and-reservoir-routing-description>`__ 37
-
-   `3.8 Conceptual base flow model
-   description <#conceptual-base-flow-model-description>`__ 40
-
-`4. Streamflow Nudging Data
-Assimilation <#streamflow-nudging-data-assimilation>`__ **43**
-
-   `4.1 Streamflow Nudging Data Assimilation
-   Overview <#streamflow-nudging-data-assimilation-overview>`__ 43
-
-   `4.2 Nudging Formulation <#nudging-formulation>`__ 43
-
-   `4.3 Nudging Workflow <#nudging-workflow>`__ 45
-
-   `4.3.1 Input Files <#input-files>`__ 46
-
-   `4.3.2 Output Files <#output-files>`__ 47
-
-   `4.4 Nudging compile-time option <#nudging-compile-time-option>`__ 47
-
-   `4.5 Nudging run-time options <#nudging-run-time-options>`__ 47
-
-`5. Model inputs and preprocessing <#model-inputs-and-preprocessing>`__
-**49**
-
-   `5.1 Overview of model inputs <#overview-of-model-inputs>`__ 49
-
-   `5.2 Domain processing and description of surface physiographic input
-   files <#domain-processing-and-description-of-surface-physiographic-input-files>`__
-   50
-
-   `5.2.1 Defining the model domain <#defining-the-model-domain>`__ 50
-
-   `5.2.2 Initial land surface
-   conditions <#initial-land-surface-conditions>`__ 50
-
-   `5.2.3 Generating hydrologic routing input files via the WRF-Hydro
-   GIS pre-processing
-   tools <#generating-hydrologic-routing-input-files-via-the-wrf-hydro-gis-pre-processing-tools>`__
-   51
-
-   `5.3 Description of land surface model and lateral routing parameter
-   files <#description-of-land-surface-model-and-lateral-routing-parameter-files>`__
-   52
-
-   `5.3.1 Spatially distributed parameter
-   files <#spatially-distributed-parameter-files>`__ 54
-
-   `5.4 Description of channel routing parameter
-   files <#description-of-channel-routing-parameter-files>`__ 54
-
-   `5.5 Description of groundwater input and parameter
-   files <#description-of-groundwater-input-and-parameter-files>`__ 55
-
-   `5.6 Description of lake and reservoir parameter
-   tables <#description-of-lake-and-reservoir-parameter-tables>`__ 55
-
-   `5.7 Specification of meteorological forcing
-   data <#specification-of-meteorological-forcing-data>`__ 56
-
-`6. Description of Output Files from
-WRF-Hydro <#description-of-output-files-from-wrf-hydro>`__ **59**
-
-`REFERENCES <#references>`__ **65**
-
-`APPENDIX <#appendix>`__ **67**
-
-`A1. Example of Dependency Installation for Ubuntu 18.04
-LTS <#a1.-example-of-dependency-installation-for-ubuntu-18.04-lts>`__
-**68**
-
-`A2. Exceptions for Running WRF-Hydro with the Noah
-LSM <#a2.-exceptions-for-running-wrf-hydro-with-the-noah-lsm>`__ **69**
-
-`A3. Noah namelist.hrldas File with Description of
-Options <#a4.-noah-mp-namelist.hrldas-file-with-description-of-options>`__
-**70**
-
-`A4. Noah-MP namelist.hrldas File with Description of
-Options <#a4.-noah-mp-namelist.hrldas-file-with-description-of-options>`__
-**72**
-
-`A5. WRF-Hydro hydro.namelist File with Description of
-Options <#a5.-wrf-hydro-hydro.namelist-file-with-description-of-options>`__
-**74**
-
-`A6. Noah land surface model parameter
-tables <#a6.-noah-land-surface-model-parameter-tables>`__ **81**
-
-`A7. Noah-MP land surface model parameter
-tables <#a7.-noah-mp-land-surface-model-parameter-tables>`__ **83**
-
-`A8. Terrain routing parameter
-files <#a8.-terrain-routing-parameter-files>`__ **88**
-
-`A9. Channel routing parameter tables (CHANPARM.TBL and
-Route_Link.nc) <#a9.-channel-routing-parameter-tables-chanparm.tbl-and-route_link.nc>`__
-**89**
-
-`A10. Groundwater input and parameter
-files <#a10.-groundwater-input-and-parameter-files>`__ **90**
-
-`A11. Spatial weights input file variable
-description <#a11.-spatial-weights-input-file-variable-description>`__
-**91**
-
-`A12. Lake and reservoir parameter tables
-(LAKEPARM.nc) <#a12.-lake-and-reservoir-parameter-tables-lakeparm.nc>`__
-**92**
-
-`A13. Restart File Overview <#a13.-restart-file-overview>`__ **93**
-
-`A13.1 RESTART_MP File Variable
-Table <#a13.1-restart_mp-file-variable-table>`__ **93**
-
-`A14. HYDRO_RST File Variable
-Table <#a14.-hydro_rst-file-variable-table>`__ **96**
-
-`A15. Streamflow Nudging <#a15.-streamflow-nudging>`__ **97**
-
-`A16. National Water Model (NWM)
-Configuration <#a16.-national-water-model-nwm-configuration>`__ **99**
-
 1. Introduction
 ===============
 
@@ -357,7 +168,7 @@ mapping onto irregular objects, such as catchments or hydrologic
 response units. As additional changes and enhancements to the WRF-Hydro
 occur they will be documented in future versions of this document.
 
-*1.2 Model Description* 
+1.2 Model Description
 ------------------------
 
 WRF-Hydro has been developed to facilitate improved representations of
@@ -569,7 +380,7 @@ operating system commodity clusters and multi-processor desktops as well
 as multiple supercomputers. More detailed model requirements depend on
 the choice of model driver, described in the next section.
 
-2.2 Driver level description 
+2.2 Driver level description
 -----------------------------
 
 WRF-Hydro is essentially a group of modules and functions which handle
@@ -949,7 +760,7 @@ WRF-Hydro states independently of model time integration.
 
 **Figure 2.4** Modular calling structure of WRF-Hydro.
 
-*2.*\ 6 *WRF-Hydro compile-time options*
+2.6 WRF-Hydro compile-time options
 ----------------------------------------
 
 Compile time options are choices about the model structure which are
@@ -1016,7 +827,7 @@ indicated with <<-- and blue text.
 
 .. _section-3:
 
-*2.*\ 7 *WRF-Hydro run time options*
+2.7 WRF-Hydro run time options
 ------------------------------------
 
 There are two namelist files that users must edit in order to
@@ -1199,7 +1010,7 @@ over the pre-defined catchment and passed into the bucket as well. Each
 of these process options are enabled through the specification of
 options in the model namelist file.
 
-3.2 Land model description: The community Noah and Noah-MP land surface models 
+3.2 Land model description: The community Noah and Noah-MP land surface models
 -------------------------------------------------------------------------------
 
 *[NOTE: As of this writing, only the Noah and Noah-MP land surface
@@ -3871,7 +3682,7 @@ locate the ‘crs’ variable in one of the input files.
 
 .. _section-10:
 
-**REFERENCES** 
+**REFERENCES**
 ===============
 
 Below are cited references in an alphabetical listing by author.
@@ -5995,7 +5806,7 @@ header information.
 +=======================================================================+
 +-----------------------------------------------------------------------+
 
-A16. National Water Model (NWM) Configuration 
+A16. National Water Model (NWM) Configuration
 ==============================================
 
 It is important to note here that the community WRF-Hydro modeling
