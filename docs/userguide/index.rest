@@ -1,6 +1,16 @@
+.. vim: syntax=rst
+
 ===============================================
 WRF-Hydro Model Technical Description
 ===============================================
 
 .. toctree::
-    front_matter.rest
+    front_matter
+    introduction
+    model-code-config
+    model-physics
+    nudging
+    model-inputs-preproc
+    model-outputs
+    references
+    appendices

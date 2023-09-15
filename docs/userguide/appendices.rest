@@ -1,0 +1,2692 @@
+.. vim: syntax=rst
+
+APPENDICES
+==========
+
+This section contains supplementary information.
+
+A1. Example of Dependency Installation for Ubuntu 18.04 LTS
+-----------------------------------------------------------
+
+The example below uses the GNU compilers and Open MPI. Commands are
+issued as root user in the bash shell.
+
++-----------------------------------------------------------------------+
+| ##################################                                    |
+|                                                                       |
+| ### Get libraries available through apt-get                           |
+|                                                                       |
+| ##################################                                    |
+|                                                                       |
+| apt-get update                                                        |
+|                                                                       |
+| apt-get install wget bzip2 \\                                         |
+|                                                                       |
+| ca-certificates vim hibhdf5-dev \\                                    |
+|                                                                       |
+| gfortran g++ m4 make libswitch-perl \\                                |
+|                                                                       |
+| git tcsh libopenmpi-dev \\                                            |
+|                                                                       |
+| libnetcdff-dev libnetcdf-dev \\                                       |
+|                                                                       |
+| netcdf-bin                                                            |
+|                                                                       |
+| ##################################                                    |
+|                                                                       |
+| ### Check netCDF installs (optional)                                  |
+|                                                                       |
+| ##################################                                    |
+|                                                                       |
+| nf-config --all                                                       |
+|                                                                       |
+| nc-config --all                                                       |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+.. _section-11:
+
+A2. Exceptions for Running WRF-Hydro with the Noah LSM
+------------------------------------------------------
+
+Support for the Noah Land Surface Model (LSM) within WRF-Hydro is
+currently frozen at Noah version 3.6. Since the Noah LSM is not under
+active development by the community, WRF-Hydro is continuing to support
+Noah in deprecated mode only. Some new model features, such as the
+improved output routines, have not been setup to be backward compatible
+with Noah. Noah users should follow the guidelines below for adapting
+the WRF-Hydro workflow to work with Noah:
+
+-  **LSM initialization:** The simple wrfinput.nc initialization file
+   created by the create_Wrfinput.R script does not currently include
+   all of the fields required by the Noah LSM. Therefore, Noah users
+   should use the WRF real.exe utility to create a wrfinput_d0x file.
+   Refer to the WRF documentation and user guides for information on how
+   to do this.
+
+-  **Time-varying vegetation specifications:** While the Noah LSM will
+   be properly initialized with green vegetation fraction from the
+   wrfinput file, there is currently no automated method to update this
+   field over time (e.g., seasonally based on climatology). Therefore,
+   Noah users will need to provide these time-varying fields in the
+   model input forcing files (e.g., LDASIN).
+
+-  **Spatially varying parameters**: Spatially varying soil and
+   vegetation parameters (e.g., soil_properties.nc) are not supported in
+   Noah.
+
+-  **Model outputs:** The updated output routines have not been adapted
+   to work with Noah. Therefore, Noah users should always use
+   io_form_outputs = 0 to activate the deprecated output routines.
+   Scale/offset and compression options, CF compliance, augmented
+   spatial metadata, etc. are not available in this deprecated mode.
+
+.. _section-12:
+
+.. _section-13:
+
+A3. Noah namelist.hrldas File with Description of Options
+---------------------------------------------------------
+
+Below is an annotated namelist.hrldas file for running with the Noah
+land surface model. Notes and descriptions are indicated with <<-- and
+blue text.
+
++-----------------------------------------------------------------------+
+| | **&NOAHLSM_OFFLINE**                                                |
+| | HRLDAS_CONSTANTS_FILE = "./DOMAIN/wrfinput_d01" <<-- Path to        |
+|   wrfinput file containing initialization data for the LSM. This is   |
+|   required even for a warm start where a restart file is provided.    |
+| | INDIR = "./FORCING" <<-- Path to atmospheric forcing data           |
+|   directory.                                                          |
+| | OUTDIR = "./" <<-- Generally leave this as-is (output goes to base  |
+|   run directory); redirected output only applies to LSM output files  |
+|   and can cause issues when running coupled to WRF-Hydro.             |
+| | START_YEAR = 2013 <<-- Simulation start year                        |
+| | START_MONTH = 09 <<-- Simulation start month\ **                    |
+|   **\ START_DAY = 01 <<-- Simulation start day                        |
+| | START_HOUR = 00 <<-- Simulation start hour\ **                      |
+|   **\ START_MIN = 00 <<-- Simulation start min                        |
+| | RESTART_FILENAME_REQUESTED = "RESTART.2013090100_DOMAIN1" <<-- Path |
+|   to LSM restart file if using; this contains a "warm" model state    |
+|   from a previous model run. Comment if not a restart simulation.     |
+| | ! Specification of simulation length in days OR hours               |
+|                                                                       |
+| | KDAY = 1440 <<-- Number of days for simulation; can specify this OR |
+|   KHOUR.                                                              |
+| | !KHOUR = 1 <<-- Number of hours for simulation; can specify this OR |
+|   KDAY.                                                               |
+|                                                                       |
+| | ! Timesteps in units of seconds                                     |
+| | FORCING_TIMESTEP = 3600 <<-- Timestep for forcing input data (in    |
+|   seconds)                                                            |
+| | NOAH_TIMESTEP = 3600 <<-- Timestep the LSM to cycle (in seconds)    |
+| | OUTPUT_TIMESTEP = 86400 <<-- Timestep for LSM outputs, LDASOUT (in  |
+|   seconds)                                                            |
+|                                                                       |
+| | :mark:`! Land surface model restart file write frequency`           |
+| | RESTART_FREQUENCY_HOURS = 6 <<-- Timestep for LSM restart files to  |
+|   be generated (in hours). A value of -99999 will simply output       |
+|   restarts on the start of each month, useful for longer model runs.  |
+|   Restart files are generally quite large, so be cognizant of storage |
+|   space and runtime impacts when specifying.                          |
+| | ! Split output after split_output_count output times.               |
+| | SPLIT_OUTPUT_COUNT = 1 <<-- Number of timesteps to put in a single  |
+|   output file. This option must be 1 for NWM output configurations.   |
+|                                                                       |
+| | :mark:`! Soil layer specification`                                  |
+| | NSOIL=4 <<-- Number of soil layers                                  |
+| | ZSOIL(1) = 0.10 <<-- Thickness of top soil layer (m)                |
+| | ZSOIL(2) = 0.30 <<-- Thickness of second soil layer (m)             |
+| | ZSOIL(3) = 0.60 <<-- Thickness of third soil layer (m)              |
+| | ZSOIL(4) = 1.00 <<-- Thickness of bottom soil layer (m)             |
+|                                                                       |
+| | :mark:`! Forcing data measurement heights`                          |
+| | ZLVL = 2.0 <<-- Height of input temperature and humidity            |
+|   measurement/estimate                                                |
+| | ZLVL_WIND = 10.0 <<-- Height of input wind speed                    |
+|   measurement/estimate                                                |
+|                                                                       |
+| | IZ0TLND = 0 <<-- Switch to control land thermal roughness length.   |
+|   Option 0 is the default, non-vegetation dependent value and option  |
+|   1 introduces a vegetation dependence.                               |
+| | SFCDIF_OPTION = 0 <<-- Option to use the newer, option 1, or older, |
+|   option 0, SFCDIF routine. The default value is 0.                   |
+| | UPDATE_SNOW_FROM_FORCING = .FALSE. <<-- Option to activate or       |
+|   deactivate updating the snow­cover fields from available analyses.   |
+|   The default option is true.                                         |
+|                                                                       |
+| ! -------- Section: Select atmospheric forcing input file format,     |
+| FORC_TYP -------- !                                                   |
+|                                                                       |
+| ! Specification of forcing data: 1=HRLDAS-hr format,                  |
+|                                                                       |
+| ! 2=HRLDAS-min format, 3=WRF,4=Idealized, 5=Ideal w/ Spec.Precip.,    |
+|                                                                       |
+| | ! 6=HRLDAS-hrl y fomat w/ Spec. Precip, 7=WRF w/ Spec. Precip       |
+| | FORC_TYP = 3                                                        |
+| | /                                                                   |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+.. _section-14:
+
+A4. Noah-MP namelist.hrldas File with Description of Options
+------------------------------------------------------------
+
+Below is an annotated namelist.hrldas file for running with the Noah-MP
+land surface model. Do note that the file says “&NOAHLSM_OFFLINE”
+however it is for use with the Noah-MP LSM. This namelist statement
+happens to be hardcoded and thus not easily changed. Notes and
+descriptions are indicated with <<--and blude text when after sections
+being described. When the beginning of sections are annotated, they
+being with ! --------- Following Section -------- !. See the official
+HRLDAS namelist description here:
+https://github.com/NCAR/hrldas-release/blob/release/HRLDAS/run/README.namelist
+
++-----------------------------------------------------------------------+
+| | &NOAHLSM_OFFLINE                                                    |
+| | HRLDAS_SETUP_FILE = "./DOMAIN/wrfinput_d01" <<-- Path to wrfinput   |
+|   file containing initialization data for the LSM. This is required   |
+|   even for a warm start where a restart file is provided.             |
+| | INDIR = "./FORCING" <<-- Path to atmospheric forcing data           |
+|   directory.                                                          |
+|                                                                       |
+| | SPATIAL_FILENAME = "./DOMAIN/soil_properties.nc" <<-- Path to       |
+|   optional 2d/3d soil and vegetation parameter file. If you are using |
+|   this option, you must also use a binary compiled with               |
+|   SPATIAL_SOIL=1. If using the traditional parameter lookup tables,   |
+|   compile with SPATIAL_SOIL=0 and comment out this option.            |
+| | OUTDIR = "./" <<-- Generally leave this as-is (output goes to base  |
+|   run directory); redirected output only applies to LSM output files  |
+|   and can cause issues when running coupled to WRF-Hydro.             |
+| | START_YEAR = 2013 <<-- Simulation start year                        |
+| | START_MONTH = 09 <<-- Simulation start month\ **                    |
+|   **\ START_DAY = 12 <<-- Simulation start day                        |
+| | START_HOUR = 04 <<-- Simulation start hour\ **                      |
+|   **\ START_MIN = 00 <<-- Simulation start min                        |
+| | RESTART_FILENAME_REQUESTED = "RESTART.2013091204_DOMAIN1" <<-- Path |
+|   to LSM restart file if using; this contains a "warm" model state    |
+|   from a previous model run. Comment if not a restart simulation.     |
+| | ! Specification of simulation length in days OR hours               |
+|                                                                       |
+| | KDAY = 1 <<-- Number of days for simulation; can specify this OR    |
+|   KHOUR.                                                              |
+| | !KHOUR = 8 <<-- Number of hours for simulation; can specify this OR |
+|   KDAY.\ **                                                           |
+|   **                                                                  |
+|                                                                       |
+| ! -------- Following Section: Noah-MP physics options -------- !      |
+|                                                                       |
+| :mark:`! Physics options (see the documentation for details)`         |
+|                                                                       |
+| | DYNAMIC_VEG_OPTION = 4                                              |
+| | CANOPY_STOMATAL_RESISTANCE_OPTION = 1                               |
+| | BTR_OPTION = 1                                                      |
+| | RUNOFF_OPTION = 3                                                   |
+| | SURFACE_DRAG_OPTION = 1                                             |
+| | FROZEN_SOIL_OPTION = 1                                              |
+| | SUPERCOOLED_WATER_OPTION = 1                                        |
+| | RADIATIVE_TRANSFER_OPTION = 3                                       |
+| | SNOW_ALBEDO_OPTION = 2                                              |
+| | PCP_PARTITION_OPTION = 1                                            |
+| | TBOT_OPTION = 2                                                     |
+| | TEMP_TIME_SCHEME_OPTION = 3                                         |
+| | GLACIER_OPTION = 2                                                  |
+| | SURFACE_RESISTANCE_OPTION = 4                                       |
+|                                                                       |
+| | :mark:`! Timesteps in units of seconds`                             |
+| | FORCING_TIMESTEP = 3600 <<-- Timestep for forcing input data (in    |
+|   seconds)                                                            |
+| | NOAH_TIMESTEP = 3600 <<-- Timestep the LSM to cycle (in seconds)    |
+| | OUTPUT_TIMESTEP = 86400 <<-- Timestep for LSM outputs, LDASOUT (in  |
+|   seconds)                                                            |
+|                                                                       |
+| | :mark:`! Land surface model restart file write frequency`           |
+| | RESTART_FREQUENCY_HOURS = 2 <<-- Timestep for LSM restart files to  |
+|   be generated (in hours). A value of -99999 will simply output       |
+|   restarts on the start of each month, useful for longer model runs.  |
+|   Restart files are generally quite large, so be cognizant of storage |
+|   space and runtime impacts when specifying.                          |
+| | ! Split output after split_output_count output times.               |
+| | SPLIT_OUTPUT_COUNT = 1 <<-- Number of timesteps to put in a single  |
+|   output file. This option must be 1 for NWM output configurations.   |
+|                                                                       |
+| | :mark:`! Soil layer specification`                                  |
+| | NSOIL=4 <<-- Number of soil layers                                  |
+| | soil_thick_input(1) = 0.10 <<-- Thickness of top soil layer (m)     |
+| | soil_thick_input(2) = 0.30 <<-- Thickness of second soil layer (m)  |
+| | soil_thick_input(3) = 0.60 <<-- Thickness of third soil layer (m)   |
+| | soil_thick_input(4) = 1.00 <<-- Thickness of bottom soil layer (m)  |
+|                                                                       |
+| | :mark:`! Forcing data measurement height for winds, temp, humidity` |
+| | ZLVL = 10.0 <<-- Height of input wind speed                         |
+|                                                                       |
+| ! -------- Following Section: Restart IO file formats -------- !      |
+|                                                                       |
+| Options to specify whether restart files (both read in and output)    |
+| should be in binary or netCDF format. Generally recommend using       |
+| netCDF format (option 0) for both. -->>                               |
+|                                                                       |
+| | :mark:`! Restart file format options`                               |
+| | rst_bi_in = 0 ! 0: use netcdf input restart file                    |
+| | ! 1: use parallel io for reading multiple                           |
+|                                                                       |
+| | ! restart files (1 per core)                                        |
+| | rst_bi_out = 0 ! 0: use netcdf output restart file                  |
+| | ! 1: use parallel io for outputting multiple                        |
+|                                                                       |
+| ! restart files (1 per core)                                          |
+|                                                                       |
+| | /                                                                   |
+| | &WRF_HYDRO_OFFLINE                                                  |
+|                                                                       |
+| ! Specification of forcing data: 1=HRLDAS-hr format,                  |
+|                                                                       |
+| ! 2=HRLDAS-min format, 3=WRF, 4=Idealized, 5=Ideal w/ Spec.Precip.,   |
+|                                                                       |
+| ! 6=HRLDAS-hrl y fomat w/ Spec. Precip,                               |
+|                                                                       |
+| | ! 7=WRF w/ Spec.Precip                                              |
+| | FORC_TYP = 1                                                        |
+|                                                                       |
+| /                                                                     |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+.. _section-15:
+
+A5. WRF-Hydro hydro.namelist File with Description of Options
+-------------------------------------------------------------
+
+Below is an annotated hydro.namelist file. Annotations follow what is
+being described, indicated with <<-- and blue text. Note that
+annotations describing options are meant to accompany the commented
+description in the namelist which precedes the option.
+
++-----------------------------------------------------------------------+
+| | &HYDRO_nlist                                                        |
+| | !!!! --------------- SYSTEM COUPLING -------------- !!!! <<--       |
+|   Section                                                             |
+| | ! Specify what is being coupled: 1=HRLDAS (offline Noah-LSM),       |
+|                                                                       |
+| | ! 2=WRF, 3=NASA/LIS, 4=CLM                                          |
+| | sys_cpl = 1 <<-- For offline runs, including Noah and NoahMP, this  |
+|   will be option 1.                                                   |
+| | !!!! ----------- MODEL INPUT DATA FILES ----------- !!!! <<--       |
+|   Section                                                             |
+| | ! Specify land surface model gridded input data file                |
+|                                                                       |
+| | !(e.g.: "geo_em.d01.nc")                                            |
+| | GEO_STATIC_FLNM = "./DOMAIN/geo_em.d01.nc" <<-- Path to the         |
+|   “GEOGRID” file which contains base information on the LSM grid      |
+|   (this file is generally created via WPS in the model preprocessing  |
+|   steps).                                                             |
+| | ! Specify the high-resolution routing terrain input data file       |
+|                                                                       |
+| | !(e.g.: "Fulldom_hires.nc")                                         |
+| | GEO_FINEGRID_FLNM = "./DOMAIN/Fulldom_hires.nc" <<-- Path to the    |
+|   “routing stack” which contains base information on the              |
+|   high-resolution routing grid. This file is generally created via    |
+|   the GIS pre-processing tools.                                       |
+| | ! Specify the spatial hydro parameters file (e.g.: "hydro2dtbl.nc") |
+| | ! If you specify a filename and the file does not exist, it will    |
+|                                                                       |
+| | ! be created for you.                                               |
+| | HYDROTBL_F = "./DOMAIN/hydro2dtbl.nc" <<-- Path to the new 2d hydro |
+|   parameters file. If this file does not exist, it will be created    |
+|   for you based on HYDRO.TBL and the soil and land class grids found  |
+|   in the GEOGRID netCDF file                                          |
+| | ! Specify spatial metadata file for land surface grid. (e.g.:       |
+|                                                                       |
+| | ! "GEOGRID_LDASOUT_Spatial_Metadata.nc")                            |
+| | LAND_SPATIAL_META_FLNM =                                            |
+|   "./DOMAIN/GEOGRID_LDASOUT_Spatial_Metadata.nc" <<-- Path to the     |
+|   geospatial metadata file for your domain. This file is required if  |
+|   using any of the io_form_outputs options (i.e., io_form_outputs >   |
+|   0). This file is generally created via the GIS pre-processing       |
+|   tools.                                                              |
+| | ! Specify the name of the restart file if starting from             |
+|                                                                       |
+| | ! restart...comment out with '!' if not...                          |
+| | RESTART_FILE = 'HYDRO_RST.2013-09-12_04:00_DOMAIN3' <<-- Path to    |
+|   hydro restart file if using; this contains a "warm" model state     |
+|   from a previous model run.                                          |
+| | !!!! ------------- MODEL SETUP OPTIONS ------------ !!!! <<--       |
+|   Section                                                             |
+| | ! Specify the domain or nest number identifier...(integer)          |
+| | IGRID = 1 <<-- Domain ID number. This comes from the WRF coupling   |
+|   framework and is intended to specify which nested domain you are    |
+|   running. For standalone runs, this is not relevant HOWEVER this ID  |
+|   must match the number specified after DOMAIN in your forcing file   |
+|   names (e.g., the "1" in "2013091200.LDASIN_DOMAIN1").               |
+| | ! Specify the restart file write frequency...(minutes)              |
+| | ! A value of -99999 will output restarts on the first day           |
+|                                                                       |
+| | ! of the month only.                                                |
+| | rst_dt = 120 <<-- Specify how often hydro restart files should be   |
+|   generated, in minutes. This should generally track your LSM restart |
+|   file frequency (as specified in namelist.hrldas). A value of -99999 |
+|   will simply output restarts on the start of each month, useful for  |
+|   longer model runs. Hydro restart files are generally quite large,   |
+|   so be cognizant of storage space and runtime impacts when           |
+|   specifying.                                                         |
+| | ! Reset the LSM soil states from the high-res routing restart       |
+|                                                                       |
+| | ! file (1=overwrite, 0=no overwrite)                                |
+| | ! NOTE: Only turn this option on if overland or subsurface          |
+|                                                                       |
+| | ! routing is active!                                                |
+| | rst_typ = 1 <<-- Specify whether or not to use the soil conditions  |
+|   (soil moisture and ponded water) from the high-resolution hydro     |
+|   restart file, if "warm" starting the model with a provided          |
+|   HYDRO_RST file. If this option is 0, the LSM restart states will be |
+|   used instead. IMPORTANT: If you are NOT running with terrain        |
+|   routing turned on, do not set this option to 1 as it may bring in   |
+|   invalid values.                                                     |
+| | ! Restart file format control <<-- Options to whether restart files |
+|   (input and output separately) should be in binary or netCDF format. |
+|   Generally recommend using netCDF format (option 0) for both.        |
+| | rst_bi_in = 0 !0: use netCDF input restart file (default)           |
+| | !1: use parallel io for reading multiple restart                    |
+|                                                                       |
+| | ! files, 1 per core                                                 |
+| | rst_bi_out = 0 !0: use netCDF output restart file (default)         |
+| | !1: use parallel io for outputting multiple                         |
+|                                                                       |
+| | ! restart files, 1 per core                                         |
+| | ! Restart switch to set restart accumulation variables to 0         |
+|                                                                       |
+| | ! (0=no reset, 1=yes reset to 0.0)                                  |
+| | RSTRT_SWC = 0 <<-- Specify whether or not to reset any accumulated  |
+|   output variables to 0 (option 1) or to continue accumulating from   |
+|   the values in the hydro restart file (option 0). Note that this     |
+|   only applies to the hydrologic model outputs; the LSM outputs will  |
+|   always continue to accumulate from the LSM restart file.            |
+| | ! Specify baseflow/bucket model initialization…                     |
+|                                                                       |
+| | ! (0=cold start from table, 1=restart file)                         |
+| | GW_RESTART = 1 <<-- Specify whether to initialize the groundwater   |
+|   bucket states from the hydro restart file (option 1) or "cold"      |
+|   start the bucket states from the parameter table, GWBUCKPARM.nc.    |
+| | !!!! ------------ MODEL OUTPUT CONTROL ------------ !!!! <<--       |
+|   Section                                                             |
+| | ! Specify the output file write frequency...(minutes)               |
+| | out_dt = 60 <<-- Timestep for hydro model outputs, in minutes. This |
+|   covers all output options listed below (CHRTOUT, GWOUT, RTOUT,      |
+|   LAKEOUT, etc.) so be cognizant of impacts on disk space and runtime |
+|   when specifying.                                                    |
+| | ! Specify the number of output times to be contained                |
+|                                                                       |
+| | ! within each output history file...(integer)                       |
+| | ! SET = 1 WHEN RUNNING CHANNEL ROUTING ONLY/CALIBRATION SIMS!!!     |
+| | ! SET = 1 WHEN RUNNING COUPLED TO WRF!!!                            |
+| | SPLIT_OUTPUT_COUNT = 1 <<-- Number of timesteps to put in a single  |
+|   output file.                                                        |
+| | ! Specify the minimum stream order to output to netcdf              |
+|                                                                       |
+| | ! point file...(integer)                                            |
+| | ! Note: lower value of stream order produces more output.           |
+| | order_to_write = 4 <<-- Lowest stream order to include in output    |
+|   files. Selecting 1 gives you output for every reach/channel cell,   |
+|   selecting a higher order number gives you fewer channel output      |
+|   elements.                                                           |
+| | ! Flag to turn on/off new I/O routines:                             |
+|                                                                       |
+| ! 0 = deprecated output routines (only use when running with the Noah |
+| LSM),                                                                 |
+|                                                                       |
+| | ! 1 = with scale/offset/compression,                                |
+| | ! 2 = with scale/offset/NO compression,                             |
+|                                                                       |
+| ! 3 = compression only,                                               |
+|                                                                       |
+| | ! 4 = no scale/offset/compression (default)                         |
+| | io_form_outputs = 1 <<-- Specify which output option to use (NOTE:  |
+|   option 0 is the only supported option when running with the Noah    |
+|   LSM)                                                                |
+| | ! Realtime run configuration option:                                |
+| | ! 0=all (default), 1=analysis, 2=short-range, 3=medium-range,       |
+|                                                                       |
+| | ! 4=long-range, 5=retrospective,                                    |
+| | ! 6=diagnostic (includes all of 1-4 outputs combined)               |
+| | io_config_outputs = 1 <<-- Specify which configuration of output    |
+|   variables to generate (NOTE: not active when io_form_outputs=0).    |
+| | ! Option to write output files at time 0 (restart cold start time): |
+|                                                                       |
+| | ! 0=no, 1=yes (default)                                             |
+| | t0OutputFlag = 1 <<-- Select whether or not to create outputs at    |
+|   the initial timestep.                                               |
+| | ! Options to output channel & bucket influxes. Only active          |
+|                                                                       |
+| | ! for UDMP_OPT=1.                                                   |
+| | ! Nonzero choice requires that out_dt above matches NOAH_TIMESTEP   |
+|   in                                                                  |
+|                                                                       |
+| | ! namelist.hrldas.                                                  |
+| | ! 0=None (default), 1=channel influxes (qSfcLatRunoff, qBucket)     |
+| | ! 2=channel+bucket fluxes (qSfcLatRunoff, qBucket,                  |
+|                                                                       |
+| | ! qBtmVertRunoff_toBucket)                                          |
+| | ! 3=channel accumulations (accSfcLatRunoff, accBucket) \**\* NOT    |
+|                                                                       |
+| | ! TESTED \**\*                                                      |
+| | output_channelBucket_influx = 0 <<-- Select which additional        |
+|   channel and groundwater bucket outputs will be generated. These     |
+|   additional variables can be used to drive the channel-only model.   |
+| | ! Output netCDF file control <<-- Subsection: Specify which outputs |
+|   to generate for the run.                                            |
+|                                                                       |
+| CHRTOUT_DOMAIN = 1 ! NetCDF point timeseries output at all            |
+|                                                                       |
+| | ! channel points (1d)                                               |
+| | ! 0 = no output, 1 = output <<-- Channel output variables           |
+|   (streamflow, velocity, head, etc.)                                  |
+|                                                                       |
+| CHANOBS_DOMAIN = 0 ! NetCDF point timeseries at forecast              |
+|                                                                       |
+| ! points or gage points (defined in                                   |
+|                                                                       |
+| | ! Route_Link.nc)                                                    |
+| | ! 0 = no output, 1 = output at forecast                             |
+|                                                                       |
+| ! points or gage points. <<-- Streamflow for forecast points (gridded |
+| routing) or Route Link gages (reach routing) in netCDF format         |
+|                                                                       |
+| CHRTOUT_GRID = 0 ! NetCDF grid of channel                             |
+|                                                                       |
+| | ! streamflow values (2d)                                            |
+| | ! 0 = no output, 1 = output                                         |
+| | ! NOTE: Not available with                                          |
+|                                                                       |
+| ! reach-based routing <<-- Channel output variables on the 2D grid    |
+| (gridded channel routing only)                                        |
+|                                                                       |
+| LSMOUT_DOMAIN = 0 ! NetCDF grid of variables passed                   |
+|                                                                       |
+| ! between LSM and routing components                                  |
+|                                                                       |
+| | !(2d)                                                               |
+| | ! 0 = no output, 1 = output                                         |
+| | ! NOTE: No scale_factor/add_offset                                  |
+|                                                                       |
+| ! available <<-- Variables passed between the routing code and the    |
+| LSM (generally used for diagnostics only)                             |
+|                                                                       |
+| RTOUT_DOMAIN = 1 ! NetCDF grid of terrain routing                     |
+|                                                                       |
+| | ! variables on routing grid (2d)                                    |
+| | ! 0 = no output, 1 = output <<-- Terrain variables on the high-res  |
+|   grid; these files can be large                                      |
+|                                                                       |
+| | output_gw = 1 ! NetCDF GW output                                    |
+| | ! 0 = no output, 1 = output <<-- Groundwater bucket outputs (level, |
+|   inflow, outflow)                                                    |
+|                                                                       |
+| | outlake = 1 ! NetCDF grid of lake values (1d)                       |
+| | ! 0 = no output, 1 = output <<-- Lake output variables if lakes are |
+|   included in the domain (level, inflow, outflow)                     |
+|                                                                       |
+| frxst_pts_out = 0 ! ASCII text file of forecast points or             |
+|                                                                       |
+| | ! gage points (defined in Route_Link.nc)                            |
+| | ! 0 = no output, 1 = output <<-- Streamflow for forecast points     |
+|   (gridded routing) or Route Link gages (reach routing) in txt format |
+|                                                                       |
+| | !!!! ---- PHYSICS OPTIONS AND RELATED SETTINGS ---- !!!! <<--       |
+|   Section                                                             |
+| | ! Specify the number of soil layers (integer) and the depth of the  |
+|                                                                       |
+| | ! bottom of each layer... (meters)                                  |
+| | ! Notes: In Version 1 of WRF-Hydro these must be the same as in the |
+|                                                                       |
+| | ! namelist.input file.                                              |
+| | ! Future versions will permit this to be different.                 |
+| | NSOIL=4 <<-- Number of soil layers                                  |
+| | ZSOIL8(1) = -0.10 <<-- Depth of bottom boundary of top soil layer   |
+|   in meters                                                           |
+| | ZSOIL8(2) = -0.40 <<-- Depth of bottom of second soil layer in      |
+|   meters (note that this is specified differently than the            |
+|   namelist.hrldas; this is total depth from the surface instead of    |
+|   thickness)                                                          |
+| | ZSOIL8(3) = -1.00 <<-- Depth of bottom of third soil layer in       |
+|   meters (note that this is specified differently than the            |
+|   namelist.hrldas; this is total depth from the surface instead of    |
+|   thickness)                                                          |
+| | ZSOIL8(4) = -2.00 <<-- Depth of bottom of the last soil layer in    |
+|   meters (note that this is specified differently than the            |
+|   namelist.hrldas; this is total depth from the surface instead of    |
+|   thickness)                                                          |
+| | ! Specify the grid spacing of the terrain routing grid...(meters)   |
+| | DXRT = 100.0 <<-- Resolution of the high-res routing grid           |
+| | ! Specify the integer multiple between the land model grid and      |
+|                                                                       |
+| | ! the terrain routing grid...(integer)                              |
+| | AGGFACTRT = 10 <<-- Aggregation factor between the high-res routing |
+|   grid and the LSM grid; e.g., a 100-m routing grid resolution and a  |
+|   1km LSM grid resolution would be AGGFACTRT = 10.                    |
+| | ! Specify the channel routing model timestep...(seconds)            |
+| | DTRT_CH = 10 <<-- Timestep for the channel routing module to cycle, |
+|   in seconds; model runtime will be sensitive to this timestep, so    |
+|   choose something appropriate for your domain resolution (finer      |
+|   resolutions generally require finer timesteps).                     |
+|                                                                       |
+| | ! Specify the terrain routing model timestep...(seconds)            |
+| | DTRT_TER = 10 <<-- Timestep for the terrain routing module to       |
+|   cycle, in seconds; model runtime will be sensitive to this          |
+|   timestep, so choose something appropriate for your domain           |
+|   resolution (finer resolutions generally require finer timesteps).   |
+| | ! Switch to activate subsurface routing...(0=no, 1=yes)             |
+| | SUBRTSWCRT = 1 <<-- Turn on/off subsurface routing module.          |
+| | ! Switch to activate surface overland flow routing...(0=no, 1=yes)  |
+| | OVRTSWCRT = 1 <<-- Turn on/off overland routing module.             |
+| | ! Specify overland flow routing option:                             |
+|                                                                       |
+| | ! 1=Seepest Descent (D8) 2=CASC2D (not active)                      |
+| | ! NOTE: Currently subsurface flow is only steepest descent          |
+| | rt_option = 1 <<-- For both terrain routing modules, specify        |
+|   whether flow should follow the steepest path (option 1) or          |
+|   multi-directional (option 2). Option 2 is currently unsupported.    |
+| | ! Switch to activate channel routing...(0=no, 1=yes)                |
+|                                                                       |
+| | CHANRTSWCRT = 1 <<-- Turn on/off channel routing module.            |
+| | ! Specify channel routing option:                                   |
+|                                                                       |
+| | ! 1=Muskingam-reach, 2=Musk.-Cunge-reach, 3=Diff.Wave-gridded       |
+| | channel_option = 3 <<-- If channel routing module is active, select |
+|   which physics option to use.                                        |
+| | ! Specify the reach file for reach-based routing options (e.g.:     |
+|                                                                       |
+| | ! "Route_Link.nc")                                                  |
+| | !route_link_f = "./DOMAIN/Route_Link.nc" <<-- If using one of the   |
+|   reach-based channel routing options (channel_option = 1 or 2),      |
+|   specify the path to the Route_Link.nc file, which provides the      |
+|   channel-reach parameters.                                           |
+|                                                                       |
+| ! If using channel_option=2, activate the compound channel            |
+| formulation?                                                          |
+|                                                                       |
+| ! (Default=.FALSE.)                                                   |
+|                                                                       |
+| ! This option is currently only supported if using reach-based        |
+| routing with UDMP=1.                                                  |
+|                                                                       |
+| compound_channel = .FALSE.                                            |
+|                                                                       |
+| | ! Specify the lake parameter file (e.g.: "LAKEPARM.nc").            |
+| | ! Note REQUIRED if lakes are on.                                    |
+| | route_lake_f = "./DOMAIN/LAKEPARM.nc" <<-- If lakes are active,     |
+|   specify the path to the lake parameter file, which provides the     |
+|   lake parameters.                                                    |
+| | ! Switch to activate baseflow bucket model…                         |
+|                                                                       |
+| | ! (0=none, 1=exp. bucket, 2=pass-through)                           |
+| | GWBASESWCRT = 1 <<-- Turn on/off the ground water bucket module.    |
+|   Option 1 activates the exponential bucket model, option 2 bypasses  |
+|   the bucket model and dumps all flow from the bottom of the soil     |
+|   column directly into the channel, and option 0 creates a sink at    |
+|   the bottom of the soil column (water draining from the bottom of    |
+|   the soil column leaves the system, so note that this option will    |
+|   not have water balance closure).                                    |
+| | ! Groundwater/baseflow 2d mask specified on land surface model grid |
+|                                                                       |
+| ! (e.g.: "GWBASINS.nc"). Note: Only required if baseflow              |
+|                                                                       |
+| | ! model is active (1 or 2) and UDMP_OPT=0.                          |
+| | gwbasmskfil = "./DOMAIN/GWBASINS.nc" <<-- For configurations where  |
+|   the bucket or pass-through groundwater modules are active, provide  |
+|   the path to the 2d netCDF file (LSM grid resolution) that maps the  |
+|   groundwater basin IDs. Bucket parameters will be specified through  |
+|   the GWBUCKPARM.nc file, whose IDs should match those in the         |
+|   groundwater basin mask file.                                        |
+| | ! Groundwater bucket parameter file (e.g.: "GWBUCKPARM.nc")         |
+| | GWBUCKPARM_file = "./DOMAIN/GWBUCKPARM.nc" <<-- For configurations  |
+|   where the groundwater bucket model is active, specify the path to   |
+|   the bucket parameter file, which provides bucket parameters by      |
+|   catchment.                                                          |
+| | ! User defined mapping, such NHDPlus: 0=no (default), 1=yes         |
+| | UDMP_OPT = 0 <<-- If 1, this tells the model to use a "user-defined |
+|   mapping" scheme to translate between terrain and groundwater flow   |
+|   and reaches, e.g., NHDPlus.                                         |
+| | ! If on, specify the user-defined mapping file (e.g.:               |
+|                                                                       |
+| | ! "spatialweights.nc")                                              |
+| | !udmap_file = "./DOMAIN/spatialweights.nc" <<-- If UDMP_OPT=1 (user |
+|   defined mapping is active), provide the path to the required        |
+|   spatial weights file, which maps between grid cells and catchments. |
+| | / <<-- End of hydro namelist HYDRO_nlist                            |
+|                                                                       |
+| | &NUDGING_nlist <<-- Start of separate namelist for nudging is only  |
+|   used if the model is compiled with the compile-time option          |
+|   WRF_HYDRO_NUDGING=1. Ignore otherwise                               |
+| | ! Path to the "timeslice" observation files.                        |
+| | timeSlicePath = "./nudgingTimeSliceObs/" <<-- Path to a directory   |
+|   containing nuding “time slice” observation files. There are no      |
+|   requirements on the existence of files in the directory             |
+| | nudgingParamFile = "DOMAIN/nudgingParams.nc" <<-- Path to the       |
+|   require nudging parameter file.                                     |
+| | ! Nudging restart flie = "nudgingLastObsFile"                       |
+| | ! nudgingLastObsFile defaults to '', which will look for            |
+|                                                                       |
+| | ! nudgingLastObs.YYYY-mm-dd_HH:MM:SS.nc                             |
+| | ! \**AT THE INITALIZATION TIME OF THE RUN*\*. Set to a missing file |
+|                                                                       |
+| | ! to use no restart.                                                |
+| | !nudgingLastObsFile =                                               |
+|   '/a/nonexistent/file/gives/nudging/cold/start' <<-- Optional path   |
+|   to optional nuding restart file. See comments.                      |
+| | !! Parallel input of nudging timeslice observation files?           |
+| | readTimesliceParallel = .TRUE. <<-- Can read the observation files  |
+|   in parallel (on different cores) for quicker run speeds.            |
+| | ! temporalPersistence defaults to true, only runs if necessary      |
+|                                                                       |
+| | ! params present.                                                   |
+| | temporalPersistence = .FALSE. <<-- This option uses the expCoeff    |
+|   parameter for persisting observations                               |
+|                                                                       |
+| ! The total number of last (obs, modeled) pairs to save in            |
+|                                                                       |
+| ! nudgingLastObs for removal of bias. This is the maximum array       |
+|                                                                       |
+| | ! length. (This option is active when persistBias=FALSE)            |
+| | ! (Default=960=10days @15min obs resolution, if all the obs are     |
+|                                                                       |
+| | ! present and longer if not.)                                       |
+| | nLastObs = 960 <<-- The maximum trailing window size for            |
+|   calculating bias correction.                                        |
+| | ! If using temporalPersistence the last observation persists        |
+|                                                                       |
+| ! by default. This option instead persists the bias after the         |
+|                                                                       |
+| | ! last observation.                                                 |
+| | persistBias = .FALSE. <<-- Apply bias correction as observations    |
+|   move in to the past?                                                |
+| | ! AnA (FALSE) vs Forecast (TRUE) bias persistence.                  |
+| | ! If persistBias: Does the window for calculating the bias end at   |
+|                                                                       |
+| ! model init time (=t0)?                                              |
+|                                                                       |
+| ! FALSE = window ends at model time (moving),                         |
+|                                                                       |
+| | ! TRUE = window ends at init=t0(fcst) time.                         |
+| | ! (If commented out, Default=FALSE)                                 |
+|                                                                       |
+| | ! Note: Perfect restart tests require this option to be .FALSE.     |
+| | biasWindowBeforeT0 = .FALSE. <<-- Is the bias window shifting with  |
+|   model integration?                                                  |
+| | ! If persistBias: Only use this many last (obs, modeled) pairs.     |
+|                                                                       |
+| | ! (If Commented out, Default=-1*nLastObs)                           |
+| | ! > 0: apply an age-based filter, units=hours.                      |
+| | ! = 0: apply no additional filter, use all available/usable obs.    |
+| | ! < 0: apply an count-based filter, units=count                     |
+| | maxAgePairsBiasPersist = -960                                       |
+|                                                                       |
+| ! If persistBias: The minimum number of last (obs, modeled) pairs,    |
+|                                                                       |
+| ! with age less than maxAgePairsBiasPersist, required to apply a bias |
+|                                                                       |
+| | ! correction. (default=8)                                           |
+| | minNumPairsBiasPersist = 8                                          |
+| | ! If persistBias: give more weight to observations closer in time?  |
+|                                                                       |
+| | ! (default=FALSE)                                                   |
+| | invDistTimeWeightBias = .TRUE. <<-- The exact form of this          |
+|   weighting is currently hard-coded.                                  |
+| | ! If persistBias: "No constructive interference in bias             |
+|   correction?",                                                       |
+|                                                                       |
+| ! Reduce the bias adjustment when the model and the bias adjustment   |
+|                                                                       |
+| ! have the same sign relative to the modeled flow at t0?              |
+|                                                                       |
+| ! (default=FALSE)                                                     |
+|                                                                       |
+| | ! Note: Perfect restart tests require this option to be .FALSE.     |
+| | noConstInterfBias = .FALSE. <<-- Tactical response to phase errors. |
+| | /                                                                   |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+.. _section-16:
+
+A6. Noah land surface model parameter tables
+--------------------------------------------
+
+The Noah land surface model requires three parameter table files denoted
+by the file suffix TBL. The variables contained within these files are
+described in the tables below.
+
+Please refer to the Noah land surface model documentation
+(https://ral.ucar.edu/sites/default/files/public/product-tool/unified-noah-lsm/Noah_LSM_USERGUIDE_2.7.1.pdf)
+for additional information.
+
+**GENPARM.TBL -** This file contains global parameters for the Noah land
+surface model.
+
++--------------------+-------------------------------------------------+
+| **Variable name**  | **Description**                                 |
++====================+=================================================+
+| SLOPE_DATA         | Linear reservoir coefficient                    |
++--------------------+-------------------------------------------------+
+| SBETA_DATA         | Parameter used to calculate vegetation effect   |
+|                    | on soil heat                                    |
++--------------------+-------------------------------------------------+
+| FXEXP_DAT          | Soil evaporation exponent used in DEVAP         |
++--------------------+-------------------------------------------------+
+| CSOIL_DATA         | Soil heat capacity [J/m\ :sup:`3`/K]            |
++--------------------+-------------------------------------------------+
+| SALP_DATA          | Shape parameter of distribution function of     |
+|                    | snow cover                                      |
++--------------------+-------------------------------------------------+
+| REFDK_DATA         | Parameter in the surface runoff                 |
+|                    | parameterization                                |
++--------------------+-------------------------------------------------+
+| REFKDT_DATA        | Parameter in the surface runoff                 |
+|                    | parameterization                                |
++--------------------+-------------------------------------------------+
+| FRZK_DATA          | Frozen ground parameter                         |
++--------------------+-------------------------------------------------+
+| ZBOT_DATA          | Depth of lower boundary soil temperature [m]    |
++--------------------+-------------------------------------------------+
+| CZIL_DATA          | Parameter used in the calculation of the        |
+|                    | roughness length for heat                       |
++--------------------+-------------------------------------------------+
+| SMLOW_DATA         | Soil moisture wilt, soil moisture reference     |
+|                    | parameter                                       |
++--------------------+-------------------------------------------------+
+| SMHIGH_DATA        | Soil moisture wilt, soil moisture reference     |
+|                    | parameter                                       |
++--------------------+-------------------------------------------------+
+| LVCOEF_DATA        | Parameter in the snow albedo formulation        |
++--------------------+-------------------------------------------------+
+
+**SOILPARM.TBL -** This file contains parameters that are assigned based
+upon soil classification.
+
++-------------+--------------------------------------------------------+
+| **Variable  | **Description**                                        |
+| name**      |                                                        |
++=============+========================================================+
+| *All        |                                                        |
+| parameters  |                                                        |
+| are a       |                                                        |
+| function of |                                                        |
+| soil class* |                                                        |
++-------------+--------------------------------------------------------+
+| BB          | B parameter                                            |
++-------------+--------------------------------------------------------+
+| DRYSMC      | Dry soil moisture threshold at which direct            |
+|             | evaporation from top soil layer ends                   |
++-------------+--------------------------------------------------------+
+| F11         | Soil thermal diffusivity/conductivity coefficient      |
++-------------+--------------------------------------------------------+
+| MAXSMC      | Saturation soil moisture content (i.e. porosity)       |
++-------------+--------------------------------------------------------+
+| REFSMC      | Reference soil moisture (field capacity), where        |
+|             | transpiration begins to stress                         |
++-------------+--------------------------------------------------------+
+| SATPSI      | Saturation soil matric potential                       |
++-------------+--------------------------------------------------------+
+| SATDK       | Saturation soil conductivity                           |
++-------------+--------------------------------------------------------+
+| SATDW       | Saturation soil diffusivity                            |
++-------------+--------------------------------------------------------+
+| WLTSMC      | Wilting point soil moisture                            |
++-------------+--------------------------------------------------------+
+| QTZ         | Soil quartz content                                    |
++-------------+--------------------------------------------------------+
+
+**VEGPARM.TBL -** This file contains parameters that a function of land
+cover type.
+
++------------+---------------------------------------------------------+
+| **         | **Description**                                         |
+| Variable** |                                                         |
++============+=========================================================+
+| *All       |                                                         |
+| parameters |                                                         |
+| are a      |                                                         |
+| function   |                                                         |
+| of land    |                                                         |
+| cover      |                                                         |
+| type*      |                                                         |
++------------+---------------------------------------------------------+
+| SHDFAC     | Green vegetation fraction                               |
++------------+---------------------------------------------------------+
+| NROOT      | Number of soil layers (from the top) reached by         |
+|            | vegetation roots                                        |
++------------+---------------------------------------------------------+
+| RS         | Minimum stomatal resistance [s/m]                       |
++------------+---------------------------------------------------------+
+| RGL        | Parameter used in radiation stress function             |
++------------+---------------------------------------------------------+
+| HS         | Parameter used in vapor pressure deficit function       |
++------------+---------------------------------------------------------+
+| SNUP       | Threshold water-equivalent snow depth [m] that implies  |
+|            | 100% snow cover                                         |
++------------+---------------------------------------------------------+
+| MAXALB     | Upper bound on maximum albedo over deep snow [%]        |
++------------+---------------------------------------------------------+
+| LAIMIN     | Minimum leaf area index through the year                |
+|            | [dimensionless]                                         |
++------------+---------------------------------------------------------+
+| LAIMAX     | Maximum leaf area index through the year                |
+|            | [dimensionless]                                         |
++------------+---------------------------------------------------------+
+| EMISSMIN   | Minimum background emissivity through the year          |
+|            | [fraction 0.0 to 1.0]                                   |
++------------+---------------------------------------------------------+
+| EMISSMAX   | Maximum background emissivity through the year          |
+|            | [fraction 0.0 to 1.0]                                   |
++------------+---------------------------------------------------------+
+| ALBEDOMIN  | Minimum background albedo through the year [fraction    |
+|            | 0.0 to 1.0]                                             |
++------------+---------------------------------------------------------+
+| ALBEDOMAX  | Maximum background albedo through the year [fraction    |
+|            | 0.0 to 1.0]                                             |
++------------+---------------------------------------------------------+
+| Z0MIN      | Minimum background roughness length through the year    |
+|            | [m]                                                     |
++------------+---------------------------------------------------------+
+| Z0MAX      | Maximum background roughness length through the year    |
+|            | [m]                                                     |
++------------+---------------------------------------------------------+
+| TOPT_DATA  | Optimum transpiration air temperature [K]               |
++------------+---------------------------------------------------------+
+| C          | Maximum canopy water capacity [volumetric fraction]     |
+| MCMAX_DATA |                                                         |
++------------+---------------------------------------------------------+
+| C          | Parameter used in the canopy interception calculation   |
+| FACTR_DATA | [dimensionless]                                         |
++------------+---------------------------------------------------------+
+| RSMAX_DATA | Maximal stomatal resistance [s/m]                       |
++------------+---------------------------------------------------------+
+| BARE       | The land-use category representing bare ground (used to |
+|            | set the vegetation fraction to zero) [land-use category |
+|            | index]                                                  |
++------------+---------------------------------------------------------+
+| NATURAL    | The land-use category representative of the non-urban   |
+|            | portion of urban land-use points [land-use category     |
+|            | index]                                                  |
++------------+---------------------------------------------------------+
+
+A7. Noah-MP land surface model parameter tables
+-----------------------------------------------
+
+The Noah-MP land surface model requires three parameter table files
+denoted by the file suffix TBL. The variables contained within these
+files are described in the tables below.
+
+As part of the work conducted for the National Water Model
+implementation, the ability to specify a number of these land surface
+model parameters spatially on a two or three dimensional grid was
+introduced. This is done through the use of the compile time option
+SPATIAL_SOIL and the specification of a netCDF format parameter file
+with the default filename soil_properties.nc. A list of the variables
+contained in this file is included in a table below as well.
+
+**GENPARM.TBL -** This file contains global parameters for the Noah-MP
+land surface model.
+
++---------------+------------------------------------------------------+
+| **Variable    | **Description**                                      |
+| name**        |                                                      |
++===============+======================================================+
+| SLOPE_DATA    | Linear reservoir coefficient                         |
++---------------+------------------------------------------------------+
+| SBETA_DATA    | Parameter used to calculate vegetation effect on     |
+|               | soil heat                                            |
++---------------+------------------------------------------------------+
+| FXEXP_DAT     | Soil evaporation exponent used in DEVAP              |
++---------------+------------------------------------------------------+
+| CSOIL_DATA    | Soil heat capacity [J/m\ :sup:`3`/K]                 |
++---------------+------------------------------------------------------+
+| SALP_DATA     | Shape parameter of distribution function of snow     |
+|               | cover                                                |
++---------------+------------------------------------------------------+
+| REFDK_DATA    | Parameter in the surface runoff parameterization     |
++---------------+------------------------------------------------------+
+| REFKDT_DATA   | Parameter in the surface runoff parameterization     |
++---------------+------------------------------------------------------+
+| FRZK_DATA     | Frozen ground parameter                              |
++---------------+------------------------------------------------------+
+| ZBOT_DATA     | Depth of lower boundary soil temperature [m]         |
++---------------+------------------------------------------------------+
+| CZIL_DATA     | Parameter used in the calculation of the roughness   |
+|               | length for heat                                      |
++---------------+------------------------------------------------------+
+| SMLOW_DATA    | Soil moisture wilt, soil moisture reference          |
+|               | parameter                                            |
++---------------+------------------------------------------------------+
+| SMHIGH_DATA   | Soil moisture wilt, soil moisture reference          |
+|               | parameter                                            |
++---------------+------------------------------------------------------+
+| LVCOEF_DATA   | Parameter in the snow albedo formulation             |
++---------------+------------------------------------------------------+
+
+**SOILPARM.TBL -** This file contains parameters that are assigned based
+on soil classification.
+
++--------------+-------------------------------------------------------+
+| **Variable   | **Description**                                       |
+| name**       |                                                       |
++==============+=======================================================+
+| BB           | B parameter                                           |
++--------------+-------------------------------------------------------+
+| DRYSMC       | Dry soil moisture threshold at which direct           |
+|              | evaporation from top soil layer ends                  |
++--------------+-------------------------------------------------------+
+| F11          | Soil thermal diffusivity/conductivity coefficient     |
++--------------+-------------------------------------------------------+
+| MAXSMC       | Saturation soil moisture content (i.e. porosity)      |
++--------------+-------------------------------------------------------+
+| REFSMC       | Reference soil moisture (field capacity), where       |
+|              | transpiration begins to stress                        |
++--------------+-------------------------------------------------------+
+| SATPSI       | Saturation soil matric potential                      |
++--------------+-------------------------------------------------------+
+| SATDK        | Saturation soil conductivity                          |
++--------------+-------------------------------------------------------+
+| SATDW        | Saturation soil diffusivity                           |
++--------------+-------------------------------------------------------+
+| WLTSMC       | Wilting point soil moisture                           |
++--------------+-------------------------------------------------------+
+| QTZ          | Soil quartz content                                   |
++--------------+-------------------------------------------------------+
+
+**MPTABLE.TBL-** This file contains parameters that are a function of
+land cover type.
+
++-------------------------+--------------------------------------------+
+| **Variable**            | **Description**                            |
++=========================+============================================+
+| VEG_DATASET_DESCRIPTION | Land cover classification dataset          |
++-------------------------+--------------------------------------------+
+| NVEG                    | Number of land cover categories            |
++-------------------------+--------------------------------------------+
+| ISURBAN                 | Land cover category for urban              |
++-------------------------+--------------------------------------------+
+| ISWATER                 | Land cover category for water              |
++-------------------------+--------------------------------------------+
+| ISBARREN                | Land cover category for barren             |
++-------------------------+--------------------------------------------+
+| ISICE                   | Land cover category for ice                |
++-------------------------+--------------------------------------------+
+| EBLFOREST               | Land cover category for evergreen          |
+|                         | broadleaf forest                           |
++-------------------------+--------------------------------------------+
+| *Parameters below are a |                                            |
+| function of land cover  |                                            |
+| type*                   |                                            |
++-------------------------+--------------------------------------------+
+| CH2OP                   | Maximum intercepted H2O per unit LAI + SAI |
+|                         | [mm]                                       |
++-------------------------+--------------------------------------------+
+| DLEAF                   | Characteristic leaf dimension [m]          |
++-------------------------+--------------------------------------------+
+| Z0MVT                   | Momentum roughness length [m]              |
++-------------------------+--------------------------------------------+
+| HVT                     | Top of canopy [m]                          |
++-------------------------+--------------------------------------------+
+| HVB                     | Bottom of canopy [m]                       |
++-------------------------+--------------------------------------------+
+| DEN                     | Tree density [trunks/m\ :sup:`2`]          |
++-------------------------+--------------------------------------------+
+| RC                      | Tree crown radius [m]                      |
++-------------------------+--------------------------------------------+
+| MFSNO                   | Snowmelt m parameter                       |
++-------------------------+--------------------------------------------+
+| RHOS_VIS                | Monthly stem area index (SAI), one-sided   |
++-------------------------+--------------------------------------------+
+| RHOS_NIR                | Monthly leaf area index (LAI), one-sided   |
++-------------------------+--------------------------------------------+
+| TAUL_VIS                | Leaf transmittance, visible                |
++-------------------------+--------------------------------------------+
+| TAUL_NIR                | Leaf transmittance, near infrared          |
++-------------------------+--------------------------------------------+
+| TAUS_VIS                | Stem transmittance, visible                |
++-------------------------+--------------------------------------------+
+| TAUS_NIR                | Stem transmittance, near infrared          |
++-------------------------+--------------------------------------------+
+| XL                      | Leaf / stem orientation index              |
++-------------------------+--------------------------------------------+
+| CWPVT                   | Canopy wind parameter                      |
++-------------------------+--------------------------------------------+
+| C3PSN                   | Photosynthetic pathway [c4 = 0. \| c3 =    |
+|                         | 1.]                                        |
++-------------------------+--------------------------------------------+
+| KC25                    | co2 michaelis-menten constant at 25c (pa)  |
++-------------------------+--------------------------------------------+
+| AKC                     | q10 for kc25                               |
++-------------------------+--------------------------------------------+
+| KO25                    | o2 michaelis-menten constant at 25c (pa)   |
++-------------------------+--------------------------------------------+
+| AKO                     | q10 for ko25                               |
++-------------------------+--------------------------------------------+
+| AVCMX                   | q10 for vcmx25                             |
++-------------------------+--------------------------------------------+
+| AQE                     | q10 for qe25                               |
++-------------------------+--------------------------------------------+
+| LTOVRC                  | leaf turnover [1/s]                        |
++-------------------------+--------------------------------------------+
+| DILEFC                  | coefficient for leaf stress death [1/s]    |
++-------------------------+--------------------------------------------+
+| DILEFW                  | coefficient for leaf stress death [1/s]    |
++-------------------------+--------------------------------------------+
+| RMF25                   | Leaf maintenance respiration at 25C [umol  |
+|                         | CO2/m2/s]                                  |
++-------------------------+--------------------------------------------+
+| SLA                     | Single-side leaf area [m2/kg]              |
++-------------------------+--------------------------------------------+
+| FRAGR                   | Fraction of growth respiration             |
++-------------------------+--------------------------------------------+
+| TMIN                    | Minimum temperature for photosynthesis []  |
++-------------------------+--------------------------------------------+
+| VCMX25                  | maximum rate of carboxylation at 25c (umol |
+|                         | co2/m**2/s)                                |
++-------------------------+--------------------------------------------+
+| TDLEF                   | Characteristic temperature for leaf        |
+|                         | freezing [K]                               |
++-------------------------+--------------------------------------------+
+| BP                      | Minimum leaf conductance [umol/m2/s]       |
++-------------------------+--------------------------------------------+
+| MP                      | Slope of conductance to photosynthesis     |
+|                         | relationship                               |
++-------------------------+--------------------------------------------+
+| QE25                    | Quantum efficiency at 25C [umol CO2 / umol |
+|                         | photon]                                    |
++-------------------------+--------------------------------------------+
+| RMS25                   | stem maintenance respiration at 25c (umol  |
+|                         | co2/kg bio/s)                              |
++-------------------------+--------------------------------------------+
+| RMR25                   | root maintenance respiration at 25c (umol  |
+|                         | co2/kg bio/s)                              |
++-------------------------+--------------------------------------------+
+| ARM                     | q10 for maintenance respiration            |
++-------------------------+--------------------------------------------+
+| FOLNMX                  | foliage nitrogen concentration when f(n)=1 |
+|                         | (%)                                        |
++-------------------------+--------------------------------------------+
+| WRRAT                   | wood to non-wood ratio                     |
++-------------------------+--------------------------------------------+
+| MRP                     | microbial respiration parameter (umol co2  |
+|                         | /kg c/ s)                                  |
++-------------------------+--------------------------------------------+
+| NROOT                   | number of soil layers with root present    |
++-------------------------+--------------------------------------------+
+| RGL                     | Parameter used in radiation stress         |
+|                         | function                                   |
++-------------------------+--------------------------------------------+
+| RS                      | Stomatal resistance [s/m]                  |
++-------------------------+--------------------------------------------+
+| HS                      | Parameter used in vapor pressure deficit   |
+|                         | function                                   |
++-------------------------+--------------------------------------------+
+| TOPT                    | Optimum transpiration air temperature [K]  |
++-------------------------+--------------------------------------------+
+| RSMAX                   | Maximal stomatal resistance [s m-1]        |
++-------------------------+--------------------------------------------+
+| SAI                     | Steam area index                           |
++-------------------------+--------------------------------------------+
+| LAI                     | Leaf area index                            |
++-------------------------+--------------------------------------------+
+| SLAREA                  | (not used in Noah-MP as configured in      |
+|                         | WRF-Hydro)                                 |
++-------------------------+--------------------------------------------+
+| EPS1                    | (not used in Noah-MP as configured in      |
+|                         | WRF-Hydro)                                 |
++-------------------------+--------------------------------------------+
+| EPS2                    | (not used in Noah-MP as configured in      |
+|                         | WRF-Hydro)                                 |
++-------------------------+--------------------------------------------+
+| EPS3                    | (not used in Noah-MP as configured in      |
+|                         | WRF-Hydro)                                 |
++-------------------------+--------------------------------------------+
+| EPS4                    | (not used in Noah-MP as configured in      |
+|                         | WRF-Hydro)                                 |
++-------------------------+--------------------------------------------+
+| EPS5                    | (not used in Noah-MP as configured in      |
+|                         | WRF-Hydro)                                 |
++-------------------------+--------------------------------------------+
+| *Parameters below are a |                                            |
+| function of soil color  |                                            |
+| index*                  |                                            |
++-------------------------+--------------------------------------------+
+| ALBSAT_VIS              | saturated soil albedos for visible         |
++-------------------------+--------------------------------------------+
+| ALBSAT_NIR              | saturated soil albedos for near infrared   |
++-------------------------+--------------------------------------------+
+| ALBDRY_VIS              | dry soil albedos for visible               |
++-------------------------+--------------------------------------------+
+| ALBDRY_NIR              | dry soil albedos for near infrared         |
++-------------------------+--------------------------------------------+
+| *Parameters below are   |                                            |
+| global*                 |                                            |
++-------------------------+--------------------------------------------+
+| ALBICE                  | albedo land ice (visible and near          |
+|                         | infrared)                                  |
++-------------------------+--------------------------------------------+
+| ALBLAK                  | albedo frozen lakes (visible and near      |
+|                         | infrared)                                  |
++-------------------------+--------------------------------------------+
+| OMEGAS                  | two-stream parameter for snow              |
++-------------------------+--------------------------------------------+
+| BETADS                  | two-stream parameter for snow              |
++-------------------------+--------------------------------------------+
+| BETAIS                  | two-stream parameter for snow              |
++-------------------------+--------------------------------------------+
+| EG                      | emissivity soil surface (soil and lake)    |
++-------------------------+--------------------------------------------+
+| CO2                     | CO2 partial pressure                       |
++-------------------------+--------------------------------------------+
+| O2                      | O2 partial pressure                        |
++-------------------------+--------------------------------------------+
+| TIMEAN                  | gridcell mean topographic index [global    |
+|                         | mean]                                      |
++-------------------------+--------------------------------------------+
+| FSATMX                  | maximum surface saturated fraction [global |
+|                         | mean]                                      |
++-------------------------+--------------------------------------------+
+| Z0SNO                   | snow surface roughness length [m]          |
++-------------------------+--------------------------------------------+
+| SSI                     | liquid water holding capacity for snowpack |
+|                         | [m3/m3]                                    |
++-------------------------+--------------------------------------------+
+| SWEMX                   | new snow mass to fully cover old snow [mm] |
++-------------------------+--------------------------------------------+
+| :mark:`TAU0`            | :mark:`tau0 from Yang97 eqn. 10a`          |
++-------------------------+--------------------------------------------+
+| :mark:`GRAIN_GROWTH`    | :mark:`growth from vapor diffusion Yang97  |
+|                         | eqn. 10b`                                  |
++-------------------------+--------------------------------------------+
+| :mark:`EXTRA_GROWTH`    | :mark:`extra growth near freezing Yang97   |
+|                         | eqn. 10c`                                  |
++-------------------------+--------------------------------------------+
+| :mark:`DIRT_SOOT`       | :mark:`dirt and soot term Yang97 eqn. 10d` |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_COSZ`       | :mark:`zenith angle snow albedo            |
+|                         | adjustment; b in Yang97 eqn. 15`           |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_VIS_NEW`    | :mark:`new snow visible albedo`            |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_NIR_NEW`    | :mark:`new snow NIR albedo`                |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_VIS_AGE`    | :mark:`age factor for diffuse visible snow |
+|                         | albedo Yang97 eqn. 17`                     |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_NIR_AGE`    | :mark:`age factor for diffuse NIR snow     |
+|                         | albedo Yang97 eqn. 18`                     |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_VIS_DIR`    | :mark:`cosz factor for direct visible snow |
+|                         | albedo Yang97 eqn. 15`                     |
++-------------------------+--------------------------------------------+
+| :mark:`BATS_NIR_DIR`    | :mark:`cosz factor for direct NIR snow     |
+|                         | albedo Yang97 eqn. 16`                     |
++-------------------------+--------------------------------------------+
+| RSURF_SNOW              | surface resistance for snow [s/m]          |
++-------------------------+--------------------------------------------+
+| :mark:`RSURF_EXP`       | :mark:`exponent in the shape parameter for |
+|                         | soil resistance option 1`                  |
++-------------------------+--------------------------------------------+
+
+**soil_properties.nc [optional]**
+
++-----------+----------------------------------------------------------+
+| *         | **Description**                                          |
+| *Variable |                                                          |
+| name**    |                                                          |
++===========+==========================================================+
+| bexp      | Beta parameter                                           |
++-----------+----------------------------------------------------------+
+| cwpvt     | Empirical canopy wind parameter                          |
++-----------+----------------------------------------------------------+
+| dksat     | Saturated soil hydraulic conductivity                    |
++-----------+----------------------------------------------------------+
+| dwsat     | Saturated soil hydraulic diffusivity                     |
++-----------+----------------------------------------------------------+
+| hvt       | Top of vegetation canopy [m]                             |
++-----------+----------------------------------------------------------+
+| mfsno     | Snowmelt m parameter                                     |
++-----------+----------------------------------------------------------+
+| mp        | Slope of conductance to photosynthesis relationship      |
++-----------+----------------------------------------------------------+
+| psisat    | Saturated soil matric potential                          |
++-----------+----------------------------------------------------------+
+| quartz    | Soil quartz content                                      |
++-----------+----------------------------------------------------------+
+| refdk     | Parameter in the surface runoff parameterization         |
++-----------+----------------------------------------------------------+
+| refkdt    | Parameter in the surface runoff parameterization         |
++-----------+----------------------------------------------------------+
+| :mark:`r  | :mark:`Exponent in the shape parameter for soil          |
+| surf_exp` | resistance option 1`                                     |
++-----------+----------------------------------------------------------+
+| slope     | Slope index                                              |
++-----------+----------------------------------------------------------+
+| smcdry    | Dry soil moisture threshold where direction evaporation  |
+|           | from the top layer ends                                  |
++-----------+----------------------------------------------------------+
+| smcmax    | Saturated value of soil moisture [volumetric]            |
++-----------+----------------------------------------------------------+
+| smcref    | Reference soil moisture (field capacity) [volumetric]    |
++-----------+----------------------------------------------------------+
+| smcwlt    | Wilting point soil moisture [volumetric]                 |
++-----------+----------------------------------------------------------+
+| vcmx25    | Maximum rate of carboxylation at 25 C [umol              |
+|           | CO\ :sub:`2`/m\ :sup:`2`/s]                              |
++-----------+----------------------------------------------------------+
+
+A8. Terrain routing parameter files
+-----------------------------------
+
+Parameters for the lateral routing component of WRF-Hydro are specified
+via either the HYDRO.TBL file or the hydro2dtbl.nc file. Variables
+within these files are described in the tables below.
+
+   **HYDRO.TBL**
+
++--------------------+-------------------------------------------------+
+| **Variable name**  | **Description**                                 |
++====================+=================================================+
+| *The parameter     |                                                 |
+| below is a         |                                                 |
+| function of land   |                                                 |
+| cover type*        |                                                 |
++--------------------+-------------------------------------------------+
+| SFC_ROUGH          | Overland flow roughness coefficient             |
++--------------------+-------------------------------------------------+
+| *The parameters    |                                                 |
+| below are a        |                                                 |
+| function of soil   |                                                 |
+| class*             |                                                 |
++--------------------+-------------------------------------------------+
+| SATDK              | Saturated soil hydraulic conductivity [m/s]     |
++--------------------+-------------------------------------------------+
+| MAXSMC             | Maximum volumetric soil moisture                |
+|                    | [m\ :sup:`3`/m\ :sup:`3`]                       |
++--------------------+-------------------------------------------------+
+| REFSMC             | Reference volumetric soil moisture              |
+|                    | [m\ :sup:`3`/m\ :sup:`3`]                       |
++--------------------+-------------------------------------------------+
+| WLTSMC             | Wilting point volumetric soil moisture          |
+|                    | [m\ :sup:`3`/m\ :sup:`3`]                       |
++--------------------+-------------------------------------------------+
+| QTZ                | Quartz fraction of the soil                     |
++--------------------+-------------------------------------------------+
+
+..
+
+   **hydro2dtbl.nc**
+
++-----------------------+----------------------------------------------+
+| **Variable name**     | **Description**                              |
++=======================+==============================================+
+| SMCMAX1               | Maximum volumetric soil moisture             |
+|                       | [m\ :sup:`3`/m\ :sup:`3`]                    |
++-----------------------+----------------------------------------------+
+| SMCREF1               | Reference volumetric soil moisture           |
+|                       | [m\ :sup:`3`/m\ :sup:`3`]                    |
++-----------------------+----------------------------------------------+
+| SMCWLT1               | Wilting point volumetric soil moisture       |
+|                       | [m\ :sup:`3`/m\ :sup:`3`]                    |
++-----------------------+----------------------------------------------+
+| OV_ROUGH2D            | Overland flow roughness coefficient          |
++-----------------------+----------------------------------------------+
+| LKSAT                 | Lateral saturated soil hydraulic             |
+|                       | conductivity [m/s]                           |
++-----------------------+----------------------------------------------+
+
+.. _section-18:
+
+A9. Channel routing parameter tables (CHANPARM.TBL and Route_Link.nc)
+---------------------------------------------------------------------
+
+Variables of the the channel routing parameter tables are described in
+the tables below.
+
+   **CHANPARM.TBL**
+
++----------------------+-----------------------------------------------+
+| **Variable name**    | **Description**                               |
++======================+===============================================+
+| *All parameters are  |                                               |
+| a function of        |                                               |
+| Strahler stream      |                                               |
+| order*               |                                               |
++----------------------+-----------------------------------------------+
+| Bw                   | Channel bottom width [m]                      |
++----------------------+-----------------------------------------------+
+| HLINK                | Initial depth of water in the channel [m]     |
++----------------------+-----------------------------------------------+
+| ChSSlp               | Channel side slope [m/m]                      |
++----------------------+-----------------------------------------------+
+| MannN                | Manning’s roughness coefficient               |
++----------------------+-----------------------------------------------+
+
+..
+
+   **Route_Link.nc**
+
++----------------------+-----------------------------------------------+
+| **Variable name**    | **Description**                               |
++======================+===============================================+
+| *All parameters are  |                                               |
+| specified per stream |                                               |
+| segment (i.e. link)* |                                               |
++----------------------+-----------------------------------------------+
+| BtmWdth              | Channel bottom width [m]                      |
++----------------------+-----------------------------------------------+
+| ChSlp                | Channel side slope [m/m]                      |
++----------------------+-----------------------------------------------+
+| Kchan                | Channel conductivity [mm/hr]                  |
++----------------------+-----------------------------------------------+
+| Length               | Stream segment length [m]                     |
++----------------------+-----------------------------------------------+
+| MusK                 | Muskingum routing time [s]                    |
++----------------------+-----------------------------------------------+
+| MusX                 | Muskingum weighting coefficient               |
++----------------------+-----------------------------------------------+
+| NHDWaterbodyComID    | ComID of an associated water body if any      |
++----------------------+-----------------------------------------------+
+| Qi                   | Initial flow in link [m\ :sup:`3`/s]          |
++----------------------+-----------------------------------------------+
+| So                   | Slope [m/m]                                   |
++----------------------+-----------------------------------------------+
+| alt                  | Elevation from the NAD88 datum at start node  |
+|                      | [m]                                           |
++----------------------+-----------------------------------------------+
+| ascendingIndex       | Index to user for sorting IDs - *only in NWM  |
+|                      | files*                                        |
++----------------------+-----------------------------------------------+
+| from                 | From Link ID                                  |
++----------------------+-----------------------------------------------+
+| gages                | Identifier for stream gage at this location   |
++----------------------+-----------------------------------------------+
+| lat                  | Latitude of the segment midpoint [degrees     |
+|                      | north]                                        |
++----------------------+-----------------------------------------------+
+| link                 | Link ID                                       |
++----------------------+-----------------------------------------------+
+| lon                  | Longitude of the segment midpoint [degrees    |
+|                      | east]                                         |
++----------------------+-----------------------------------------------+
+| n                    | Manning’s roughness                           |
++----------------------+-----------------------------------------------+
+| order                | Strahler stream order                         |
++----------------------+-----------------------------------------------+
+| to                   | To Link ID                                    |
++----------------------+-----------------------------------------------+
+| time                 | Time of measurement                           |
++----------------------+-----------------------------------------------+
+
+.. _section-19:
+
+A10. Groundwater input and parameter files
+------------------------------------------
+
+The contents of the groundwater input and parameter files are described
+in the tables below.
+
+   **GWBASINS.nc**
+
++----------------------+-----------------------------------------------+
+| **Variable name**    | **Description**                               |
++======================+===============================================+
+| y                    | projection y coordinate                       |
++----------------------+-----------------------------------------------+
+| x                    | projection x coordinate                       |
++----------------------+-----------------------------------------------+
+| crs                  | coordinate reference system definition        |
++----------------------+-----------------------------------------------+
+| BASIN                | groundwater basin ID                          |
++----------------------+-----------------------------------------------+
+
+..
+
+   **GWBUCKPARM.nc**
+
++-----------------------+----------------------------------------------+
+| **Variable name**     | **Description**                              |
++=======================+==============================================+
+| Basin                 | Basin monotonic ID (1...n)                   |
++-----------------------+----------------------------------------------+
+| Coeff                 | Coefficient                                  |
++-----------------------+----------------------------------------------+
+| Expon                 | Exponent                                     |
++-----------------------+----------------------------------------------+
+| Zmax                  | Zmax                                         |
++-----------------------+----------------------------------------------+
+| Zinit                 | Zinit                                        |
++-----------------------+----------------------------------------------+
+| Area_sqkm             | Basin area in square kilometers              |
++-----------------------+----------------------------------------------+
+| ComID                 | NHDCatchment FEATUREID (NHDFlowline ComID)   |
++-----------------------+----------------------------------------------+
+
+.. _section-20:
+
+.. _section-21:
+
+A11. Spatial weights input file variable description
+----------------------------------------------------
+
+The contents of the spatialweights.nc file is described in the table
+below.
+
+**spatialweights.nc**
+
++------------+--------------------------------------------+------------+
+| **Variable | **Description**                            | **D        |
+| name**     |                                            | imension** |
++============+============================================+============+
+| polyid     | ID of polygon                              | polyid     |
++------------+--------------------------------------------+------------+
+| IDmask     | Polygon ID (polyid) associated with each   | data       |
+|            | record)                                    |            |
++------------+--------------------------------------------+------------+
+| overlaps   | Number of intersecting polygons            | polyid     |
++------------+--------------------------------------------+------------+
+| weight     | Fraction of intersecting polygon(polyid)   | data       |
+|            | intersected by poly2                       |            |
++------------+--------------------------------------------+------------+
+| re         | Fraction of intersecting                   | data       |
+| gridweight | polyid(overlapper) intersected by          |            |
+|            | polygon(polyid)                            |            |
++------------+--------------------------------------------+------------+
+| i_index    | Index in the x dimension of the raster     | data       |
+|            | grid (starting with 1,1 in the LL corner)  |            |
++------------+--------------------------------------------+------------+
+| j_index    | Index in the y dimension of the raster     | data       |
+|            | grid (starting with 1,1 in the LL corner)  |            |
++------------+--------------------------------------------+------------+
+
+.. _section-22:
+
+A12. Lake and reservoir parameter tables (LAKEPARM.nc)
+------------------------------------------------------
+
+Variables within the LAKEPARM.nc file are described in the tables below.
+
+**LAKEPARM.nc**
+
++--------------------+-------------------------------------------------+
+| **Variable name**  | **Description**                                 |
++====================+=================================================+
+| lake_id            | Lake index (consecutively from 1 to n # of      |
+|                    | lakes)                                          |
++--------------------+-------------------------------------------------+
+| LkArea             | Area [m\ :sup:`2`]                              |
++--------------------+-------------------------------------------------+
+| LkMxE              | Elevation of maximum lake height [m, AMSL]      |
++--------------------+-------------------------------------------------+
+| WeirC              | Weir coefficient (ranges from zero to one)      |
++--------------------+-------------------------------------------------+
+| WeirL              | Weir length [m]                                 |
++--------------------+-------------------------------------------------+
+| OrificeC           | Orifice coefficient (ranges from zero to one)   |
++--------------------+-------------------------------------------------+
+| OrificeA           | Orifice area [m\ :sup:`2`]                      |
++--------------------+-------------------------------------------------+
+| OrificeE           | Orifice elevation [m, AMSL]                     |
++--------------------+-------------------------------------------------+
+| lat                | Latitude [decimal degrees]                      |
++--------------------+-------------------------------------------------+
+| lon                | Longitude [decimal degrees]                     |
++--------------------+-------------------------------------------------+
+| time               | time                                            |
++--------------------+-------------------------------------------------+
+| WeirE              | Weir elevation [m, AMSL]                        |
++--------------------+-------------------------------------------------+
+| ascendingIndex     | Index to use for sorting IDs (ascending)        |
++--------------------+-------------------------------------------------+
+| ifd                | Initial fraction water depth                    |
++--------------------+-------------------------------------------------+
+| crs                | CRS definition                                  |
++--------------------+-------------------------------------------------+
+
+.. _section-23:
+
+A13. Restart Files Overview\ |image41|
+-------------------------------------
+
+**Figure A13.** Overview of restart files for the various model physics
+components.
+
+A13.1 RESTART_MP File Variable Table
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Noah-MP restarts are made in "subroutine lsm_restart()" in
+trunk/NDHMS/Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.F
+
+Noah-MP variables are defined in "SUBROUTINE noahmplsm" in
+trunk/NDHMS/Land_models/NoahMP/Noah/module_sf_noahmpdrv.f
+
+**RESTART_MP** file variable descriptions
+
++-------------+-------------------------------------------+-----------+
+| *           | **Description**                           | **Units** |
+| *Variable** |                                           |           |
++=============+===========================================+===========+
+| ACMELT      | accumulated melting water out of snow     | mm        |
+|             | bottom                                    |           |
++-------------+-------------------------------------------+-----------+
+| ACSNOW      | accumulated snowfall on grid              | mm        |
++-------------+-------------------------------------------+-----------+
+| ALBOLD      | snow albedo at last time step (-)         |           |
++-------------+-------------------------------------------+-----------+
+| AREAXY      | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| CANICE      | Canopy ice water content /                | mm        |
+|             | canopy-intercepted ice                    |           |
++-------------+-------------------------------------------+-----------+
+| CANLIQ      | Canopy liquid water content /             | mm        |
+|             | canopy-intercepted liquid water           |           |
++-------------+-------------------------------------------+-----------+
+| CH          | Sensible heat exchange coefficient        |           |
++-------------+-------------------------------------------+-----------+
+| CM          | Momentum drag coefficient                 |           |
++-------------+-------------------------------------------+-----------+
+| DEEPRECHXY  | soil moisture below the bottom of the     | m3m-3     |
+|             | column                                    |           |
++-------------+-------------------------------------------+-----------+
+| EAH         | canopy air vapor pressure                 | Pa        |
++-------------+-------------------------------------------+-----------+
+| EQZWT       | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| FASTCP      | short-lived carbon in shallow soil        | g/m2      |
++-------------+-------------------------------------------+-----------+
+| FDEPTHXY    | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| FWET        | Wetted or snowed fraction of canopy       | fraction  |
++-------------+-------------------------------------------+-----------+
+| GVFMAX      | annual maximum in vegetation fraction     |           |
++-------------+-------------------------------------------+-----------+
+| GVFMIN      | annual minimum in vegetation fraction     |           |
++-------------+-------------------------------------------+-----------+
+| ISNOW       | Number of snow layers                     | count     |
++-------------+-------------------------------------------+-----------+
+| LAI         | leaf area index                           |           |
++-------------+-------------------------------------------+-----------+
+| LFMASS      | Leaf mass                                 | g m{-2}   |
++-------------+-------------------------------------------+-----------+
+| PEXPXY      | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| QRFSXY      | Stem mass                                 | g m{-2}   |
++-------------+-------------------------------------------+-----------+
+| QRFXY       | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| QSFC        | bulk surface specific humidity            |           |
++-------------+-------------------------------------------+-----------+
+| QSLATXY     | Stable carbon in deep soil                | g m{-2}   |
++-------------+-------------------------------------------+-----------+
+| QSNOW       | snowfall rate on the ground               | mm/s      |
++-------------+-------------------------------------------+-----------+
+| QSPRINGSXY  | Mass of wood and woody roots              | g m{-2}   |
++-------------+-------------------------------------------+-----------+
+| QSPRINGXY   | (in the file by not used by the model)    |           |
++-------------+-------------------------------------------+-----------+
+| RECHXY      | recharge to the water table (diagnostic)  | m3/m3     |
++-------------+-------------------------------------------+-----------+
+| RIVERBEDXY  | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| RIVERCONDXY | (in the file but not used by the model)   |           |
++-------------+-------------------------------------------+-----------+
+| RTMASS      | mass of fine roots                        | g/m2      |
++-------------+-------------------------------------------+-----------+
+| SAI         | stem area index                           | -         |
++-------------+-------------------------------------------+-----------+
+| SFCRUNOFF   | Accumulatetd surface runoff               | mm        |
++-------------+-------------------------------------------+-----------+
+| SH2O        | volumetric liquid soil moisture           | m3/m3     |
++-------------+-------------------------------------------+-----------+
+| SMC         | Volumetric Soil Moisture                  | m3 m-3    |
++-------------+-------------------------------------------+-----------+
+| SMCWTDXY    | soil moisture below the bottom of the     | m3m-3     |
+|             | column                                    |           |
++-------------+-------------------------------------------+-----------+
+| SMOISEQ     | volumetric soil moisture                  | m3/m3     |
++-------------+-------------------------------------------+-----------+
+| SNEQV       | Snow water equivalent                     | kg m{-2}  |
++-------------+-------------------------------------------+-----------+
+| SNEQVO      | snow mass at last time step               | mm h2o    |
++-------------+-------------------------------------------+-----------+
+| SNICE       | snow layer ice                            | mm        |
++-------------+-------------------------------------------+-----------+
+| SNLIQ       | Snow layer liquid water                   | mm        |
++-------------+-------------------------------------------+-----------+
+| SNOWH       | Snow depth                                | m         |
++-------------+-------------------------------------------+-----------+
+| SNOW_T      | snow temperature                          | K         |
++-------------+-------------------------------------------+-----------+
+| SOIL_T      | Soil Temperature on NSOIL layers          | K         |
++-------------+-------------------------------------------+-----------+
+| STBLCP      | Stable carbon in deep soil                | g m{-2}   |
++-------------+-------------------------------------------+-----------+
+| STMASS      | stem mass                                 | g/m2      |
++-------------+-------------------------------------------+-----------+
+| TAH         | Canopy Air Temperature                    | K         |
++-------------+-------------------------------------------+-----------+
+| TAUSS       | snow age factor                           |           |
++-------------+-------------------------------------------+-----------+
+| TG          | Ground Temperature                        | K         |
++-------------+-------------------------------------------+-----------+
+| TV          | Canopy Temperature                        | K         |
++-------------+-------------------------------------------+-----------+
+| UDRUNOFF    | Accumulated underground runoff"           | mm        |
++-------------+-------------------------------------------+-----------+
+| WA          | Water in aquifer relative to reference    | kg m{-2}  |
+|             | level                                     |           |
++-------------+-------------------------------------------+-----------+
+| WOOD        | Mass of wood and woody roots              | g m{-2}   |
++-------------+-------------------------------------------+-----------+
+| WSLAKE      | lake water storage                        | mm        |
++-------------+-------------------------------------------+-----------+
+| WT          | Water in aquifer and saturated soil       | kg m{-2}  |
++-------------+-------------------------------------------+-----------+
+| ZSNSO       | Snow layer depths from snow surface       | m         |
++-------------+-------------------------------------------+-----------+
+| ZWT         | water table depth                         | m         |
++-------------+-------------------------------------------+-----------+
+| VEGFRA      | Vegetation fraction                       |           |
++-------------+-------------------------------------------+-----------+
+| ACCPRCP     | Accumulated precipitation                 | mm        |
++-------------+-------------------------------------------+-----------+
+| ACCECAN     | Accumulated canopy evaporation            | mm        |
++-------------+-------------------------------------------+-----------+
+| ACCEDIR     | Accumulated direct soil evaporation       | mm        |
++-------------+-------------------------------------------+-----------+
+| ACCETRAN    | Accumulated transpiration                 | mm        |
++-------------+-------------------------------------------+-----------+
+| SMOISEQ     | volumetric soil moisture                  | m3/m3     |
++-------------+-------------------------------------------+-----------+
+
+.. _section-24:
+
+A13.2 HYDRO_RST File Variable Table
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The variables are written to the HYDRO_RST file in the subroutine of
+RESTART_OUT_nc in the Routing/module_HYDRO_io.F. The tables below
+contain all the information on the dimensions and variables in the Hydro
+RESTART file (HYDRO_RST).
+
++--------------+-----------------------------+-------------------------+
+| *            | **Description**             | **It is written**       |
+| *Dimension** |                             |                         |
++==============+=============================+=========================+
+| depth        | Number of soil layers       |                         |
++--------------+-----------------------------+-------------------------+
+| ix           | Number of columns in the    |                         |
+|              | coarse grid (LSM)           |                         |
++--------------+-----------------------------+-------------------------+
+| iy           | Number of rows in the       |                         |
+|              | coarse grid (LSM)           |                         |
++--------------+-----------------------------+-------------------------+
+| ixrt         | Number of columns in the    |                         |
+|              | fine grid (hydro)           |                         |
++--------------+-----------------------------+-------------------------+
+| iyrt         | Number of rows in the fine  |                         |
+|              | grid (hydro)                |                         |
++--------------+-----------------------------+-------------------------+
+| links        | Number of links/reaches     |                         |
++--------------+-----------------------------+-------------------------+
+| basns        | Number of basins for the    | Only if GWBASESWCRT=1   |
+|              | groundwater/baseflow        | in the hydro.namelist   |
+|              | modeling                    |                         |
++--------------+-----------------------------+-------------------------+
+| lakes        | Number of lakes             | Only if the lake        |
+|              |                             | routing is turned on    |
++--------------+-----------------------------+-------------------------+
+
++-------+-------------------------------+----------+-------+---------+
+| **    | **Description**               | **#      | **Re  | **      |
+| Varia |                               | Di       | solut | Units** |
+| ble** |                               | mensions | ion** |         |
+|       |                               | (not     |       |         |
+|       |                               | i        |       |         |
+|       |                               | ncluding |       |         |
+|       |                               | time)**  |       |         |
++=======+===============================+==========+=======+=========+
+| cvol  | volume of stream in cell      | 1        | fine  | m3      |
+|       |                               |          | /link |         |
++-------+-------------------------------+----------+-------+---------+
+| hlink | stream stage                  | 1        | fine  | m       |
+|       |                               |          | /link |         |
++-------+-------------------------------+----------+-------+---------+
+| in    | infiltration excess water     | 2        | c     | mm      |
+| fxsrt |                               |          | oarse |         |
++-------+-------------------------------+----------+-------+---------+
+| inf   | weights for disaggregation of | 2        | fine  | -       |
+| xswgt | infxsrt                       |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| qb    | accumulated value of the      | 2        | fine  | mm      |
+| dryrt | boundary flux                 |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| q     | stream flow in to cell/reach  | 1        | fine  | m3/s    |
+| link1 |                               |          | /link |         |
++-------+-------------------------------+----------+-------+---------+
+| q     | stream flow out of cell/reach | 1        | fine  | m3/s    |
+| link2 |                               |          | /link |         |
++-------+-------------------------------+----------+-------+---------+
+| qstrm | Accumulated depth of stream   | 2        | fine  | mm      |
+| volrt | channel inflow                |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| sfch  | surface head on the coarse    | 2        | c     | mm      |
+| eadrt | grid                          |          | oarse |         |
++-------+-------------------------------+----------+-------+---------+
+| sf    | surface head on the routing   | 2        | fine  | mm      |
+| chead | grid                          |          |       |         |
+| subrt |                               |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| sh    | weights for disaggregation of | 3        | fine  | -       |
+| 2owgt | total soil moisture (smc)     |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| sh2ox | liquid soil moisture          | 3        | c     | m3/m3   |
+|       |                               |          | oarse |         |
++-------+-------------------------------+----------+-------+---------+
+| smc   | total liq+ice soil moisture.  | 3        | c     | m3/m3   |
+|       |                               |          | oarse |         |
++-------+-------------------------------+----------+-------+---------+
+| sol   | soil drainage                 | 2        | c     | mm      |
+| drain |                               |          | oarse |         |
++-------+-------------------------------+----------+-------+---------+
+| stc   | soil temperature              | 3        | c     | K       |
+|       |                               |          | oarse |         |
++-------+-------------------------------+----------+-------+---------+
+| la    | lake inflow                   | 2        | fine  | mm      |
+| ke_in |                               |          |       |         |
+| flort |                               |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| resht | water surface elevation       | 1        | link  | m       |
++-------+-------------------------------+----------+-------+---------+
+| q     | outflow from lake used in     | 1        | link  | m3/s    |
+| lakeo | diffusion scheme              |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| q     | lake inflow                   | numLakes | link  | cms     |
+| lakei |                               |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+| z_gws | depth in ground water bucket  | 1        | link  | m       |
+| ubbas |                               |          |       |         |
++-------+-------------------------------+----------+-------+---------+
+
+A14. Streamflow Nudging
+-----------------------
+
+**Figure A14.1** Below is an example netCDF header nudging time slice
+observation file containing 2 gages. The command ncdump -h was used to
+produce this header information.
+
++-----------------------------------------------------------------------+
+| netcdf \\2013-06-01_21\\:45\\:00.15min.usgsTimeSlice {                |
+|                                                                       |
+| dimensions:                                                           |
+|                                                                       |
+| stationIdStrLen = 15 ;                                                |
+|                                                                       |
+| stationIdInd = UNLIMITED ; // (2 currently)                           |
+|                                                                       |
+| timeStrLen = 19 ;                                                     |
+|                                                                       |
+| variables:                                                            |
+|                                                                       |
+| char stationId(stationIdInd, stationIdStrLen) ;                       |
+|                                                                       |
+| stationId:long_name =                                                 |
+|                                                                       |
+| "USGS station identifier of length 15" ;                              |
+|                                                                       |
+| char time(stationIdInd, timeStrLen) ;                                 |
+|                                                                       |
+| time:units = "UTC" ;                                                  |
+|                                                                       |
+| time:long_name =                                                      |
+|                                                                       |
+| "YYYY-MM-DD_HH:mm:ss UTC" ;                                           |
+|                                                                       |
+| float discharge(stationIdInd) ;                                       |
+|                                                                       |
+| discharge:units = "m^3/s" ;                                           |
+|                                                                       |
+| discharge:long_name =                                                 |
+|                                                                       |
+| "Discharge.cubic_meters_per_second" ;                                 |
+|                                                                       |
+| short discharge_quality(stationIdInd) ;                               |
+|                                                                       |
+| discharge_quality:units = "-" ;                                       |
+|                                                                       |
+| discharge_quality:long_name =                                         |
+|                                                                       |
+| "Discharge quality 0 to 100 to be scaled by 100." ;                   |
+|                                                                       |
+| float queryTime(stationIdInd) ;                                       |
+|                                                                       |
+| queryTime:units =                                                     |
+|                                                                       |
+| "seconds since 1970-01-01 00:00:00 local TZ" ;                        |
+|                                                                       |
+| // global attributes:                                                 |
+|                                                                       |
+| :fileUpdateTimeUTC = "2017-08-25_17:24:22" ;                          |
+|                                                                       |
+| :sliceCenterTimeUTC = "2013-06-01_21:45:00" ;                         |
+|                                                                       |
+| :sliceTimeResolutionMinutes = "15" ;                                  |
+|                                                                       |
+| }                                                                     |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+**Figure A14.2:** Below is an example nudgingParams.nc file containing
+parameters for 3 gages. The command ncdump -h was used to create this
+header information.
+
++-----------------------------------------------------------------------+
+| netcdf nudgingParams {                                                |
+|                                                                       |
+| dimensions:                                                           |
+|                                                                       |
+| stationIdInd = UNLIMITED ; // (3 currently)                           |
+|                                                                       |
+| monthInd = 12 ;                                                       |
+|                                                                       |
+| threshCatInd = 2 ;                                                    |
+|                                                                       |
+| threshInd = 1 ;                                                       |
+|                                                                       |
+| stationIdStrLen = 15 ;                                                |
+|                                                                       |
+| variables:                                                            |
+|                                                                       |
+| float G(stationIdInd) ;                                               |
+|                                                                       |
+| G:units = "-" ;                                                       |
+|                                                                       |
+| G:long_name = "Amplitude of nudging" ;                                |
+|                                                                       |
+| float R(stationIdInd) ;                                               |
+|                                                                       |
+| R:units = "meters" ;                                                  |
+|                                                                       |
+| R:long_name = "Radius of influence in meters" ;                       |
+|                                                                       |
+| float expCoeff(stationIdInd, monthInd, threshCatInd) ;                |
+|                                                                       |
+| expCoeff:units = "minutes" ;                                          |
+|                                                                       |
+| expCoeff:long_name = "Coefficient b in denominator e^(-dt/b)" ;       |
+|                                                                       |
+| float qThresh(stationIdInd, monthInd, threshInd) ;                    |
+|                                                                       |
+| qThresh:units = "m^3/s" ;                                             |
+|                                                                       |
+| qThresh:long_name = "Discharge threshold category" ;                  |
+|                                                                       |
+| char stationId(stationIdInd, stationIdStrLen) ;                       |
+|                                                                       |
+| stationId:units = "-" ;                                               |
+|                                                                       |
+| stationId:long_name = "USGS station identifer" ;                      |
+|                                                                       |
+| float tau(stationIdInd) ;                                             |
+|                                                                       |
+| tau:units = "minutes" ;                                               |
+|                                                                       |
+| tau:long_name = "Time tapering parameter half window size in minutes" |
+| ;                                                                     |
+|                                                                       |
+| }                                                                     |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+A15. National Water Model (NWM) Configuration
+---------------------------------------------
+
+It is important to note here that the community WRF-Hydro modeling
+system is currently the actual underlying modeling architecture that is
+used in the NOAA National Water Model. This means that the community
+WRF-Hydro model code is configurable into the National Water Model
+configurations that runs in operations at the National Center for
+Environmental Prediction (NCEP).
+
+“\ *The NWM is an hourly cycling uncoupled analysis and forecast system
+that provides streamflow for 2.7 million river reaches and other
+hydrologic information on 1km and 250m grids. The model provides
+complementary hydrologic guidance at current NWS River Forecast Center
+(RFC) river forecast locations and significantly expanded guidance
+coverage and type in underserved locations.*
+
+*The NWM ingests forcing from a variety of sources including Multi-Radar
+Multi-Sensor (MRMS) radar-gauge observed precipitation data and
+High-Resolution Rapid Refresh (HRRR), Rapid Refresh (RAP), Global
+Forecast System (GFS) and Climate Forecast System (CFS) Numerical
+Weather Prediction (NWP) forecast data. USGS real-time streamflow
+observations are assimilated and all NWM configurations benefit from the
+inclusion of ~5500 reservoirs. The core of the NWM system is the
+National Center for Atmospheric Research (NCAR)-supported community
+Weather Research and Forecasting (WRF)-Hydro hydrologic model. WRF-Hydro
+is configured to use the Noah Multi-*
+
+*Parameterization (Noah-MP) Land Surface Model (LSM) to simulate land
+surface processes. Separate water routing modules perform diffusive wave
+surface routing and saturated subsurface flow routing on a 250m grid,
+and Muskingum-Cunge channel routing down NHDPlusV2 stream reaches. River
+analyses and forecasts are provided across a domain encompassing the
+continental U.S. and hydrologically-contributing areas, while land
+surface output is available on a larger domain that extends beyond the
+continental U.S. into Canada and Mexico (roughly from latitude 19N to
+58N). In addition, NWM forcing datasets are provided on this domain at a
+resolution of 1km.*\ ”
+
+Excerpt from NOUS41 KWBC 061735 PNSWSH NWS Office of Science and
+Technology Integration
+
+For more information regarding the operational configuration, input, and
+output data of the National Water Model see the Office of Water
+Prediction website: http://water.noaa.gov/about/nwm and the Open Commons
+Consortium Environmental Data Commons website:
+http://edc.occ-data.org/nwm/.
+
+:mark:`The NWM/WRF-Hydro modeling system suite of tools for data
+preparation, evaluation, and calibration. is continually under
+development and will be rolled out to the community as each tool becomes
+finalized with supporting documentation for public usage.` To be
+notified when tools become available please subscribe to the WRF-Hydro
+email list https://ral.ucar.edu/projects/wrf_hydro/subscribe.
+
+The figures below illustrate the physics permutations available in the
+WRF-Hydro framework and the Noah-MP land surface model as well as the
+current National Water Model configuration as of March 2018, :mark:`the
+NWM ecosystem and suite of tools and sample NWM configuration
+namelists`.
+
+|image42|
+
+**Figure A15.1.** Illustration of WRF-Hydro physics permutations and
+those used in the current configuration of the National Water Model
+(NWM).
+
+**Figure A15.2.** Illustration of Noah-MP physics permutations and those
+used in the configuration of the National Water Model (NWM) as of March
+2018. |image43|
+
+|image44|
+
+**Figure A15.3** National Water Model/WRF-Hydro Modeling System
+Ecosystem and Suite of Tools.
+
+There are different NWM configurations that run operationally. The full
+list of the configurations and their specifics can be found at
+https://water.noaa.gov/about/nwm. Below we provide the namelists for the
+Standard Analysis configuration (self-cycling with 3-hour look-back,
+used to initialize CONUS short- and medium-range forecasts) as the
+sample namelists. Note that the name of the files are different from the
+conventions used throughout this documentation and they match with the
+name of the files in operation (A subset of the model parameter files
+used by the operational implementation of the NWM is available on `NWM
+website <http://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/NWM_parameters/>`__).
+The namelists for all the configurations are also being distributed with
+the model code.
+
+**Figure A15.4** Below are sample NWM configuration namelists
+
++-----------------------------------------------------------------------+
+| **namelist.hrldas (sample NWM configuration)**                        |
+|                                                                       |
+| &NOAHLSM_OFFLINE                                                      |
+|                                                                       |
+| HRLDAS_SETUP_FILE = "./DOMAIN/wrfinput_d01_1km.nc"                    |
+|                                                                       |
+| INDIR = "./forcing"                                                   |
+|                                                                       |
+| SPATIAL_FILENAME = "./DOMAIN/soil_veg_properties_ASM.nc"              |
+|                                                                       |
+| OUTDIR = "./"                                                         |
+|                                                                       |
+| START_YEAR = 2018                                                     |
+|                                                                       |
+| START_MONTH = 06                                                      |
+|                                                                       |
+| START_DAY = 01                                                        |
+|                                                                       |
+| START_HOUR = 00                                                       |
+|                                                                       |
+| START_MIN = 00                                                        |
+|                                                                       |
+| RESTART_FILENAME_REQUESTED = "RESTART.2018060100_DOMAIN1"             |
+|                                                                       |
+| ! Specification of simulation length in days OR hours                 |
+|                                                                       |
+| !KDAY = 1                                                             |
+|                                                                       |
+| KHOUR = 3                                                             |
+|                                                                       |
+| ! Physics options (see the documentation for details)                 |
+|                                                                       |
+| DYNAMIC_VEG_OPTION = 4                                                |
+|                                                                       |
+| CANOPY_STOMATAL_RESISTANCE_OPTION = 1                                 |
+|                                                                       |
+| BTR_OPTION = 1                                                        |
+|                                                                       |
+| RUNOFF_OPTION = 3                                                     |
+|                                                                       |
+| SURFACE_DRAG_OPTION = 1                                               |
+|                                                                       |
+| FROZEN_SOIL_OPTION = 1                                                |
+|                                                                       |
+| SUPERCOOLED_WATER_OPTION = 1                                          |
+|                                                                       |
+| RADIATIVE_TRANSFER_OPTION = 3                                         |
+|                                                                       |
+| SNOW_ALBEDO_OPTION = 1                                                |
+|                                                                       |
+| PCP_PARTITION_OPTION = 1                                              |
+|                                                                       |
+| TBOT_OPTION = 2                                                       |
+|                                                                       |
+| TEMP_TIME_SCHEME_OPTION = 3                                           |
+|                                                                       |
+| GLACIER_OPTION = 2                                                    |
+|                                                                       |
+| SURFACE_RESISTANCE_OPTION = 4                                         |
+|                                                                       |
+| ! Timesteps in units of seconds                                       |
+|                                                                       |
+| FORCING_TIMESTEP = 3600                                               |
+|                                                                       |
+| NOAH_TIMESTEP = 3600                                                  |
+|                                                                       |
+| OUTPUT_TIMESTEP = 3600                                                |
+|                                                                       |
+| ! Land surface model restart file write frequency                     |
+|                                                                       |
+| RESTART_FREQUENCY_HOURS = 1                                           |
+|                                                                       |
+| ! Split output after split_output_count output times.                 |
+|                                                                       |
+| SPLIT_OUTPUT_COUNT = 1                                                |
+|                                                                       |
+| ! Soil layer specification                                            |
+|                                                                       |
+| NSOIL=4                                                               |
+|                                                                       |
+| soil_thick_input(1) = 0.10                                            |
+|                                                                       |
+| soil_thick_input(2) = 0.30                                            |
+|                                                                       |
+| soil_thick_input(3) = 0.60                                            |
+|                                                                       |
+| soil_thick_input(4) = 1.00                                            |
+|                                                                       |
+| ! Forcing data measurement height for winds, temp, humidity           |
+|                                                                       |
+| ZLVL = 10.0                                                           |
+|                                                                       |
+| ! Restart file format options                                         |
+|                                                                       |
+| rst_bi_in = 0 !0: use netcdf input restart file                       |
+|                                                                       |
+| !1: use parallel io for reading multiple restart files (1 per core)   |
+|                                                                       |
+| rst_bi_out = 0 !0: use netcdf output restart file                     |
+|                                                                       |
+| !1: use parallel io for outputting multiple restart files (1 per      |
+| core)                                                                 |
+|                                                                       |
+| /                                                                     |
+|                                                                       |
+| &WRF_HYDRO_OFFLINE                                                    |
+|                                                                       |
+| ! Specification of forcing data: 1=HRLDAS-hr format, 2=HRLDAS-min     |
+| format, 3=WRF,                                                        |
+|                                                                       |
+| ! 4=Idealized, 5=Ideal w/ spec. precip,                               |
+|                                                                       |
+| ! 6=HRLDAS-hr format w/ spec. precip,                                 |
+|                                                                       |
+| ! 7=WRF w/ spec. precip                                               |
+|                                                                       |
+| FORC_TYP = 2                                                          |
+|                                                                       |
+| /                                                                     |
+|                                                                       |
+| **hydro.namelist (sample NWM configuration)**                         |
+|                                                                       |
+| &HYDRO_nlist                                                          |
+|                                                                       |
+| !!!! ---------------------- SYSTEM COUPLING -----------------------   |
+| !!!!                                                                  |
+|                                                                       |
+| ! Specify what is being coupled: 1=HRLDAS (offline Noah-LSM), 2=WRF,  |
+| 3=NASA/LIS, 4=CLM                                                     |
+|                                                                       |
+| sys_cpl = 1                                                           |
+|                                                                       |
+| !!!! ------------------- MODEL INPUT DATA FILES -------------------   |
+| !!!!                                                                  |
+|                                                                       |
+| ! Specify land surface model gridded input data file (e.g.:           |
+| "geo_em.d01.nc")                                                      |
+|                                                                       |
+| GEO_STATIC_FLNM = "./DOMAIN/geo_em.d01_1km.nc"                        |
+|                                                                       |
+| ! Specify the high-resolution routing terrain input data file (e.g.:  |
+| "Fulldom_hires.nc")                                                   |
+|                                                                       |
+| GEO_FINEGRID_FLNM = "./DOMAIN/Fulldom_hires_netcdf_250m.nc"           |
+|                                                                       |
+| ! Specify the spatial hydro parameters file (e.g.: "hydro2dtbl.nc")   |
+|                                                                       |
+| ! If you specify a filename and the file does not exist, it will be   |
+| created for you.                                                      |
+|                                                                       |
+| HYDROTBL_F = "./DOMAIN/HYDRO_TBL_2D.nc"                               |
+|                                                                       |
+| ! Specify spatial metadata file for land surface grid. (e.g.:         |
+| "GEOGRID_LDASOUT_Spatial_Metadata.nc")                                |
+|                                                                       |
+| LAND_SPATIAL_META_FLNM =                                              |
+| "./DOMAIN/WRF_Hydro_NWM_geospatial_data_template_land_GIS.nc"         |
+|                                                                       |
+| ! Specify the name of the restart file if starting from               |
+| restart...comment out with '!' if not...                              |
+|                                                                       |
+| RESTART_FILE = 'HYDRO_RST.2018-06-01_00:00_DOMAIN1'                   |
+|                                                                       |
+| !!!! --------------------- MODEL SETUP OPTIONS --------------------   |
+| !!!!                                                                  |
+|                                                                       |
+| ! Specify the domain or nest number identifier...(integer)            |
+|                                                                       |
+| IGRID = 1                                                             |
+|                                                                       |
+| ! Specify the restart file write frequency...(minutes)                |
+|                                                                       |
+| ! A value of -99999 will output restarts on the first day of the      |
+| month only.                                                           |
+|                                                                       |
+| rst_dt = 60                                                           |
+|                                                                       |
+| ! Reset the LSM soil states from the high-res routing restart file    |
+| (1=overwrite, 0=no overwrite)                                         |
+|                                                                       |
+| ! NOTE: Only turn this option on if overland or subsurface rotuing is |
+| active!                                                               |
+|                                                                       |
+| rst_typ = 1                                                           |
+|                                                                       |
+| ! Restart file format control                                         |
+|                                                                       |
+| rst_bi_in = 0 !0: use netcdf input restart file (default)             |
+|                                                                       |
+| !1: use parallel io for reading multiple restart files, 1 per core    |
+|                                                                       |
+| rst_bi_out = 0 !0: use netcdf output restart file (default)           |
+|                                                                       |
+| !1: use parallel io for outputting multiple restart files, 1 per core |
+|                                                                       |
+| ! Restart switch to set restart accumulation variables to 0 (0=no     |
+| reset, 1=yes reset to 0.0)                                            |
+|                                                                       |
+| RSTRT_SWC = 1                                                         |
+|                                                                       |
+| ! Specify baseflow/bucket model initialization...(0=cold start from   |
+| table, 1=restart file)                                                |
+|                                                                       |
+| GW_RESTART = 1                                                        |
+|                                                                       |
+| !!!! -------------------- MODEL OUTPUT CONTROL --------------------   |
+| !!!!                                                                  |
+|                                                                       |
+| ! Specify the output file write frequency...(minutes)                 |
+|                                                                       |
+| out_dt = 60                                                           |
+|                                                                       |
+| ! Specify the number of output times to be contained within each      |
+| output history file...(integer)                                       |
+|                                                                       |
+| ! SET = 1 WHEN RUNNING CHANNEL ROUTING ONLY/CALIBRATION SIMS!!!       |
+|                                                                       |
+| ! SET = 1 WHEN RUNNING COUPLED TO WRF!!!                              |
+|                                                                       |
+| SPLIT_OUTPUT_COUNT = 1                                                |
+|                                                                       |
+| ! Specify the minimum stream order to output to netcdf point          |
+| file...(integer)                                                      |
+|                                                                       |
+| ! Note: lower value of stream order produces more output.             |
+|                                                                       |
+| order_to_write = 1                                                    |
+|                                                                       |
+| ! Flag to turn on/off new I/O routines: 0 = deprecated output         |
+| routines (use when running with Noah LSM),                            |
+|                                                                       |
+| ! 1 = with scale/offset/compression, ! 2 = with scale/offset/NO       |
+| compression,                                                          |
+|                                                                       |
+| ! 3 = compression only, 4 = no scale/offset/compression (default)     |
+|                                                                       |
+| io_form_outputs = 2                                                   |
+|                                                                       |
+| ! Realtime run configuration option:                                  |
+|                                                                       |
+| ! 0=all (default), 1=analysis, 2=short-range, 3=medium-range,         |
+| 4=long-range, 5=retrospective,                                        |
+|                                                                       |
+| ! 6=diagnostic (includes all of 1-4 outputs combined)                 |
+|                                                                       |
+| io_config_outputs = 1                                                 |
+|                                                                       |
+| ! Option to write output files at time 0 (restart cold start time):   |
+| 0=no, 1=yes (default)                                                 |
+|                                                                       |
+| t0OutputFlag = 1                                                      |
+|                                                                       |
+| ! Options to output channel & bucket influxes. Only active for        |
+| UDMP_OPT=1.                                                           |
+|                                                                       |
+| ! Nonzero choice requires that out_dt above matches NOAH_TIMESTEP in  |
+| namelist.hrldas.                                                      |
+|                                                                       |
+| ! 0=None (default), 1=channel influxes (qSfcLatRunoff, qBucket)       |
+|                                                                       |
+| ! 2=channel+bucket fluxes (qSfcLatRunoff, qBucket,                    |
+| qBtmVertRunoff_toBucket)                                              |
+|                                                                       |
+| ! 3=channel accumulations (accSfcLatRunoff, accBucket) \**\* NOT      |
+| TESTED \**\*                                                          |
+|                                                                       |
+| output_channelBucket_influx = 2                                       |
+|                                                                       |
+| ! Output netcdf file control                                          |
+|                                                                       |
+| CHRTOUT_DOMAIN = 1 ! Netcdf point timeseries output at all channel    |
+| points (1d)                                                           |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| CHANOBS_DOMAIN = 0 ! Netcdf point timeseries at forecast points or    |
+| gage points (defined in Routelink)                                    |
+|                                                                       |
+| ! 0 = no output, 1 = output at forecast points or gage points.        |
+|                                                                       |
+| CHRTOUT_GRID = 0 ! Netcdf grid of channel streamflow values (2d)      |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| ! NOTE: Not available with reach-based routing                        |
+|                                                                       |
+| LSMOUT_DOMAIN = 0 ! Netcdf grid of variables passed between LSM and   |
+| routing components (2d)                                               |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| ! NOTE: No scale_factor/add_offset available                          |
+|                                                                       |
+| RTOUT_DOMAIN = 1 ! Netcdf grid of terrain routing variables on        |
+| routing grid (2d)                                                     |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| output_gw = 0 ! Netcdf GW output                                      |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| outlake = 1 ! Netcdf grid of lake values (1d)                         |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| frxst_pts_out = 0 ! ASCII text file of forecast points or gage points |
+| (defined in Routelink)                                                |
+|                                                                       |
+| ! 0 = no output, 1 = output                                           |
+|                                                                       |
+| !!!! ------------ PHYSICS OPTIONS AND RELATED SETTINGS ------------   |
+| !!!!                                                                  |
+|                                                                       |
+| ! Specify the number of soil layers (integer) and the depth of the    |
+| bottom of each layer... (meters)                                      |
+|                                                                       |
+| ! Notes: In Version 1 of WRF-Hydro these must be the same as in the   |
+| namelist.input file.                                                  |
+|                                                                       |
+| ! Future versions will permit this to be different.                   |
+|                                                                       |
+| NSOIL=4                                                               |
+|                                                                       |
+| ZSOIL8(1) = -0.10                                                     |
+|                                                                       |
+| ZSOIL8(2) = -0.40                                                     |
+|                                                                       |
+| ZSOIL8(3) = -1.00                                                     |
+|                                                                       |
+| ZSOIL8(4) = -2.00                                                     |
+|                                                                       |
+| ! Specify the grid spacing of the terrain routing grid...(meters)     |
+|                                                                       |
+| DXRT = 250.0                                                          |
+|                                                                       |
+| ! Specify the integer multiple between the land model grid and the    |
+| terrain routing grid...(integer)                                      |
+|                                                                       |
+| AGGFACTRT = 4                                                         |
+|                                                                       |
+| ! Specify the channel routing model timestep...(seconds)              |
+|                                                                       |
+| DTRT_CH = 300                                                         |
+|                                                                       |
+| ! Specify the terrain routing model timestep...(seconds)              |
+|                                                                       |
+| DTRT_TER = 10                                                         |
+|                                                                       |
+| ! Switch to activate subsurface routing...(0=no, 1=yes)               |
+|                                                                       |
+| SUBRTSWCRT = 1                                                        |
+|                                                                       |
+| ! Switch to activate surface overland flow routing...(0=no, 1=yes)    |
+|                                                                       |
+| OVRTSWCRT = 1                                                         |
+|                                                                       |
+| ! Specify overland flow routing option: 1=Steepest Descent (D8)       |
+| 2=CASC2D (not active)                                                 |
+|                                                                       |
+| ! NOTE: Currently subsurface flow is only steepest descent            |
+|                                                                       |
+| rt_option = 1                                                         |
+|                                                                       |
+| ! Switch to activate channel routing...(0=no, 1=yes)                  |
+|                                                                       |
+| CHANRTSWCRT = 1                                                       |
+|                                                                       |
+| ! Specify channel routing option: 1=Muskingam-reach,                  |
+| 2=Musk.-Cunge-reach, 3=Diff.Wave-gridded                              |
+|                                                                       |
+| channel_option = 2                                                    |
+|                                                                       |
+| ! Specify the reach file for reach-based routing options (e.g.:       |
+| "Route_Link.nc")                                                      |
+|                                                                       |
+| route_link_f = "./DOMAIN/RouteLink_NHDPLUS.nc"                        |
+|                                                                       |
+| ! If using channel_option=2, activate the compound channel            |
+| formulation? (Default=.FALSE.)                                        |
+|                                                                       |
+| compound_channel = .TRUE.                                             |
+|                                                                       |
+| ! Specify the lake parameter file (e.g.: "LAKEPARM.nc").              |
+|                                                                       |
+| ! Note REQUIRED if lakes are on.                                      |
+|                                                                       |
+| route_lake_f = "./DOMAIN/LAKEPARM_NHDPLUS.nc"                         |
+|                                                                       |
+| ! Switch to activate baseflow bucket model...(0=none, 1=exp. bucket,  |
+| 2=pass-through)                                                       |
+|                                                                       |
+| GWBASESWCRT = 1                                                       |
+|                                                                       |
+| ! Groundwater/baseflow 2d mask specified on land surface model grid   |
+| (e.g.: "GWBASINS.nc")                                                 |
+|                                                                       |
+| !Note: Only required if baseflow model is active (1 or 2) and         |
+| UDMP_OPT=0.                                                           |
+|                                                                       |
+| !gwbasmskfil = "./DOMAIN/GWBASINS.nc"                                 |
+|                                                                       |
+| ! Groundwater bucket parameter file (e.g.: "GWBUCKPARM.nc")           |
+|                                                                       |
+| GWBUCKPARM_file = "./DOMAIN/GWBUCKPARM_CONUS.nc"                      |
+|                                                                       |
+| ! User defined mapping, such NHDPlus: 0=no (default), 1=yes           |
+|                                                                       |
+| UDMP_OPT = 1                                                          |
+|                                                                       |
+| ! If on, specify the user-defined mapping file (e.g.:                 |
+| "spatialweights.nc")                                                  |
+|                                                                       |
+| udmap_file = "./DOMAIN/spatialweights_250m_all_basins.nc"             |
+|                                                                       |
+| /                                                                     |
+|                                                                       |
+| &NUDGING_nlist                                                        |
+|                                                                       |
+| ! Path to the "timeslice" observation files.                          |
+|                                                                       |
+| timeSlicePath = "./nudgingTimeSliceObs/"                              |
+|                                                                       |
+| nudgingParamFile = "./DOMAIN/nudgingParams.nc"                        |
+|                                                                       |
+| ! Nudging restart file = "nudgingLastObsFile"                         |
+|                                                                       |
+| ! nudgingLastObsFile defaults to '', which will look for              |
+| nudgingLastObs.YYYY-mm-dd_HH:MM:SS.nc                                 |
+|                                                                       |
+| ! \**AT THE INITALIZATION TIME OF THE RUN*\*. Set to a missing file   |
+| to use no restart.                                                    |
+|                                                                       |
+| !nudgingLastObsFile = '/a/nonexistent/file/gives/nudging/cold/start'  |
+|                                                                       |
+| !! Parallel input of nudging timeslice observation files?             |
+|                                                                       |
+| readTimesliceParallel = .TRUE.                                        |
+|                                                                       |
+| ! temporalPersistence defaults to true, only runs if necessary params |
+| present.                                                              |
+|                                                                       |
+| temporalPersistence = .TRUE.                                          |
+|                                                                       |
+| ! The total number of last (obs, modeled) pairs to save in            |
+| nudgingLastObs for                                                    |
+|                                                                       |
+| ! removal of bias. This is the maximum array length. (This option is  |
+| active when persistBias=FALSE)                                        |
+|                                                                       |
+| ! (Default=960=10days @15min obs resolution, if all the obs are       |
+| present and longer if not.)                                           |
+|                                                                       |
+| nLastObs = 480                                                        |
+|                                                                       |
+| ! If using temporalPersistence the last observation persists by       |
+| default.                                                              |
+|                                                                       |
+| ! This option instead persists the bias after the last observation.   |
+|                                                                       |
+| persistBias = .TRUE.                                                  |
+|                                                                       |
+| ! AnA (FALSE) vs Forecast (TRUE) bias persistence.                    |
+|                                                                       |
+| ! If persistBias: Does the window for calculating the bias end at     |
+|                                                                       |
+| ! model init time (=t0)?                                              |
+|                                                                       |
+| ! FALSE = window ends at model time (moving),                         |
+|                                                                       |
+| ! TRUE = window ends at init=t0(fcst) time.                           |
+|                                                                       |
+| ! (If commented out, Default=FALSE)                                   |
+|                                                                       |
+| ! Note: Perfect restart tests require this option to be .FALSE.       |
+|                                                                       |
+| biasWindowBeforeT0 = .FALSE.                                          |
+|                                                                       |
+| ! If persistBias: Only use this many last (obs, modeled) pairs. (If   |
+| Commented out, Default=-1*nLastObs)                                   |
+|                                                                       |
+| ! > 0: apply an age-based filter, units=hours.                        |
+|                                                                       |
+| ! = 0: apply no additional filter, use all available/usable obs.      |
+|                                                                       |
+| ! < 0: apply an count-based filter, units=count                       |
+|                                                                       |
+| maxAgePairsBiasPersist = 3                                            |
+|                                                                       |
+| ! If persistBias: The minimum number of last (obs, modeled) pairs,    |
+| with age less than                                                    |
+|                                                                       |
+| ! maxAgePairsBiasPersist, required to apply a bias correction.        |
+| (default=8)                                                           |
+|                                                                       |
+| minNumPairsBiasPersist = 1                                            |
+|                                                                       |
+| ! If persistBias: give more weight to observations closer in time?    |
+| (default=FALSE)                                                       |
+|                                                                       |
+| invDistTimeWeightBias = .TRUE.                                        |
+|                                                                       |
+| ! If persistBias: "No constructive interference in bias correction?", |
+| Reduce the bias adjustment                                            |
+|                                                                       |
+| ! when the model and the bias adjustment have the same sign relative  |
+| to the modeled flow at t0?                                            |
+|                                                                       |
+| ! (default=FALSE)                                                     |
+|                                                                       |
+| ! Note: Perfect restart tests require this option to be .FALSE.       |
+|                                                                       |
+| noConstInterfBias = .TRUE.                                            |
+|                                                                       |
+| /                                                                     |
++=======================================================================+
++-----------------------------------------------------------------------+
+
+.. _section-25:
+
+.. |image1| image:: media/image50.png
+   :width: 5.35821in
+   :height: 3.74412in
+.. |image2| image:: media/image7.png
+   :width: 7in
+   :height: 2.5in
+.. |image3| image:: media/image65.png
+   :width: 5.34236in
+   :height: 2.75625in
+.. |image4| image:: media/image53.png
+   :width: 3.71875in
+   :height: 2.94631in
+.. |image5| image:: media/image60.png
+   :width: 5.95556in
+   :height: 2.71736in
+.. |image6| image:: media/image51.png
+   :width: 6.92708in
+   :height: 4.70833in
+.. |image7| image:: media/image14.png
+   :width: 7in
+   :height: 3.13889in
+.. |image8| image:: media/image68.png
+   :width: 7.44792in
+   :height: 1.86458in
+.. |Subsfc_fig| image:: media/image55.png
+   :width: 3.96223in
+   :height: 2.73438in
+.. |image9| image:: media/image52.png
+   :width: 2.62321in
+   :height: 0.37612in
+.. |image10| image:: media/image30.png
+   :width: 1.43229in
+   :height: 0.6875in
+.. |image11| image:: media/image69.png
+   :width: 2.30208in
+   :height: 0.38542in
+.. |image12| image:: media/image59.png
+   :width: 2in
+   :height: 0.48958in
+.. |figure3_1overlandflowrouting.jpg| image:: media/image13.jpg
+   :width: 2.98438in
+   :height: 2.7482in
+.. |image13| image:: media/image56.png
+   :width: 1.65808in
+   :height: 0.6195in
+.. |image14| image:: media/image63.png
+   :width: 1.22973in
+   :height: 0.47396in
+.. |image15| image:: media/image61.png
+   :width: 0.92654in
+   :height: 0.40104in
+.. |image16| image:: media/image67.png
+   :width: 1.88787in
+   :height: 0.60938in
+.. |image17| image:: media/image49.png
+   :width: 4.67708in
+   :height: 1.90625in
+.. |image18| image:: media/image11.png
+   :width: 0.19792in
+   :height: 0.19792in
+.. |image19| image:: media/image34.png
+   :width: 1.00972in
+   :height: 0.40556in
+.. |image20| image:: media/image32.png
+   :width: 2.38681in
+   :height: 0.41528in
+.. |image21| image:: media/image40.png
+   :width: 0.14167in
+   :height: 0.15069in
+.. |image22| image:: media/image37.png
+   :width: 0.77361in
+   :height: 0.5in
+.. |image23| image:: media/image36.png
+   :width: 1in
+   :height: 0.40556in
+.. |image24| image:: media/image42.png
+   :width: 1.64167in
+   :height: 0.44306in
+.. |image25| image:: media/image41.png
+   :width: 0.70764in
+   :height: 0.23611in
+.. |image26| image:: media/image43.png
+   :width: 0.70764in
+   :height: 0.23611in
+.. |image27| image:: media/image44.png
+   :width: 2.46696in
+   :height: 0.46723in
+.. |image28| image:: media/image45.png
+   :width: 0.32813in
+   :height: 0.32813in
+.. |image29| image:: media/image21.png
+   :width: 2.26389in
+   :height: 0.52847in
+.. |image30| image:: media/image4.png
+   :width: 1.14167in
+   :height: 0.26389in
+.. |image31| image:: media/image3.png
+   :width: 3.61319in
+   :height: 0.30208in
+.. |image32| image:: media/image54.png
+   :width: 5.48438in
+   :height: 1.67871in
+.. |image33| image:: media/image12.png
+   :width: 1.10417in
+   :height: 0.30208in
+.. |image34| image:: media/image16.png
+   :width: 1.30208in
+   :height: 0.30208in
+.. |image35| image:: media/image2.png
+   :width: 1.13056in
+   :height: 0.46875in
+.. |image36| image:: media/image64.png
+   :width: 2.25872in
+   :height: 1.66875in
+.. |image37| image:: media/image66.png
+   :width: 2.2587in
+   :height: 1.9223in
+.. |image38| image:: media/image62.png
+   :width: 1.77083in
+   :height: 1.58333in
+.. |image39| image:: media/image38.png
+   :width: 7.71908in
+   :height: 4.78646in
+.. |image40| image:: media/image35.png
+   :width: 7in
+   :height: 3.70833in
+.. |image41| image:: media/image15.png
+   :width: 7in
+   :height: 3.41667in
+.. |image42| image:: media/image17.png
+   :width: 7in
+   :height: 5.22222in
+.. |image43| image:: media/image39.png
+   :width: 7.42188in
+   :height: 5.5852in
+.. |image44| image:: media/image25.png
+   :width: 4.09546in
+   :height: 3.05729in

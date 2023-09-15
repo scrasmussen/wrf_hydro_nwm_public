@@ -1,7 +1,7 @@
 project = 'WRF-Hydro Modeling System'
 author = 'WRF-Hydro Team'
 copyright = '2023, '+author
-version = '5.3'
+version = 'v5.3.0'
 release = '5.3.0'
 try:
     import sphinx_rtd_theme
