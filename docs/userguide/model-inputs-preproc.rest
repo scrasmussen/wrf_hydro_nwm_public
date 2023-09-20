@@ -1,4 +1,5 @@
 .. vim: syntax=rst
+.. include:: media.rest
 
 5. Model inputs and preprocessing
 =================================
@@ -6,8 +7,10 @@
 This chapter describes WRF-Hydro input and parameter file requirements
 and the preprocessing tools used to generate them.
 
-5.1 Overview of model inputs\ |image39|
----------------------------------------
+5.1 Overview of model inputs
+----------------------------
+
+|image39|
 
 **Figure 5.1** WRF-Hydro input and parameter files organized by model
 physics component. See the Key for files specific to a certain land
@@ -683,4 +686,3 @@ FORCING_TIMESTEP namelist parameter in the namelist.hrldas file. For
 example, the user can have ‘hourly’ meteorology with ‘5-minute’
 precipitation analyses.
 
-.. _section-9:

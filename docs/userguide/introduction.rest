@@ -1,4 +1,5 @@
 .. vim: syntax=rst
+.. include:: media.rest
 
 1. Introduction
 ===============

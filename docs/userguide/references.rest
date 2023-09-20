@@ -1,7 +1,7 @@
 .. vim: syntax=rst
 
-**REFERENCES**
-===============
+REFERENCES
+==========
 
 Below are cited references in an alphabetical listing by author.
 

@@ -1,4 +1,5 @@
 .. vim: syntax=rst
+.. include:: media.rest
 
 6. Description of Output Files from WRF-Hydro
 =============================================
@@ -377,5 +378,3 @@ locate the ‘crs’ variable in one of the input files.
    versions of QGIS struggle to properly read in information from a
    netCDF file without this extension. Future upgrades will
    automatically add this file extension into the filenames.
-
-.. _section-10:

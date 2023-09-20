@@ -1,4 +1,5 @@
 .. vim: syntax=rst
+.. include:: media.rest
 
 3. Model Physics Description
 ============================
@@ -1334,5 +1335,3 @@ hydro.namelist:
 -  spatialweights.nc - netCDF file specifying the weights to map between
    the land surface grid and the pre-defined groundwater basin
    boundaries.
-
-.. _section-7:
