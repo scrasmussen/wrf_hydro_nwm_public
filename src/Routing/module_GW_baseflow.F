@@ -26,7 +26,7 @@ module module_GW_baseflow
    use MODULE_mpp_GWBUCKET, only: gw_sum_real, gw_write_io_real
    use MODULE_mpp_ReachLS, only : updatelinkv
 #endif
-   use iso_fortran_env, only: int64
+   use iso_fortran_env, only: int64, real64
    implicit none
 
 !#include "rt_include.inc"
@@ -73,7 +73,7 @@ contains
    !! intent inout for channelBucket_only .eq. 1
    real, intent(inout),dimension(numbasns)           :: qin_gwsubbas
    real, intent(out),dimension(numbasns)             :: qloss_gwsubbas
-   real*8                                            :: z_gwsubbas(numbasns)
+   real(real64)                                      :: z_gwsubbas(numbasns)
    real                                              :: qout_max, qout_spill, z_gw_spill
    real, intent(inout),dimension(:)                  :: z_gwsubbas_tmp
    real, intent(in),dimension(ixrt,jxrt)             :: INFXSWGT
@@ -89,7 +89,7 @@ contains
    integer                                           :: i,j,bas, k, m, ii,jj
 
    integer :: AGGFACYRT, AGGFACTRT, AGGFACXRT, IXXRT, JYYRT
-   real*8,  dimension(LNLINKSL) :: LQLateral
+   real(real64),  dimension(LNLINKSL) :: LQLateral
 
    real, parameter :: one         = 1.000000000000000
    real, parameter :: m_to_mm     = 1000.000000000000
@@ -234,7 +234,7 @@ contains
 
                if (bucket_loss .eq. 1) then
                     qloss_gwsubbas(bas) = qout_gwsubbas(bas)*loss_fraction(bas)
-                    qout_gwsubbas(bas) = qout_gwsubbas(bas)-qloss_gwsubbas(bas) 
+                    qout_gwsubbas(bas) = qout_gwsubbas(bas)-qloss_gwsubbas(bas)
                endif
 
           elseif (GWBASESWCRT.eq.2) then  !Pass through/steady-state bucket
@@ -251,7 +251,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
           if (bucket_loss .eq. 1) then
-             z_gwsubbas(bas) = z_gwsubbas(bas) - (qout_gwsubbas(bas)+qloss_gwsubbas(bas))*DT/( basns_area(bas) )   ! units (meters)	
+             z_gwsubbas(bas) = z_gwsubbas(bas) - (qout_gwsubbas(bas)+qloss_gwsubbas(bas))*DT/( basns_area(bas) )   ! units (meters)
           else
              z_gwsubbas(bas) = z_gwsubbas(bas) - (qout_gwsubbas(bas))*DT/( basns_area(bas) )   ! units (meters)
           endif
@@ -299,7 +299,7 @@ contains
    real, intent(out),dimension(numbasns)             :: qout_gwsubbas
    real, intent(out),dimension(numbasns)             :: qin_gwsubbas
    real, dimension(numbasns)                         :: qin_gwsubbas_surf
-   real*8                                            :: z_gwsubbas(numbasns)
+   real(real64)                                      :: z_gwsubbas(numbasns)
    real                                              :: qout_max, qout_spill, z_gw_spill
    real, intent(inout),dimension(numbasns)           :: z_gwsubbas_tmp
    real, intent(out),dimension(ixrt,jxrt)            :: qinflowbase
@@ -308,7 +308,7 @@ contains
    integer, intent(in)                               :: OVRTSWCRT
 
 
-   real*8, dimension(numbasns)                      :: sum_perc8, ct_bas8, sum_perc8_surf
+   real(real64), dimension(numbasns)                :: sum_perc8, ct_bas8, sum_perc8_surf
    real, dimension(numbasns)                        :: sum_perc, sum_perc_surf
    real, dimension(numbasns)                        :: net_perc, net_perc_surf
 
@@ -459,7 +459,7 @@ contains
 !DJG bug adjust output to be mm and correct area bug...                       / (ct_bas(bas)*basns_area(bas))   !units(m)
 
      z_gwsubbas(bas) = z_gwsubbas(bas) - qout_gwsubbas(bas)*DT/( &
-                       ct_bas(bas)*basns_area(bas))*1000.   ! units (mm)	
+                       ct_bas(bas)*basns_area(bas))*1000.   ! units (mm)
 
 !DJG...Combine calculated bucket discharge and amount spilled from bucket...
 !ADCHANGE: Add in surface runoff as direct pass-through

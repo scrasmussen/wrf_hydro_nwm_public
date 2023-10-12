@@ -19,7 +19,7 @@
 !  User controllable options: <if applicable>
 
 MODULE NOAHMP_GLACIER_GLOBALS
-
+  use iso_fortran_env, only: real64
   implicit none
 
 ! ==================================================================================================
@@ -586,8 +586,8 @@ contains
   REAL, DIMENSION(-NSNOW+1:    0)              :: CVSNO   !volumetric specific heat (j/m3/k)
   REAL, DIMENSION(-NSNOW+1:    0)              :: TKSNO   !snow thermal conductivity (j/m3/k)
 
-!++ Model crashed (divided by zero) with REAL instead of REAL*8
-  REAL*8                                         :: ZMID    !mid-point soil depth
+!++ Model crashed (divided by zero) with real instead of real(real64)
+  real(real64)                                 :: ZMID    !mid-point soil depth
 
 ! --------------------------------------------------------------------------------------------------
 

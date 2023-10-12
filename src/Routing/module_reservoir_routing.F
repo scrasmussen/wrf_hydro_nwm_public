@@ -1,5 +1,5 @@
 ! Intended purpose is to provide a module for all subroutines related to
-! reservoir routing, including active management, level pool, and integrating live 
+! reservoir routing, including active management, level pool, and integrating live
 ! data feeds. As of NWMv2.0, this module stub can read in a timeslice file
 ! to incorporate data from external sources, should a data service become available.
 
@@ -17,7 +17,8 @@ implicit none
 contains
 
 subroutine read_reservoir_obs(domainId)
-  use config_base, only: nlst
+   use iso_fortran_env, only: real64
+   use config_base, only: nlst
    use netcdf
    use module_hydro_stop, only: HYDRO_stop
 #ifdef MPP_LAND
@@ -35,15 +36,15 @@ subroutine read_reservoir_obs(domainId)
    real, allocatable, dimension(:) :: poolElev ! Value of time-varying water surface elevation
    real, allocatable, dimension(:) :: resFlow ! Reservoir discharge in cms
    real, allocatable, dimension(:) :: qType ! Reservoir discharge type
-   real*8, allocatable, dimension(:) :: ifd ! Initial fractional depth
-   real*8, allocatable, dimension(:) :: lkArea ! Gridded lake area (sq. km)
-   real*8, allocatable, dimension(:) :: lkMxE ! Maximum lake elevation (m ASL)
-   real*8, allocatable, dimension(:) :: orificeA ! Orifice cross-sectional area (sq. m)
-   real*8, allocatable, dimension(:) :: orificeC ! Orifice coefficient
-   real*8, allocatable, dimension(:) :: orificeE ! Orifice elevation (m ASL)
-   real*8, allocatable, dimension(:) :: weirC ! Weir coefficient
-   real*8, allocatable, dimension(:) :: weirE ! Weir height (m ASL)
-   real*8, allocatable, dimension(:) :: weirL ! Weir length (m)
+   real(real64), allocatable, dimension(:) :: ifd ! Initial fractional depth
+   real(real64), allocatable, dimension(:) :: lkArea ! Gridded lake area (sq. km)
+   real(real64), allocatable, dimension(:) :: lkMxE ! Maximum lake elevation (m ASL)
+   real(real64), allocatable, dimension(:) :: orificeA ! Orifice cross-sectional area (sq. m)
+   real(real64), allocatable, dimension(:) :: orificeC ! Orifice coefficient
+   real(real64), allocatable, dimension(:) :: orificeE ! Orifice elevation (m ASL)
+   real(real64), allocatable, dimension(:) :: weirC ! Weir coefficient
+   real(real64), allocatable, dimension(:) :: weirE ! Weir height (m ASL)
+   real(real64), allocatable, dimension(:) :: weirL ! Weir length (m)
    integer, allocatable, dimension(:) :: ascIndex ! Index to sort lake objects by ascending ID
    integer, allocatable, dimension(:) :: lakeID ! Lake index value
    real, allocatable, dimension(:) :: lakeLat ! Lake latitude values.
@@ -92,7 +93,7 @@ subroutine read_reservoir_obs(domainId)
 
    ! Open up and read in the NetCDF file containing disharge data.
    if(myId .eq. 0) then
-      ! Initialize our missing flag to 0. If at any point we don't find a file, 
+      ! Initialize our missing flag to 0. If at any point we don't find a file,
       ! the flag value will go to 1 to indicate no files were found.
       missingFlag = 0
 

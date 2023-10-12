@@ -30,7 +30,7 @@ use module_reservoir, only: reservoir
 use module_RT_data, only: rt_domain
 use module_hydro_stop, only: HYDRO_stop
 
-use iso_fortran_env, only: int64
+use iso_fortran_env, only: int64, real64
 
 #endif
 implicit none
@@ -640,7 +640,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
 
         !-- lake params
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: RESHT    !-- reservoir height (m)
-        REAL*8,  DIMENSION(NLAKES)    :: QLAKEI8   !-- lake inflow (cms)
+        REAL(REAL64),  DIMENSION(NLAKES)          :: QLAKEI8   !-- lake inflow (cms)
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEI   !-- lake inflow (cms)
         REAL,                DIMENSION(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
@@ -648,9 +648,9 @@ END SUBROUTINE SUBMUSKINGCUNGE
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
         !REAL, DIMENSION(NLINKS)                   :: QLateral !--lateral flow
         REAL, DIMENSION(NLINKS)                   :: QSUM     !--mass bal of node
-        REAL*8, DIMENSION(NLINKS)                   :: QSUM8     !--mass bal of node
+        REAL(REAL64), DIMENSION(NLINKS)           :: QSUM8     !--mass bal of node
         REAL, DIMENSION(NLAKES)                   :: QLLAKE   !-- lateral inflow to lake in diffusion scheme
-        REAL*8, DIMENSION(NLAKES)                   :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
+        REAL(REAL64), DIMENSION(NLAKES)           :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
 
 !-- Local Variables
         INTEGER                     :: i,j,k,t,m,jj,kk,KRT,node
@@ -671,14 +671,14 @@ END SUBROUTINE SUBMUSKINGCUNGE
         integer(kind=int64) link_location(ixrt,jxrt)
         real     ywtmp(ixrt,jxrt)
         integer LNLINKSL
-        real*8,  dimension(LNLINKSL) :: LQLateral
+        real(real64), dimension(LNLINKSL) :: LQLateral
 !        real*4,  dimension(LNLINKSL) :: LQLateral
         integer, dimension(:) ::  toNodeInd
         integer(kind=int64), dimension(:,:) ::  gtoNode
         integer  :: nToNodeInd
         real, dimension(nToNodeInd,2) :: gQLINK
 #else
-        real*8, dimension(NLINKS)                   :: LQLateral !--lateral flow
+        real(real64), dimension(NLINKS) :: LQLateral !--lateral flow
 #endif
         integer flag
 
@@ -1661,7 +1661,7 @@ end subroutine drive_CHANNEL
 
        real, dimension(:), intent(inout)     :: QLateral !--lateral flow
        real, dimension(:), intent(out)       :: velocity, qloss
-       real*8, dimension(:), intent(inout)     :: accSfcLatRunoff, accBucket
+       real(real64), dimension(:), intent(inout) :: accSfcLatRunoff, accBucket
        real  , dimension(:), intent(out)     :: qSfcLatRunoff  ,   qBucket
 
        real ,  dimension(NLINKSL,2) :: tmpQLINK
@@ -1706,8 +1706,8 @@ end subroutine drive_CHANNEL
        real, intent(INOUT), dimension(:)           :: CVOL
 
 #ifdef MPP_LAND
-       real*8,  dimension(LNLINKSL) :: LQLateral
-       real*8,  dimension(LNLINKSL) :: tmpLQLateral
+       real(real64), dimension(LNLINKSL) :: LQLateral
+       real(real64), dimension(LNLINKSL) :: tmpLQLateral
        real,  dimension(NLINKSL)    :: tmpQLateral
 
        integer nlinks_index(:)
@@ -1719,7 +1719,7 @@ end subroutine drive_CHANNEL
        integer  :: nToNodeInd
        real, dimension(nToNodeInd,2) :: gQLINK
 #else
-       real*8,  dimension(NLINKS) :: tmpLQLateral
+       real(real64), dimension(NLINKS) :: tmpLQLateral
        real,  dimension(NLINKSL) :: tmpQLateral
        real,  dimension(NLINKSL) :: LQLateral
 #endif

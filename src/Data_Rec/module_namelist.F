@@ -34,6 +34,7 @@ module module_namelist
 contains
 
     subroutine read_rt_nlst(nlst)
+          use iso_fortran_env, only: real64
           implicit none
 
           TYPE(namelist_rt_field) nlst
@@ -71,7 +72,7 @@ contains
           character(len=256) :: GWBUCKPARM_file = ""
           integer :: reservoir_data_ingest ! STUB FOR USE OF REALTIME RESERVOIR DISCHARGE DATA. CURRENTLY NOT IN USE.
        integer :: SOLVEG_INITSWC
-       real*8 :: out_dt, rst_dt
+       real(real64) :: out_dt, rst_dt
        character(len=256)  :: RESTART_FILE = ""
        character(len=256)  :: hydrotbl_f   = ""
        logical            :: GwPreDiag, GwSpinUp

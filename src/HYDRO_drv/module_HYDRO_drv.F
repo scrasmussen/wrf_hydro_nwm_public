@@ -49,6 +49,7 @@ module module_HYDRO_drv
 #endif
    use module_hydro_stop, only: HYDRO_stop
    use module_UDMAP, only: get_basn_area_nhd
+   use iso_fortran_env, only: real64
    use netcdf
 
    implicit none
@@ -68,7 +69,7 @@ module module_HYDRO_drv
   integer, parameter :: r4 = selected_real_kind(4)
   real,    parameter :: zeroFlt=0.0000000000000000000_r4
   integer, parameter :: r8 = selected_real_kind(8)
-  real*8,  parameter :: zeroDbl=0.0000000000000000000_r8
+  real(real64), parameter :: zeroDbl=0.0000000000000000000_r8
 
    contains
    subroutine HYDRO_rst_out(did)

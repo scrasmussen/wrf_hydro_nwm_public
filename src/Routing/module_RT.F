@@ -41,7 +41,7 @@ MODULE module_Routing
    use module_rfc_forecasts, only: rfc_forecasts
    use module_hydro_stop, only: HYDRO_stop
    use hashtable
-   use iso_fortran_env, only: int64
+   use iso_fortran_env, only: int64, real64
 #ifdef OUTPUT_CHAN_CONN
 #ifdef MPP_LAND
    use mpi
@@ -52,7 +52,7 @@ MODULE module_Routing
 
 
    integer, parameter :: r8 = selected_real_kind(8)
-   real*8,  parameter :: zeroDbl=0.0000000000000000000_r8
+   real(real64), parameter :: zeroDbl=0.0000000000000000000_r8
    integer, parameter :: r4 = selected_real_kind(4)
    real  ,  parameter :: zeroFlt=0.0000000000000000000_r4
 

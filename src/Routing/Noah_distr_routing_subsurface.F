@@ -572,7 +572,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                               mpp_land_com_real8, my_id, mpp_land_com_real
 #endif
    use module_hydro_stop, only:HYDRO_stop
-
+   use iso_fortran_env, only: real64
    implicit none
 
    ! Passed variables
@@ -603,7 +603,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    real    :: qqsub ! net subsurface flow out of cell (m3/s?)
    real    :: waterToRoute ! total water to route from cell (m)
    ! Local arrays
-   real*8, DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
+   real(real64), DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
    ! Local parameters
    real :: tmp_dist(9)
 

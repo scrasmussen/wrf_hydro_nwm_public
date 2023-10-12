@@ -33,6 +33,7 @@ module module_HRLDAS_HYDRO
     use module_rt_data, only:  rt_domain
     use config_base, only: nlst
     use module_gw_gw2d_data, only: gw2d
+    use iso_fortran_env, only: real64
 
     implicit none
     integer begg, endg
@@ -66,7 +67,7 @@ CONTAINS
 
         integer :: i,j
 
-        real*8 :: t1, t2, dact
+        real(real64) :: t1, t2, dact
         integer :: clock_count_1, clock_count_2, clock_rate
         save dact
 

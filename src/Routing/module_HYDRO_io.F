@@ -35,7 +35,7 @@ module module_HYDRO_io
    use netcdf
    use module_hydro_stop, only:HYDRO_stop
    use hashtable
-   use iso_fortran_env, only: int64, compiler_version
+   use iso_fortran_env, only: int64, real64, compiler_version
 
    implicit none
 
@@ -1789,8 +1789,8 @@ end subroutine get_albedo12m_netcdf
     character(len=*),          intent(in)                :: geo_finegrid_flnm
     real,             dimension(nsoil),       intent(in) :: sldpth
     real, allocatable, DIMENSION(:,:)                   :: xdumd  !-- decimated variable
-    real*8, allocatable, DIMENSION(:)                   :: xcoord_d
-    real*8, allocatable, DIMENSION(:)                   :: ycoord_d, ycoord
+    real(real64), allocatable, DIMENSION(:)                   :: xcoord_d
+    real(real64), allocatable, DIMENSION(:)                   :: ycoord_d, ycoord
 
     integer, save :: ncid,ncstatic
     integer, save :: output_count
@@ -2321,8 +2321,8 @@ endif
     character(len=*),                         intent(in) :: date
     character(len=*),          intent(in)                :: geo_finegrid_flnm
     real, allocatable, DIMENSION(:,:)                   :: xdumd  !-- decimated variable
-    real*8, allocatable, DIMENSION(:)                   :: xcoord_d, xcoord
-    real*8, allocatable, DIMENSION(:)                   :: ycoord_d, ycoord
+    real(real64), allocatable, DIMENSION(:)                   :: xcoord_d, xcoord
+    real(real64), allocatable, DIMENSION(:)                   :: ycoord_d, ycoord
 
     integer, save :: ncid,ncstatic
     integer, save :: output_count
@@ -2646,8 +2646,8 @@ subroutine sub_output_gw(igrid, split_output_count, ixrt, jxrt, nsoil, &
     character(len=*),          intent(in)                :: geo_finegrid_flnm
     real,             dimension(nsoil),       intent(in) :: sldpth
     real, allocatable, DIMENSION(:,:)                   :: xdumd  !-- decimated variable
-    real*8, allocatable, DIMENSION(:)                   :: xcoord_d, xcoord
-    real*8, allocatable, DIMENSION(:)                   :: ycoord_d, ycoord
+    real(real64), allocatable, DIMENSION(:)                   :: xcoord_d, xcoord
+    real(real64), allocatable, DIMENSION(:)                   :: ycoord_d, ycoord
 
     integer, save :: ncid,ncstatic
     integer, save :: output_count
@@ -3137,7 +3137,7 @@ subroutine sub_output_gw(igrid, split_output_count, ixrt, jxrt, nsoil, &
      INTEGER  OTXDIMS(OTDIMS) ! variable shape
      INTEGER  OTSTART(OTDIMS), OTCOUNT(OTDIMS)
 
-     real*8, dimension(:), intent(in) :: accSfcLatRunoff, accBucket
+     real(real64), dimension(:), intent(in) :: accSfcLatRunoff, accBucket
      real,   dimension(:), intent(in) ::   qSfcLatRunoff,   qBucket, qBtmVertRunoff
 
      !! currently, this is the time of the hydro model, it's
@@ -3892,7 +3892,7 @@ end subroutine output_chrt
      INTEGER  OTXDIMS(OTDIMS) ! variable shape
      INTEGER  OTSTART(OTDIMS), OTCOUNT(OTDIMS)
 
-     real*8, dimension(:), intent(in) :: accSfcLatRunoff, accBucket
+     real(real64), dimension(:), intent(in) :: accSfcLatRunoff, accBucket
      real,   dimension(:), intent(in) ::   qSfcLatRunoff,   qBucket, qBtmVertRunoff
 
      !! currently, this is the time of the hydro model, it's
@@ -4597,9 +4597,9 @@ end subroutine output_chrt_bak
       real,allocatable,dimension(:,:) :: g_qlink
       integer  :: gsize
       character(len=15),allocatable,dimension(:) :: g_gages
-      real*8, dimension(:), intent(in) ::   accSfcLatRunoff,   accBucket
+      real(real64), dimension(:), intent(in) ::   accSfcLatRunoff,   accBucket
       real  , dimension(:), intent(in) ::     qSfcLatRunoff,     qBucket, qBtmVertRunoff
-      real*8,allocatable,dimension(:)  :: g_accSfcLatRunoff, g_accBucket
+      real(real64),allocatable,dimension(:)  :: g_accSfcLatRunoff, g_accBucket
       real  ,allocatable,dimension(:)  ::   g_qSfcLatRunoff,   g_qBucket, g_qBtmVertRunoff
 
         gsize = gNLINKS
@@ -6588,11 +6588,11 @@ end if  ! end if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
            implicit none
            integer:: ncid,varid , iret, n
            character(len=*) varName
-           real*8, dimension(:) :: inVar
+           real(real64), dimension(:) :: inVar
 
 #ifdef MPP_LAND
            integer:: gnlinksl
-           real*8,allocatable,dimension(:) :: g_var
+           real(real64),allocatable,dimension(:) :: g_var
            if(my_id .eq. io_id) then
                 allocate(g_var(gnlinksl))
                 g_var  = 0
@@ -7334,13 +7334,13 @@ end subroutine RESTART_IN_nc
       subroutine read_rst_crt_reach_nc_real8(ncid, var_out, varStr, gnlinksl, fatalErr)
          implicit none
          integer, intent(in)          ::  ncid, gnlinksl
-         real*8, dimension(:), intent(inout) ::  var_out
+         real(real64), dimension(:), intent(inout) ::  var_out
          character(len=*), intent(in) :: varStr
          logical, optional, intent(in)       ::  fatalErr
 
          integer :: varid, n, iret, l, g
          logical :: fatalErr_local
-         real*8,allocatable,dimension(:) ::  var
+         real(real64),allocatable,dimension(:) ::  var
          real :: scale_factor, add_offset
 
          fatalErr_local = .false.
@@ -9528,7 +9528,7 @@ end subroutine readBucket_nhd
 #endif
      real, dimension(:), intent(in) :: QLateral, velocity
      integer, intent(in) :: io_config_outputs
-     real*8, dimension(:), intent(in) :: accSfcLatRunoff, accBucket
+     real(real64), dimension(:), intent(in) :: accSfcLatRunoff, accBucket
      real  , dimension(:), intent(in) ::   qSfcLatRunoff,   qBucket, qBtmVertRunoff
      integer, intent(in) :: UDMP_OPT
 
@@ -9546,7 +9546,7 @@ end subroutine readBucket_nhd
       integer(kind=int64), allocatable, dimension(:) :: g_linkid
       real,allocatable,dimension(:,:) :: g_qlink
       integer  :: gsize
-      real*8, allocatable, dimension(:) :: g_accSfcLatRunoff, g_accBucket
+      real(real64), allocatable, dimension(:) :: g_accSfcLatRunoff, g_accBucket
       real  , allocatable, dimension(:) ::    g_qSfcLatRunoff,  g_qBucket, g_qBtmVertRunoff
       real, allocatable, dimension(:)   :: g_QLateral, g_velocity
 
@@ -9737,7 +9737,7 @@ end subroutine mpp_output_chrt2
 #endif
      real, dimension(:), intent(in) :: QLateral, velocity
      integer, intent(in) :: io_config_outputs
-     real*8, dimension(nlinks), intent(in) :: accSfcLatRunoff, accBucket
+     real(real64), dimension(nlinks), intent(in) :: accSfcLatRunoff, accBucket
      real  , dimension(nlinks), intent(in) ::   qSfcLatRunoff,   qBucket, qBtmVertRunoff
      integer  :: UDMP_OPT
 
@@ -11299,10 +11299,10 @@ character :: hgrid
 character(len=*):: olddateIn,indir
 character(len=19) :: olddate
 character(len=256):: fileName
-real*8, allocatable, dimension(:):: accBucket_in, accSfcLatRunoff_in
+real(real64), allocatable, dimension(:):: accBucket_in, accSfcLatRunoff_in
 real  , allocatable, dimension(:)::   qBucket_in,   qSfcLatRunoff_in
 integer, parameter :: r8 = selected_real_kind(8)
-real*8,  parameter :: zeroDbl=0.0000000000000000000_r8
+real(real64),  parameter :: zeroDbl=0.0000000000000000000_r8
 integer :: ovrtswcrt_in, noah_timestep_in, channel_only_in, channelBucket_only_in
 character(len=86) :: attNotInFileMsg
 

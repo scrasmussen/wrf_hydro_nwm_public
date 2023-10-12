@@ -32,6 +32,7 @@ module module_HRLDAS_HYDRO
     use config_base, only: nlst
     use module_gw_gw2d_data, only: gw2d
     use module_hydro_stop, only:HYDRO_stop
+    use iso_fortran_env, only: real64
 
     implicit none
     integer begg, endg
@@ -89,7 +90,7 @@ CONTAINS
 
         integer :: i,j
 
-        real*8 :: t1, t2, dact
+        real(real64) :: t1, t2, dact
         save dact
 
 

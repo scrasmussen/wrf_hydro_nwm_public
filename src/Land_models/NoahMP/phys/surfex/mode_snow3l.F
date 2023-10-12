@@ -1,6 +1,6 @@
 !SFX_LIC Copyright 1994-2014 CNRS, Meteo-France and Universite Paul Sabatier
 !SFX_LIC This is part of the SURFEX software governed by the CeCILL-C licence
-!SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
+!SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt
 !SFX_LIC for details. version 1.
 !     ##################
       MODULE MODE_SNOW3L
@@ -733,9 +733,9 @@ END FUNCTION SNOW3LSCAP_0D
 !####################################################################
 !####################################################################
 !####################################################################
-      FUNCTION SNOW3L_MARBOUTY(PSNOWRHO,PSNOWTEMP,PGRADT) RESULT(PDANGL) 
+      FUNCTION SNOW3L_MARBOUTY(PSNOWRHO,PSNOWTEMP,PGRADT) RESULT(PDANGL)
 !**** *ZDANGL* - CROISSANCE DES GRAINS NON DENDRITIQUES ET ANGULEUX .
-!              - GROWTH RATES FOR NON DENDRITIC GRAINS WITH SPHERICITY=0 
+!              - GROWTH RATES FOR NON DENDRITIC GRAINS WITH SPHERICITY=0
 
 
 !     OBJET.
@@ -752,7 +752,7 @@ END FUNCTION SNOW3LSCAP_0D
 
 !     METHODE.
 !     --------
-!     THE FUNCTION RETURN A VALUE BETWEEN 0 AND 1 WHICH IS USED IN THE DETERMINATION OF THE 
+!     THE FUNCTION RETURN A VALUE BETWEEN 0 AND 1 WHICH IS USED IN THE DETERMINATION OF THE
 !     GROWTH RATE FOR THE CONSIDERED LAYER.
 !     THIS VALUE (WITHOUT UNIT) IS THE PRODUCT OF 3 FUNCTIONS (WHICH HAVE THEIR SOLUTIONS BETWEEN 0 AND 1) :
 !     F(TEMPERATURE) * H(DENSITY) * G(TEMPERATURE GRADIENT)
@@ -762,7 +762,7 @@ END FUNCTION SNOW3LSCAP_0D
 
 !     REFERENCES.
 !     -----------
-!        MARBOUTY D (1980) AN EXPERIMENTAL STUDY OF TEMPERATURE GRADIENT 
+!        MARBOUTY D (1980) AN EXPERIMENTAL STUDY OF TEMPERATURE GRADIENT
 !                          METAMORPHISM J GLACIOLOGY
 
 !     AUTEURS.
@@ -773,7 +773,7 @@ END FUNCTION SNOW3LSCAP_0D
 !     --------------
 !        08/95: YANNICK DANIELOU - CODAGE A LA NORME DOCTOR.
 !        03/06: JM WILLEMET      - F90 AND SI UNITS
-!        01/08: JM WILLEMET      - ERROR ON THE FORMULATION OF G FUNCTION (WITH GRADIENT) IS CORRECTED 
+!        01/08: JM WILLEMET      - ERROR ON THE FORMULATION OF G FUNCTION (WITH GRADIENT) IS CORRECTED
 
 USE MODD_CSTS, ONLY : XTT
 USE MODD_SNOW_METAMO
@@ -1062,7 +1062,7 @@ ELSEIF(INLVLS == 12)THEN
                & PSNOWDZ_OLD(:, 2) < ZCOEF1 * MIN(ZDZ2 ,PSNOW(:)/INLVLS) .OR. &
                & PSNOWDZ_OLD(:, 2) > ZCOEF2 * MIN(ZDZ2 ,PSNOW(:)/INLVLS) .OR. &
                & PSNOWDZ_OLD(:,12) < ZCOEF1 * MIN(ZDZN0,PSNOW(:)/INLVLS) .OR. &
-               & PSNOWDZ_OLD(:,12) > ZCOEF2 * MIN(ZDZN0,PSNOW(:)/INLVLS) 
+               & PSNOWDZ_OLD(:,12) > ZCOEF2 * MIN(ZDZN0,PSNOW(:)/INLVLS)
   ENDIF
 !
   WHERE(GREGRID(:))
@@ -1118,7 +1118,7 @@ ELSE !(INLVLS>=10 and /=12)
                & PSNOWDZ_OLD(:,     2) < ZCOEF1 * MIN(ZDZ2         ,PSNOW(:)/INLVLS) .OR. &
                & PSNOWDZ_OLD(:,     2) > ZCOEF2 * MIN(ZDZ2         ,PSNOW(:)/INLVLS) .OR. &
                & PSNOWDZ_OLD(:,INLVLS) < ZCOEF1 * MIN(0.05*PSNOW(:),PSNOW(:)/INLVLS) .OR. &
-               & PSNOWDZ_OLD(:,INLVLS) > ZCOEF2 * MIN(0.05*PSNOW(:),PSNOW(:)/INLVLS) 
+               & PSNOWDZ_OLD(:,INLVLS) > ZCOEF2 * MIN(0.05*PSNOW(:),PSNOW(:)/INLVLS)
   ENDIF
 !
   WHERE(GREGRID(:))
@@ -1134,7 +1134,7 @@ ELSE !(INLVLS>=10 and /=12)
      DO JI=1,INI
         IF(GREGRID(JI))THEN
           ZWORK(JI) = PSNOWDZ(JI,1)+PSNOWDZ(JI,2)+PSNOWDZ(JI,3)+PSNOWDZ(JI,4)+PSNOWDZ(JI,5)
-          PSNOWDZ(JI,JJ) = (PSNOW(JI)-ZWORK(JI)-PSNOWDZ(JI,INLVLS))/(INLVLS-6) 
+          PSNOWDZ(JI,JJ) = (PSNOW(JI)-ZWORK(JI)-PSNOWDZ(JI,INLVLS))/(INLVLS-6)
         ENDIF
      ENDDO
   ENDDO
@@ -1421,7 +1421,7 @@ ELSE
                & PSNOWDZ_OLD(     2) < ZCOEF1 * MIN(ZDZ2      ,PSNOW/INLVLS) .OR. &
                & PSNOWDZ_OLD(     2) > ZCOEF2 * MIN(ZDZ2      ,PSNOW/INLVLS) .OR. &
                & PSNOWDZ_OLD(INLVLS) < ZCOEF1 * MIN(0.05*PSNOW,PSNOW/INLVLS) .OR. &
-               & PSNOWDZ_OLD(INLVLS) > ZCOEF2 * MIN(0.05*PSNOW,PSNOW/INLVLS) 
+               & PSNOWDZ_OLD(INLVLS) > ZCOEF2 * MIN(0.05*PSNOW,PSNOW/INLVLS)
   ENDIF
 !
   IF (GREGRID)THEN
@@ -1469,7 +1469,7 @@ IMPLICIT NONE
 REAL, DIMENSION(:), INTENT(IN)  :: PSNOWDZN,PSNOWDZ,PSNOWRHO,PSNOWDDZ
 !
 REAL, DIMENSION(:), INTENT(IN)  :: PSNOWGRAN1,PSNOWGRAN2,PSNOWHIST
-REAL, DIMENSION(:), INTENT(OUT) :: PSNOWGRAN1N,PSNOWGRAN2N,PSNOWHISTN                                              
+REAL, DIMENSION(:), INTENT(OUT) :: PSNOWGRAN1N,PSNOWGRAN2N,PSNOWHISTN
 !
 INTEGER, INTENT(IN) :: KL1  ! Indice couche de reference (i)
 INTEGER, INTENT(IN) :: KL2 ! Indice de la couche (i-1 ou i+1) dont une
@@ -1516,10 +1516,10 @@ IF (  PSNOWGRAN1(KL1)*PSNOWGRAN1(KL2)>0.0 .OR. &
   !code original vincent          PSNOWGRAN1N(KL1)=(PSNOWGRAN1(KL1)*PSNOWRHO(KL1)&
   !code original vincent        *(PSNOWDZN(KL1)-(1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))-ZDELTA*&
   !code original vincent        ABS(PSNOWDDZ(KL2)))+PSNOWGRAN1(KL2)*                   &
-  !code original vincent        PSNOWRHO(KL2)*((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+        &   
+  !code original vincent        PSNOWRHO(KL2)*((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+        &
   !code original vincent        ZDELTA*ABS(PSNOWDDZ(KL2))))/((PSNOWDZN(KL1)-(1.0-ZDELTA)&
   !code original vincent        *ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2)))*        &
-  !code original vincent        PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+        &   
+  !code original vincent        PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+        &
   !code original vincent        ZDELTA*ABS(PSNOWDDZ(KL2)))*PSNOWRHO(KL2))
   !code original vincent !
   !code original vincent          PSNOWGRAN2N(KL1)=(PSNOWGRAN2(KL1)*PSNOWRHO(KL1) &
@@ -1528,7 +1528,7 @@ IF (  PSNOWGRAN1(KL1)*PSNOWGRAN1(KL2)>0.0 .OR. &
   !code original vincent        PSNOWRHO(KL2)*((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))        &
   !code original vincent        +ZDELTA*ABS(PSNOWDDZ(KL2))))/((PSNOWDZN(KL1)-(1.0-ZDELTA)&
   !code original vincent        *ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2)))*        &
-  !code original vincent        PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+        &   
+  !code original vincent        PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+        &
   !code original vincent        ZDELTA*ABS(PSNOWDDZ(KL2)))*PSNOWRHO(KL2))
   !
   !plm
@@ -1568,7 +1568,7 @@ ELSE
     !code original vincent            (1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2))))/&
     !code original vincent            ((PSNOWDZN(KL1)-(1.0-ZDELTA)*                                    &
     !code original vincent            ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2)))*            &
-    !code original vincent            PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+          &   
+    !code original vincent            PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+          &
     !code original vincent            ZDELTA*ABS(PSNOWDDZ(KL2)))*PSNOWRHO(KL2))
     !
     !plm
@@ -1582,17 +1582,17 @@ ELSE
     !code original vincent            (1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2))))/&
     !code original vincent            ((PSNOWDZN(KL1)-(1.0-ZDELTA)*                                    &
     !code original vincent            ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2)))*            &
-    !code original vincent            PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+          &   
+    !code original vincent            PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+          &
     !code original vincent            ZDELTA*ABS(PSNOWDDZ(KL2)))*PSNOWRHO(KL2))
 
     !plm
-    CALL GET_AGREG(IDENT,IVIEU,ZSPHERD(KL1),ZSPHERV(KL1),ZSPHERN(KL1))   
+    CALL GET_AGREG(IDENT,IVIEU,ZSPHERD(KL1),ZSPHERV(KL1),ZSPHERN(KL1))
     !plm
     !
   ELSE
     !code original vincent        ZDIAMN(KL1)= (ZDIAMD(KL1)*PSNOWRHO(IDENT)*&
     !code original vincent            ((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+ZDELTA*ABS(PSNOWDDZ(KL2)))&
-    !code original vincent            +ZDIAMV(KL1)*PSNOWRHO(IVIEU)*(PSNOWDZN(IVIEU)-(1.0-ZDELTA)*  & 
+    !code original vincent            +ZDIAMV(KL1)*PSNOWRHO(IVIEU)*(PSNOWDZN(IVIEU)-(1.0-ZDELTA)*  &
     !code original vincent            ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2))))/&
     !code original vincent            ((PSNOWDZN(KL1)-(1.0-ZDELTA)*                          &
     !code original vincent            ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2)))*    &
@@ -1601,11 +1601,11 @@ ELSE
     !code original vincent!
     !code original vincent         ZSPHERN(KL1)= (ZSPHERD(KL1)*PSNOWRHO(IDENT)*&
     !code original vincent            ((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+ZDELTA*ABS(PSNOWDDZ(KL2)))&
-    !code original vincent            +ZSPHERV(KL1)*PSNOWRHO(IVIEU)*(PSNOWDZN(IVIEU)-(1.0-ZDELTA)* & 
+    !code original vincent            +ZSPHERV(KL1)*PSNOWRHO(IVIEU)*(PSNOWDZN(IVIEU)-(1.0-ZDELTA)* &
     !code original vincent            ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2))))/&
     !code original vincent            ((PSNOWDZN(KL1)-(1.0-ZDELTA)*                                    &
     !code original vincent            ABS(PSNOWDDZ(KL1))-ZDELTA*ABS(PSNOWDDZ(KL2)))*            &
-    !code original vincent            PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+          &   
+    !code original vincent            PSNOWRHO(KL1)+((1.0-ZDELTA)*ABS(PSNOWDDZ(KL1))+          &
     !code original vincent            ZDELTA*ABS(PSNOWDDZ(KL2)))*PSNOWRHO(KL2))
     !plm
     !
@@ -1654,14 +1654,14 @@ REAL, INTENT(OUT) :: PFIELD
 PFIELD = ( PFIELD1 * PSNOWRHO(KID1) * ( PSNOWDZN(KID1) - ABS(PSNOWDDZ(IL)) ) &
          + PFIELD2 * PSNOWRHO(KID2) * ABS(PSNOWDDZ(IL))                        ) / &
          (           PSNOWRHO (KL1) * ( PSNOWDZN (KL1) - ABS(PSNOWDDZ(IL)) ) + &
-                     PSNOWRHO (KL2) * ABS(PSNOWDDZ(IL))                        ) 
+                     PSNOWRHO (KL2) * ABS(PSNOWDDZ(IL))                        )
 !
 !IF (LHOOK) CALL DR_HOOK('MODE_SNOW3L:SNOW3LAGREG:GET_AGREG',1,ZHOOK_HANDLE)
 !
 END SUBROUTINE GET_AGREG
 !
 END SUBROUTINE SNOW3LAGREG
-!###############################################################################    
+!###############################################################################
 !###############################################################################
 !
 !
@@ -1681,7 +1681,7 @@ IMPLICIT NONE
 !
 REAL, DIMENSION(:,:), INTENT(INOUT)  :: PSNOWGRAN1,PSNOWGRAN2,PSNOWHIST
 ! ajout EB
-REAL, DIMENSION(:,:), INTENT(INOUT)  :: PSNOWGRAN1N,PSNOWGRAN2N,PSNOWHISTN 
+REAL, DIMENSION(:,:), INTENT(INOUT)  :: PSNOWGRAN1N,PSNOWGRAN2N,PSNOWHISTN
 !
 REAL, DIMENSION(:), INTENT(IN)    :: PNDENT, PNVIEU
 !
@@ -1739,7 +1739,7 @@ DO JI = 1,INI
       PSNOWGRAN2N(JI,:) = ZGRAN2(JI) / PNDENT(JI)
       PSNOWHISTN (JI,:) = 0.0
       !
-    ELSE                              ! more non dendritic than dendritic snow layers  
+    ELSE                              ! more non dendritic than dendritic snow layers
       !
       DO JL = 1,INLVLS
         IF ( .NOT.GDENDRITIC(JI,JL) ) THEN
@@ -1830,6 +1830,7 @@ SUBROUTINE GET_MASS_HEAT(KJ,KNLVLS_NEW,KNLVLS_OLD,                              
                          PSNOWAGEN, PSNOWHEATN,HSNOWMETAMO                        )
 !
 USE MODD_SNOW_PAR, ONLY : XSNOWCRITD, XD1, XD2, XD3, XX, XVALB5, XVALB6
+use iso_fortran_env, only: real64
 !
 !USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 !USE PARKIND1  ,ONLY : JPRB
@@ -1838,14 +1839,14 @@ IMPLICIT NONE
 !
 INTEGER, INTENt(IN) :: KJ
 INTEGER, INTENT(IN) :: KNLVLS_NEW, KNLVLS_OLD
-! trude, changed from REAL, to REAL*8
-REAL*8, DIMENSION(:), INTENT(IN) :: PSNOWZTOP_OLD, PSNOWZBOT_OLD
-REAL*8, DIMENSION(:), INTENT(IN) :: PSNOWZTOP_NEW, PSNOWZBOT_NEW
-REAL*8, DIMENSION(:), INTENT(IN) :: PSNOWRHOO, PSNOWDZO, PSNOWGRAN1O, PSNOWGRAN2O, &
+! trude, changed from real, to real(real64)
+real(real64), DIMENSION(:), INTENT(IN) :: PSNOWZTOP_OLD, PSNOWZBOT_OLD
+real(real64), DIMENSION(:), INTENT(IN) :: PSNOWZTOP_NEW, PSNOWZBOT_NEW
+real(real64), DIMENSION(:), INTENT(IN) :: PSNOWRHOO, PSNOWDZO, PSNOWGRAN1O, PSNOWGRAN2O, &
                                   PSNOWHISTO, PSNOWAGEO, PSNOWHEATO
 REAL,  DIMENSION(:), INTENT(IN) :: PSNOWDZN
  CHARACTER(3), INTENT(IN)       :: HSNOWMETAMO
-REAL*8, DIMENSION(:), INTENT(OUT) :: PSNOWRHON, PSNOWGRAN1N, PSNOWGRAN2N, &
+real(real64), DIMENSION(:), INTENT(OUT) :: PSNOWRHON, PSNOWGRAN1N, PSNOWGRAN2N, &
                                    PSNOWHISTN, PSNOWAGEN, PSNOWHEATN
 !
 REAL :: ZPROPOR, ZMASDZ_OLD, ZDIAM, ZMASTOT_T07
@@ -1913,7 +1914,7 @@ DO JST_NEW = 1,KNLVLS_NEW
         ! contribution to the grain optical size and then to the albedo
         IF ( PSNOWGRAN1O(JST_OLD)<0. ) THEN
           ZDIAM = -PSNOWGRAN1O(JST_OLD)*XD1/XX + (1.+PSNOWGRAN1O(JST_OLD)/XX) * &
-                 ( PSNOWGRAN2O(JST_OLD)*XD2/XX + (1.-PSNOWGRAN2O(JST_OLD)/XX)*XD3 ) 
+                 ( PSNOWGRAN2O(JST_OLD)*XD2/XX + (1.-PSNOWGRAN2O(JST_OLD)/XX)*XD3 )
           ZDIAM = ZDIAM/10000.
           ZDENTMOYN  = ZDENTMOYN  - ZMASDZ_OLD * PSNOWGRAN1O(JST_OLD) / XX
           ZSPHERMOYN = ZSPHERMOYN + ZMASDZ_OLD * PSNOWGRAN2O(JST_OLD) / XX

@@ -24,7 +24,7 @@ MODULE MODULE_mpp_GWBUCKET
   use MODULE_CPL_LAND, only: HYDRO_COMM_WORLD
   use module_mpp_land, only:  io_id, my_id, mpp_status, mpp_land_max_int1, numprocs, &
                  mpp_land_bcast_real, sum_real8,  mpp_land_sync
-  use iso_fortran_env, only: int64
+  use iso_fortran_env, only: int64, real64
   use mpi
   implicit none
 
@@ -80,10 +80,10 @@ MODULE MODULE_mpp_GWBUCKET
      integer, intent(in) :: numbasns
      integer :: i, ierr, tag, tag2,k
      real,intent(in), dimension(numbasns) :: inV
-     integer(kind=int64), intent(in), dimension(numbasns) :: ind
+     integer(int64), intent(in), dimension(numbasns) :: ind
      real, dimension(:) :: outV
      real, allocatable,dimension(:) :: vbuff
-     integer(kind=int64), allocatable,dimension(:) :: ibuff
+     integer(int64), allocatable,dimension(:) :: ibuff
 
      if(gw_ini .ne. 99) then
         stop "FATAL ERROR: mpp_GWBUCKET not initialized."
@@ -137,11 +137,11 @@ MODULE MODULE_mpp_GWBUCKET
       implicit none
       integer, intent(in) :: numbasns
       integer :: i, ierr, tag, tag2,k
-      integer(kind=int64),intent(in), dimension(numbasns) :: inV
-      integer(kind=int64),intent(in), dimension(numbasns) :: ind
-      integer(kind=int64), dimension(:) :: outV
-      integer(kind=int64), allocatable,dimension(:) :: vbuff
-      integer(kind=int64), allocatable,dimension(:) :: ibuff
+      integer(int64),intent(in), dimension(numbasns) :: inV
+      integer(int64),intent(in), dimension(numbasns) :: ind
+      integer(int64), dimension(:) :: outV
+      integer(int64), allocatable,dimension(:) :: vbuff
+      integer(int64), allocatable,dimension(:) :: ibuff
 
       if(gw_ini .ne. 99) then
          stop "FATAL ERROR: mpp_GWBUCKET not initialized."
@@ -196,7 +196,7 @@ MODULE MODULE_mpp_GWBUCKET
      integer, intent(in) :: numbasns, gnumbasns
      integer :: i, ierr, tag, bas
      real,intent(in), dimension(:) :: inV
-     integer(kind=int64),intent(in), dimension(:) :: ind
+     integer(int64),intent(in), dimension(:) :: ind
      real, dimension(:) :: outV
      real, dimension(gnumbasns) :: buff
 
@@ -215,9 +215,9 @@ MODULE MODULE_mpp_GWBUCKET
    subroutine gw_sum_real(vinout,nsize,gsize,ind)
        implicit none
        integer nsize,i,j,tag,ierr,gsize, k
-       real*8, dimension(nsize):: vinout
-       integer(kind=int64), dimension(nsize) :: ind
-       real*8, dimension(gsize) :: vbuff
+       real(real64), dimension(nsize):: vinout
+       integer(int64), dimension(nsize) :: ind
+       real(real64), dimension(gsize) :: vbuff
 
        vbuff = 0
        do k = 1, nsize

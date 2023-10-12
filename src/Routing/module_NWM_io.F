@@ -8,7 +8,7 @@ module module_NWM_io
 use module_version, only: get_code_version, get_nwm_version
 use orchestrator_base
 use module_hydro_stop, only: HYDRO_stop
-use iso_fortran_env, only: int64, compiler_version
+use iso_fortran_env, only: int64, real64, compiler_version
 
 implicit none
 
@@ -117,7 +117,7 @@ subroutine output_chrt_NWM(domainId)
    real, allocatable, dimension(:) :: g_QLateral,g_velocity,g_qloss
    real, allocatable, dimension(:) :: g_nudge,g_qSfcLatRunoff
    real, allocatable, dimension(:) :: g_qBucket,g_qBtmVertRunoff,g_accBucket
-   real*8, allocatable, dimension(:) :: g_accSfcLatRunoff
+   real(real64), allocatable, dimension(:) :: g_accSfcLatRunoff
    real, allocatable, dimension(:,:) :: g_qlinkOut
    integer, allocatable, dimension(:) :: g_orderOut
    integer(kind=int64), allocatable, dimension(:) :: g_linkidOut
@@ -125,7 +125,7 @@ subroutine output_chrt_NWM(domainId)
    real, allocatable, dimension(:) :: g_QLateralOut,g_velocityOut,g_qlossOut
    real, allocatable, dimension(:) :: g_nudgeOut,g_qSfcLatRunoffOut
    real, allocatable, dimension(:) :: g_qBucketOut,g_qBtmVertRunoffOut,g_accBucketOut
-   real*8, allocatable, dimension(:) :: g_accSfcLatRunoffOut
+   real(real64), allocatable, dimension(:) :: g_accSfcLatRunoffOut
    real, allocatable, dimension(:,:) :: varOutReal   ! Array holding output variables in real format
    integer, allocatable, dimension(:) :: varOutInt ! Array holding output variables after
                                                      ! scale_factor/add_offset have been applied.
@@ -1145,7 +1145,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    integer, allocatable, dimension(:,:,:) :: globalOutComp
    real, allocatable, dimension(:,:,:) :: globalOutReal
    real, allocatable, dimension(:,:) :: globalRealTmp
-   real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
+   real(real64), allocatable, dimension(:) :: yCoord,xCoord,yCoord2
    real, allocatable, dimension(:,:,:) :: varRealTmp
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
@@ -1909,7 +1909,7 @@ subroutine output_rt_NWM(domainId,iGrid)
    integer, allocatable, dimension(:,:,:) :: globalOutComp
    real, allocatable, dimension(:,:) :: localRealTmp
    real, allocatable, dimension(:,:,:) :: globalOutReal
-   real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
+   real(real64), allocatable, dimension(:) :: yCoord,xCoord,yCoord2
    integer :: numLev ! This will be 4 for soil moisture, and 1 for all other variables.
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
    real :: scaleFactorReciprocal
@@ -3215,7 +3215,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    integer, allocatable, dimension(:,:) :: tmpFlow
    real, allocatable, dimension(:,:) :: tmpFlowReal
    ! allocatable arrays to hold coordinate values
-   real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
+   real(real64), allocatable, dimension(:) :: yCoord,xCoord,yCoord2
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
@@ -3719,7 +3719,7 @@ subroutine output_lsmOut_NWM(domainId)
    integer :: iTmp,jTmp,iTmp2,jTmp2
    integer :: ftnGeo,geoXVarId,geoYVarId
    integer :: waterVal ! Value in HRLDAS in WRFINPUT file used to define water bodies for masking
-   real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
+   real(real64), allocatable, dimension(:) :: yCoord,xCoord,yCoord2
    real :: varRealTmp
    real, allocatable, dimension(:,:) :: localRealTmp, globalOutReal
    !integer, allocatable, dimension(:,:) :: globalCompTmp, localCompTmp

@@ -24,6 +24,7 @@ subroutine OverlandRouting( &
     use module_mpp_land, only:  mpp_land_max_int1,  sum_real1, my_id, io_id, numprocs
     use overland_data
 #endif
+    use iso_fortran_env, only: real64
     implicit none
 
     type (overland_struct), intent(inout) :: ovrt_data
@@ -447,7 +448,7 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
         up_id,mpp_land_com_real, my_id, mpp_land_com_real8,&
         mpp_land_sync
 #endif
-
+    use iso_fortran_env, only: real64
     IMPLICIT NONE
 
 
@@ -468,8 +469,8 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: q_sfcflx_x, q_sfcflx_y
     REAL, INTENT(INOUT) :: QBDRYT
     REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
-    REAL*8, DIMENSION(XX,YY) :: QBDRY_tmp, DH
-    REAL*8, DIMENSION(XX,YY) :: DH_tmp
+    REAL(REAL64), DIMENSION(XX,YY) :: QBDRY_tmp, DH
+    REAL(REAL64), DIMENSION(XX,YY) :: DH_tmp
     REAL, DIMENSION(XX,YY) :: edge_adjust ! mm
 
     !!! Declare Local Variables

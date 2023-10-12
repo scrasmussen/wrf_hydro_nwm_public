@@ -1,9 +1,10 @@
 module module_namelist_inc
+   use iso_fortran_env, only: real64
    implicit none
    type namelist_rt_field
        integer :: nsoil, SOLVEG_INITSWC
        real,allocatable,dimension(:) :: ZSOIL8
-       real*8 :: out_dt, rst_dt
+       real(real64) :: out_dt, rst_dt
        real   :: dt  !! dt is NOAH_TIMESTEP
        integer :: START_YEAR, START_MONTH, START_DAY, START_HOUR, START_MIN
        character(len=256)  :: restart_file = ""

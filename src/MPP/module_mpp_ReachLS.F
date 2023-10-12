@@ -21,6 +21,7 @@
 !   This is used as a coupler with the WRF model.
 MODULE MODULE_mpp_ReachLS
 
+  use iso_fortran_env, only: real64
   use module_mpp_land, only:  io_id, my_id, mpp_status, mpp_land_max_int1, mpp_land_sync, HYDRO_COMM_WORLD
   use hashtable
   use mpi
@@ -84,9 +85,9 @@ MODULE MODULE_mpp_ReachLS
 ! for big memory data
      implicit none
      real, dimension(:) :: outV
-     real*8, dimension(:) :: LinkV
+     real(real64), dimension(:) :: LinkV
      real, allocatable, dimension(:) :: gLinkV_r4
-     real*8, allocatable,dimension(:) ::  tmpBuf, gLinkV_r8
+     real(real64), allocatable,dimension(:) ::  tmpBuf, gLinkV_r8
      integer :: ierr, i, tag, k,m,lsize
      integer, allocatable,dimension(:) :: lindex
      if(my_id .eq. io_id) then
@@ -212,8 +213,8 @@ MODULE MODULE_mpp_ReachLS
   subroutine updateLinkV8(LinkV, outV)
      implicit none
      real, dimension(:) :: outV
-     real*8, dimension(:) :: LinkV
-     real*8, dimension(gNlinksl) :: gLinkV,gLinkV_r
+     real(real64), dimension(:) :: LinkV
+     real(real64), dimension(gNlinksl) :: gLinkV,gLinkV_r
      real, dimension(gNlinksl) :: gLinkV_r4
      integer :: ierr, i, tag
      gLinkV = 0.0
@@ -513,8 +514,8 @@ MODULE MODULE_mpp_ReachLS
 
   subroutine ReachLS_decompReal8(inV,outV)
       implicit none
-      real*8,intent(in),dimension(:) :: inV
-      real*8,intent(out),dimension(:) :: outV
+      real(real64),intent(in),dimension(:) :: inV
+      real(real64),intent(out),dimension(:) :: outV
       integer ::  i, ierr, tag
       tag = 11
       if(my_id .eq. io_id) then
@@ -677,8 +678,8 @@ MODULE MODULE_mpp_ReachLS
 
   subroutine ReachLS_wReal8(inV,outV)
       implicit none
-      real*8,intent(in),dimension(:)  :: inV
-      real*8,intent(out),dimension(:) :: outV
+      real(real64),intent(in),dimension(:)  :: inV
+      real(real64),intent(out),dimension(:) :: outV
       integer :: i, ierr, tag, ss  , mm
       outV = 0
       if(my_id .eq. io_id) then
@@ -1341,10 +1342,10 @@ MODULE MODULE_mpp_ReachLS
   subroutine pack_decomp_real8(g1bufid, ndata, nprocs_map, lnsizes, istart,bufid)
      implicit none
      integer :: ndata
-     real*8, dimension(:) :: g1bufid, bufid
+     real(real64), dimension(:) :: g1bufid, bufid
      integer,dimension(:) ::  nprocs_map, lnsizes
      integer :: i,j,k, tag, ierr
-     real*8, allocatable,dimension(:) :: buf
+     real(real64), allocatable,dimension(:) :: buf
      integer, dimension(:) :: istart
      integer, dimension(numprocs) :: count
      ! pack data

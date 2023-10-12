@@ -1,8 +1,7 @@
 module config_base
   !use netcdf_layer_base
-
-  use module_hydro_stop, only:HYDRO_stop
-
+  use iso_fortran_env, only: real64
+  use module_hydro_stop, only: HYDRO_stop
   implicit none
 
   integer, PARAMETER    :: MAX_SOIL_LEVELS = 10   ! maximum soil levels in namelist
@@ -73,7 +72,7 @@ module config_base
      integer :: nsoil, SOLVEG_INITSWC
      integer :: act_lev = 0
      real,allocatable,dimension(:) :: ZSOIL8
-     real*8  :: out_dt, rst_dt
+     real(real64)  :: out_dt, rst_dt
      real    :: dt  !! dt is NOAH_TIMESTEP
      integer :: START_YEAR, START_MONTH, START_DAY, START_HOUR, START_MIN
      character(len=256)  :: restart_file = ""
@@ -508,7 +507,7 @@ contains
     character(len=256) :: GWBUCKPARM_file = ""
     integer :: reservoir_data_ingest ! STUB FOR USE OF REALTIME RESERVOIR DISCHARGE DATA. CURRENTLY NOT IN USE.
     integer :: SOLVEG_INITSWC
-    real*8 :: out_dt, rst_dt
+    real(real64) :: out_dt, rst_dt
     character(len=256)  :: RESTART_FILE = ""
     character(len=256)  :: hydrotbl_f   = ""
     logical            :: GwPreDiag, GwSpinUp

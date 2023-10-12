@@ -5,7 +5,7 @@ module module_rt_inc
    use module_subsurface_input
    use module_subsurface_output
    use module_reservoir, only: reservoir_container
-   use iso_fortran_env, only: int64
+   use iso_fortran_env, only: int64, real64
    implicit none
 
    TYPE RT_FIELD
@@ -184,7 +184,7 @@ module module_rt_inc
   INTEGER, allocatable, DIMENSION(:) :: LAKEIDX ! integer index for lakes, mapped to linkid
 
 !!! accumulated variables for reach beased rt
-  Real*8, allocatable, DIMENSION(:)  :: accSfcLatRunoff, accBucket
+  real(real64), allocatable, DIMENSION(:) :: accSfcLatRunoff, accBucket
   REAL  , allocatable, DIMENSION(:)  ::   qSfcLatRunoff,   qBucket, qBtmVertRunoff
   REAL, allocatable, DIMENSION(:)    :: accLndRunOff, accQLateral, accStrmvolrt
   !REAL, allocatable, DIMENSION(:)    :: qqLndRunOff, qqStrmvolrt, qqBucket

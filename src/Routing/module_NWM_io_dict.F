@@ -11,6 +11,7 @@
 
 module module_NWM_io_dict
 
+  use iso_fortran_env, only: real64
   use module_version, only: get_model_version
   use config_base, only: nlst
   use module_hydro_stop, only: HYDRO_stop
@@ -44,7 +45,7 @@ public :: lsmMeta ! Public metadata for LSMOUT output.
 public :: chObsMeta ! Public CHANOBS metadata for NWM output.
 public :: gwMeta ! Public groundwater metadata.
 
-real*8 :: one_dbl = 1.0d0
+real(real64) :: one_dbl = 1.0d0
 
 ! Establish types for each output type
 type chrtMeta
@@ -63,8 +64,8 @@ type chrtMeta
    character (len=64), dimension(numChVars) :: coordNames ! Coordinate names for each variable.
    integer(kind=4), dimension(numChVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numChVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numChVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numChVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numChVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numChVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numChVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numChVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numChVars) :: fillReal ! Fill value (before conversion to integer)
@@ -142,8 +143,8 @@ type ldasMeta
    integer, dimension(numLdasVars) :: numLev ! Number of levels for each variable.
    integer(kind=4), dimension(numLdasVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numLdasVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numLdasVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numLdasVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numLdasVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numLdasVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numLdasVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numLdasVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numLdasVars) :: fillReal ! Fill value (before conversion to integer)
@@ -215,8 +216,8 @@ type rtDomainMeta
    character (len=64), dimension(numRtDomainVars) :: coordNames ! Coordinate names for each variable.
    integer(kind=4), dimension(numRtDomainVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numRtDomainVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numRtDomainVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numRtDomainVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numRtDomainVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numRtDomainVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numRtDomainVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numRtDomainVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numRtDomainVars) :: fillReal ! Fill value (before conversion to integer)
@@ -286,8 +287,8 @@ type lakeMeta
    character (len=64), dimension(numLakeVars) :: coordNames ! Coordinate names for each variable.
    integer(kind=4), dimension(numLakeVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numLakeVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numLakeVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numLakeVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numLakeVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numLakeVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numLakeVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numLakeVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numLakeVars) :: fillReal ! Fill value (before conversion to integer)
@@ -367,8 +368,8 @@ type chrtGrdMeta
    character (len=64), dimension(numChGrdVars) :: coordNames ! Coordinate names for each variable.
    integer(kind=4), dimension(numChGrdVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numChGrdVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numChGrdVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numChGrdVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numChGrdVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numChGrdVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numChGrdVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numChGrdVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numChGrdVars) :: fillReal ! Fill value (before conversion to integer)
@@ -443,8 +444,8 @@ type lsmMeta
    integer, dimension(numLsmVars) :: numLev ! Number of levels for each variable.
    integer(kind=4), dimension(numLsmVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numLsmVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numLsmVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numLsmVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numLsmVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numLsmVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numLsmVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numLsmVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numLsmVars) :: fillReal ! Fill value (before conversion to integer)
@@ -514,8 +515,8 @@ type chObsMeta
    character (len=64), dimension(numChObsVars) :: coordNames ! Coordinate names for each variable.
    integer(kind=4), dimension(numChObsVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numChObsVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numChObsVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numChObsVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numChObsVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numChObsVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numChObsVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numChObsVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numChObsVars) :: fillReal ! Fill value (before conversion to integer)
@@ -588,8 +589,8 @@ type gwMeta
    !character (len=64), dimension(numGwVars) :: coordNames ! Coordinate names for each variable.
    integer(kind=4), dimension(numGwVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numGwVars) :: validMaxComp ! Valid max (after conversion to integer)
-   real*8, dimension(numGwVars) :: validMinDbl ! Valid minimum (before conversion to integer)
-   real*8, dimension(numGwVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
+   real(real64), dimension(numGwVars) :: validMinDbl ! Valid minimum (before conversion to integer)
+   real(real64), dimension(numGwVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
    integer(kind=4), dimension(numGwVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numGwVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numGwVars) :: fillReal ! Fill value (before conversion to integer)

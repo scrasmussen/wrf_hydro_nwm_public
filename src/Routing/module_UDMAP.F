@@ -35,9 +35,8 @@ module module_UDMAP
        com_decomp1dint8, pack_decomp_int8, com_write1dInt8
   use module_hydro_stop, only:HYDRO_stop
   use hashtable
-
-  use iso_fortran_env, only: int64
 #endif
+  use iso_fortran_env, only: int64, real64
 
   implicit none
 
@@ -61,10 +60,10 @@ end type userDefineMapping
 TYPE ( userDefineMapping ), allocatable, DIMENSION (:) :: LUDRSL
 
 integer(kind=int64), allocatable, dimension(:) :: bufid
-real*8 , allocatable, dimension(:) :: bufw
+real(real64), allocatable, dimension(:) :: bufw
 integer :: LNUMRSL  ! number of local links
 integer :: ter_rt_flag
-real*8, allocatable, dimension(:) :: basns_area
+real(real64), allocatable, dimension(:) :: basns_area
 integer :: gnpid, lnsize
 integer, allocatable, dimension(:) :: bufi,bufj
 
@@ -91,7 +90,7 @@ contains
         integer(kind=int64), allocatable, dimension(:) :: g1bufid, gbufid, linkid, bufid_tmp, bufidflag
         integer :: ix_bufid, ii, ixrt,jxrt
         integer, allocatable, dimension(:) :: gbufi,gbufj,bufsize
-        real*8 , allocatable, dimension(:) :: gbufw
+        real(real64), allocatable, dimension(:) :: gbufw
 
         did = 1
         call get_dimension(trim(nlst(did)%UDMAP_FILE), ndata, npid)
@@ -335,8 +334,8 @@ contains
                allocate(LUDRSL(LNUMRSL))
                allocate( basns_area(LNUMRSL) )
         else
-! When MPI is performed,for every subdomain in each process, all the links 
-! are listed and if there is no link in the subdomain then it is calling 
+! When MPI is performed,for every subdomain in each process, all the links
+! are listed and if there is no link in the subdomain then it is calling
 ! cleanBuf (memory cleaning purposes), this used to print a warning
 ! that is not necessary for the user to see it, therefore it is been commented out here
 !               write(6,*) "Warning: no routing links found."
@@ -469,9 +468,10 @@ contains
      end subroutine get_dimension
 
        subroutine get1d_real8(fileName,var_name,out_buff)
+          use iso_fortran_env, only: real64
           implicit none
           integer :: ivar, iret,varid,ncid
-          real*8 out_buff(:)
+          real(real64) :: out_buff(:)
           character(len=*), intent(in) :: var_name
           character(len=*), intent(in) :: fileName
 
@@ -544,17 +544,17 @@ contains
          do k  = 1, LNUMRSL
             if(LUDRSL(k)%ngrids .gt. 0) then
                 do m = 1, LUDRSL(k)%ngrids
-                    LUDRSL(k)%nodeArea(m) = cell_area(LUDRSL(k)%grid_i(m),LUDRSL(k)%grid_j(m)) 
+                    LUDRSL(k)%nodeArea(m) = cell_area(LUDRSL(k)%grid_i(m),LUDRSL(k)%grid_j(m))
                 enddo
             endif
                 do m = 1, LUDRSL(k)%ncell
-                    LUDRSL(k)%cellArea(m) = cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m)) 
+                    LUDRSL(k)%cellArea(m) = cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m))
                 enddo
 
             basns_area(k) = 0
             do m = 1, LUDRSL(k)%ncell
                     basns_area(k) = basns_area(k) + &
-                          cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m)) * LUDRSL(k)%cellWeight(m) 
+                          cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m)) * LUDRSL(k)%cellWeight(m)
             enddo
 
          end do
