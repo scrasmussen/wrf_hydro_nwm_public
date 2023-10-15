@@ -28,7 +28,7 @@ module module_lsm_forcing
 
 implicit none
 #include <netcdf.inc>
-    integer :: i_forcing
+integer :: i_forcing
 character(len=19) out_date
 
 interface read_hydro_forcing
@@ -3298,25 +3298,22 @@ end subroutine read_hydro_forcing_mpp1
         soldrain = soldrain2 - soldrain
 
    end subroutine read_ldasout_seq
+
+   subroutine read_forc_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+     implicit none
+     integer :: ix,jx
+     character(len=*) :: olddate,hgrid,indir
+     real :: dt
+     real, dimension(ix,jx):: infxsrt,soldrain
+     call read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+   end subroutine read_forc_ldasout
+
+   subroutine read_forc_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+     implicit none
+     integer :: ix,jx
+     character(len=*) :: olddate,hgrid,indir
+     real :: dt
+     real, dimension(ix,jx):: infxsrt,soldrain
+     call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+   end subroutine read_forc_ldasout_seq
 end module module_lsm_forcing
-
-     subroutine read_forc_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
-      use module_lsm_forcing, only: read_ldasout
-      implicit none
-      integer :: ix,jx
-      character(len=*) :: olddate,hgrid,indir
-      real :: dt
-      real, dimension(ix,jx):: infxsrt,soldrain
-      call read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
-    end subroutine read_forc_ldasout
-
-    subroutine read_forc_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
-! temporary for Noah model
-      use module_lsm_forcing, only: read_ldasout_seq
-      implicit none
-      integer :: ix,jx
-      character(len=*) :: olddate,hgrid,indir
-      real :: dt
-      real, dimension(ix,jx):: infxsrt,soldrain
-      call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
-    end subroutine read_forc_ldasout_seq

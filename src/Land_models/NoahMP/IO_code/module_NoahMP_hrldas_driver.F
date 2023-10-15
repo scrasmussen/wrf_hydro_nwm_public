@@ -1184,11 +1184,11 @@ module module_NoahMP_hrldas_driver
      !PSNOWAGEXY     = undefined_real
 
 ! These should probably be kept initialized with an undefined value (above)
-! to allow tracking of cells that fall through the cracks in value updates 
+! to allow tracking of cells that fall through the cracks in value updates
 ! (also worth noting that 0 is not a valid value for all of these variables).
-! However, since restarts are not currently water-masking 2d reals, this makes 
+! However, since restarts are not currently water-masking 2d reals, this makes
 ! for odd value ranges in the LSM restarts so leaving as 0s for now.
-! On quick tests, the only one of these that changes answers if NOT initialized 
+! On quick tests, the only one of these that changes answers if NOT initialized
 ! at 0 is PSNOWHISTXY so making sure that one is covered in value initialization
 ! loop below in case we go back to undefined_real for these.
      PSNOWLIQXY     = 0.
@@ -1661,6 +1661,7 @@ end subroutine land_driver_ini
   subroutine land_driver_exe(itime, state)
     use module_hydro_io, only: read_channel_only
     use state_module, only: state_type
+    use module_lsm_forcing, only: read_forc_ldasout
     implicit  none
     type(state_type) :: state
     integer :: itime          ! timestep loop
