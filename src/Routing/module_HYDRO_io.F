@@ -27,7 +27,6 @@ module module_HYDRO_io
      use MODULE_mpp_GWBUCKET, only: gw_write_io_real, gw_write_io_int
 #endif
    use Module_Date_utilities_rt, only: geth_newdate
-   use module_HYDRO_utils, only: get_dist_ll
    use config_base, only: nlst
    use module_RT_data, only: rt_domain
    use module_gw_gw2d_data, only: gw2d

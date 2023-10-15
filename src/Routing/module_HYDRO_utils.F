@@ -20,6 +20,7 @@
 
 module module_HYDRO_utils
   use module_RT_data, only: rt_domain
+  use module_HYDRO_io, only: get2d_real
   use config_base, only: nlst
   use iso_fortran_env, only: int64
 #ifdef MPP_LAND
@@ -35,39 +36,6 @@ module module_HYDRO_utils
   logical lr_dist_flag    !land routing distance calculated or not.
 
 contains
-
-  integer function get2d_real(var_name,out_buff,ix,jx,fileName)
-    implicit none
-#         include "netcdf.inc"
-    integer :: ivar, iret,varid,ncid,ix,jx
-    real out_buff(ix,jx)
-    character(len=*), intent(in) :: var_name
-    character(len=*), intent(in) :: fileName
-    get2d_real = -1
-
-    iret = nf_open(trim(fileName), NF_NOWRITE, ncid)
-    if (iret .ne. 0) then
-#ifdef HYDRO_D
-       print*,"Failed to open the netcdf file: ",trim(fileName)
-#endif
-       out_buff = -9999.
-       return
-    endif
-    ivar = nf_inq_varid(ncid,trim(var_name),  varid)
-    if(ivar .ne. 0) then
-       ivar = nf_inq_varid(ncid,trim(var_name//"_M"),  varid)
-       if(ivar .ne. 0) then
-#ifdef HYDRO_D
-          write(6,*) "Read Error: could not find ",var_name
-#endif
-          return
-       endif
-    end if
-    iret = nf_get_var_real(ncid, varid, out_buff)
-    iret = nf_close(ncid)
-    get2d_real =  ivar
-  end function get2d_real
-
 
 ! this module create the distance dx, dy and diagnoal for routing
 ! 8 direction as the slop:
@@ -146,12 +114,10 @@ contains
    end function get_ll_d_tmp
 
    subroutine get_rt_dxdy_ll(did)
-!   use the land lat and lon to derive the routing distrt
-      implicit none
+     ! use the land lat and lon to derive the routing distrt
+     implicit none
       integer:: did, k
       integer iret
-!     external get2d_real
-!     real get2d_real
 #ifdef MPP_LAND
       real, dimension(global_rt_nx,global_rt_ny):: latrt, lonrt
       real, dimension(global_rt_nx,global_rt_ny,9):: dist
@@ -362,7 +328,7 @@ contains
       jx = global_ny
       call write_IO_int(rt_domain(did)%GWSUBBASMSK,mask)
       do k = 1,  9
-         call write_IO_real(rt_domain(did)%dist_lsm(:,:,k),dist_lsm(:,:,k)) 
+         call write_IO_real(rt_domain(did)%dist_lsm(:,:,k),dist_lsm(:,:,k))
       end do
 #else
       ix = rt_domain(did)%ix
