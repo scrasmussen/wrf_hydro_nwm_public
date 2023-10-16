@@ -21,6 +21,7 @@
 ! This subrouting includs the data structure and tools used for NHDPlus network mapping.
 module module_UDMAP
 
+  use netcdf
   use config_base, only: nlst
 #ifdef MPP_LAND
   use module_mpp_land, only: my_id, local_startx_rt, local_starty_rt,  &
@@ -38,14 +39,11 @@ module module_UDMAP
 
   use iso_fortran_env, only: int64
 #endif
-
   implicit none
 
 #ifndef MPP_LAND
     integer, parameter :: numprocs=1
 #endif
-
-#include <netcdf.inc>
 
 type userDefineMapping
     integer, allocatable, dimension(:) :: grid_i, grid_j
@@ -335,8 +333,8 @@ contains
                allocate(LUDRSL(LNUMRSL))
                allocate( basns_area(LNUMRSL) )
         else
-! When MPI is performed,for every subdomain in each process, all the links 
-! are listed and if there is no link in the subdomain then it is calling 
+! When MPI is performed,for every subdomain in each process, all the links
+! are listed and if there is no link in the subdomain then it is calling
 ! cleanBuf (memory cleaning purposes), this used to print a warning
 ! that is not necessary for the user to see it, therefore it is been commented out here
 !               write(6,*) "Warning: no routing links found."
@@ -436,30 +434,28 @@ contains
 #ifdef MPP_LAND
             if(my_id .eq. IO_id) then
 #endif
-               iret = nf_open(fileName, NF_NOWRITE, ncid)
+               iret = nf90_open(fileName, NF90_NOWRITE, ncid)
                if (iret /= 0) then
                   write(*,'("FATAL ERROR: Problem opening mapping file: ''", A, "''")') &
                        trim(fileName)
                   call hydro_stop("In get_dimension() - Problem opening mapping file.")
                endif
 
-               iret = nf_inq_dimid(ncid, "polyid", dimid)
-
+               iret = nf90_inq_dimid(ncid, "polyid", dimid)
                if (iret /= 0) then
-                  print*, "nf_inq_dimid:  polyid"
-                  call hydro_stop("In get_dimension() - nf_inq_dimid:  polyid")
+                  print*, "nf90_inq_dimid:  polyid"
+                  call hydro_stop("In get_dimension() - nf90_inq_dimid:  polyid")
                endif
+               iret = nf90_inquire_dimension(ncid, dimid, len=npid)
 
-               iret = nf_inq_dimlen(ncid, dimid, npid)
-
-               iret = nf_inq_dimid(ncid, "data", dimid)
+               iret = nf90_inq_dimid(ncid, "data", dimid)
                if (iret /= 0) then
-                          print*, "nf_inq_dimid:  data"
-                          call hydro_stop("In get_file_dimension() - nf_inq_dimid:  data")
+                          print*, "nf90_inq_dimid:  data"
+                          call hydro_stop("In get_file_dimension() - nf90_inq_dimid:  data")
                endif
+               iret = nf90_inquire_dimension(ncid, dimid, len=ndata)
 
-               iret = nf_inq_dimlen(ncid, dimid, ndata)
-               iret = nf_close(ncid)
+               iret = nf90_close(ncid)
 #ifdef MPP_LAND
             endif
             call mpp_land_bcast_int1(ndata)
@@ -475,20 +471,20 @@ contains
           character(len=*), intent(in) :: var_name
           character(len=*), intent(in) :: fileName
 
-          iret = nf_open(trim(fileName), NF_NOWRITE, ncid)
+          iret = nf90_open(trim(fileName), NF90_NOWRITE, ncid)
           if (iret .ne. 0) then
             print*,"failed to open the netcdf file: ",trim(fileName)
             call hydro_stop("In get1d_real8() - failed to open the netcdf file.")
             return
           endif
-          ivar = nf_inq_varid(ncid,trim(var_name),  varid)
+          ivar = nf90_inq_varid(ncid,trim(var_name),  varid)
           if(ivar .ne. 0) then
                write(6,*) "Read Variable Error file: ",trim(fileName)
                write(6,*) "Read Error: could not find ",trim(var_name)
                call hydro_stop("In get1d_real8() - failed to read netcdf varialbe name. ")
           end if
-          iret = nf_get_var_double(ncid, varid, out_buff)
-          iret = nf_close(ncid)
+          iret = nf90_get_var(ncid, varid, out_buff)
+          iret = nf90_close(ncid)
       end subroutine get1d_real8
 
        subroutine get1d_int(fileName,var_name,out_buff)
@@ -498,20 +494,20 @@ contains
           character(len=*), intent(in) :: var_name
           character(len=*), intent(in) :: fileName
 
-          iret = nf_open(trim(fileName), NF_NOWRITE, ncid)
+          iret = nf90_open(trim(fileName), NF90_NOWRITE, ncid)
           if (iret .ne. 0) then
             print*,"FATAL ERROR: Failed to open the netcdf file: ",trim(fileName)
             call hydro_stop("In get1d_int() -  Failed to open the netcdf file")
             return
           endif
-          ivar = nf_inq_varid(ncid,trim(var_name),  varid)
+          ivar = nf90_inq_varid(ncid,trim(var_name),  varid)
           if(ivar .ne. 0) then
                write(6,*) "Read Variable Error file: ",trim(fileName)
                write(6,*) "Read Error: could not find ",trim(var_name)
                call hydro_stop("In get1d_int() - failed to read netcdf variable name.")
           end if
-          iret = nf_get_var_int(ncid, varid, out_buff)
-          iret = nf_close(ncid)
+          iret = nf90_get_var(ncid, varid, out_buff)
+          iret = nf90_close(ncid)
       end subroutine get1d_int
 
     subroutine get1d_int64(fileName,var_name,out_buff)
@@ -521,20 +517,20 @@ contains
         character(len=*), intent(in) :: var_name
         character(len=*), intent(in) :: fileName
 
-        iret = nf_open(trim(fileName), NF_NOWRITE, ncid)
+        iret = nf90_open(trim(fileName), NF90_NOWRITE, ncid)
         if (iret .ne. 0) then
             print*,"FATAL ERROR: Failed to open the netcdf file: ",trim(fileName)
             call hydro_stop("In get1d_int() -  Failed to open the netcdf file")
             return
         endif
-        ivar = nf_inq_varid(ncid,trim(var_name),  varid)
+        ivar = nf90_inq_varid(ncid,trim(var_name),  varid)
         if(ivar .ne. 0) then
             write(6,*) "Read Variable Error file: ",trim(fileName)
             write(6,*) "Read Error: could not find ",trim(var_name)
             call hydro_stop("In get1d_int() - failed to read netcdf variable name.")
         end if
-        iret = nf_get_var_int64(ncid, varid, out_buff)
-        iret = nf_close(ncid)
+        iret = nf90_get_var(ncid, varid, out_buff)
+        iret = nf90_close(ncid)
     end subroutine get1d_int64
 
       subroutine getUDMP_area(cell_area)
@@ -544,17 +540,17 @@ contains
          do k  = 1, LNUMRSL
             if(LUDRSL(k)%ngrids .gt. 0) then
                 do m = 1, LUDRSL(k)%ngrids
-                    LUDRSL(k)%nodeArea(m) = cell_area(LUDRSL(k)%grid_i(m),LUDRSL(k)%grid_j(m)) 
+                    LUDRSL(k)%nodeArea(m) = cell_area(LUDRSL(k)%grid_i(m),LUDRSL(k)%grid_j(m))
                 enddo
             endif
                 do m = 1, LUDRSL(k)%ncell
-                    LUDRSL(k)%cellArea(m) = cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m)) 
+                    LUDRSL(k)%cellArea(m) = cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m))
                 enddo
 
             basns_area(k) = 0
             do m = 1, LUDRSL(k)%ncell
                     basns_area(k) = basns_area(k) + &
-                          cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m)) * LUDRSL(k)%cellWeight(m) 
+                          cell_area(LUDRSL(k)%cell_i(m),LUDRSL(k)%cell_j(m)) * LUDRSL(k)%cellWeight(m)
             enddo
 
          end do
