@@ -876,7 +876,7 @@ contains
 
   module procedure setup_comm ! wrf_hydro_setup_comm
     ! use mpi, only: MPI_Comm_split, MPI_COMM_WORLD
-    use module_mpp_land
+    use module_mpp_land, only: HYDRO_COMM_WORLD, MPI_Comm_rank, MPI_Comm_split
     integer :: rank, ierr
 
     ! call is_MPI_Initialized_func()
