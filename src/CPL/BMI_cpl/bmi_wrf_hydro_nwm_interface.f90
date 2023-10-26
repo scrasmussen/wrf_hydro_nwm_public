@@ -506,6 +506,21 @@ module bmi_wrf_hydro_nwm_mod
     end function wrf_hydro_grid_nodes_per_face
 
     ! ------------------------------------
+    ! BMI parallel procedures
+    ! ------------------------------------
+    ! [ ] transition to wrf_hydro_
+    ! [ ] should setup_comm() have an output_comm variable??
+    ! [ ] add a bmi_get_comm() func??
+    module function setup_comm(this, input_comm, color, lower_rank, upper_rank) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: input_comm
+      integer, intent(in) :: color, lower_rank, upper_rank
+      ! integer, intent(out) :: output_comm
+      integer :: bmi_status
+    end function setup_comm ! wrf_hydro_setup_comm
+
+    ! ------------------------------------
     ! Non-BMI procedures
     ! ------------------------------------
 

@@ -874,4 +874,16 @@ contains
     end select
   end procedure ! wrf_hydro_var_itemsize
 
+  module procedure setup_comm ! wrf_hydro_setup_comm
+    ! use mpi, only: MPI_Comm_split, MPI_COMM_WORLD
+    use module_mpp_land
+    integer :: rank, ierr
+
+    ! call is_MPI_Initialized_func()
+    call MPI_Comm_rank(input_comm, rank, ierr)
+    if (rank >= lower_rank .and. rank < upper_rank) then
+       call MPI_Comm_split(input_comm, color, rank, HYDRO_COMM_WORLD, ierr)
+    end if
+  end procedure ! wrf_hydro_setup_comm
+
 end submodule bmi_wrf_hydro_nwm_smod
