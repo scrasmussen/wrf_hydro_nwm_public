@@ -402,3 +402,21 @@ else()
 	message ("Unknown land surface model:" ${HYDRO_LSM} )
 endif (HYDRO_LSM MATCHES "NoahMP")
 
+add_library(wrfhydro STATIC
+  $<TARGET_OBJECTS:hydro_utils>
+  $<TARGET_OBJECTS:hydro_mpp>
+  $<TARGET_OBJECTS:hydro_debug_utils>
+  $<TARGET_OBJECTS:hydro_routing_overland>
+  $<TARGET_OBJECTS:hydro_routing_subsurface>
+  $<TARGET_OBJECTS:hydro_data_rec>
+  $<TARGET_OBJECTS:hydro_routing>
+  $<TARGET_OBJECTS:hydro_routing_reservoirs_levelpool>
+  $<TARGET_OBJECTS:hydro_routing_reservoirs_hybrid>
+  $<TARGET_OBJECTS:hydro_routing_reservoirs_rfc>
+  $<TARGET_OBJECTS:hydro_routing_reservoirs>
+  $<TARGET_OBJECTS:hydro_driver>
+  $<TARGET_OBJECTS:noahmp_util>
+  $<TARGET_OBJECTS:noahmp_phys>
+  $<TARGET_OBJECTS:noahmp_data>
+  $<TARGET_OBJECTS:hydro_noahmp_cpl>
+  )
