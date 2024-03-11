@@ -951,6 +951,13 @@ contains
     namelist /WRF_HYDRO_OFFLINE/ &
          finemesh,finemesh_factor,forc_typ, snow_assim
 
+
+    ! should these be removed from namelist? They aren't read in
+    finemesh = 0
+    finemesh_factor = 0
+    forc_typ = 0
+    snow_assim = 0
+
     noah_lsm%nsoil                   = -999
     noah_lsm%soil_thick_input        = -999
     ! dtbl                             = -999
@@ -1090,6 +1097,9 @@ contains
     integer :: ierr, f_local
     namelist /CROCUS_nlist/ &
          crocus_opt, act_lev
+
+    crocus_opt = 0
+    act_lev = 0
 
     ! check if file is opened
     if (present(f_in)) then
