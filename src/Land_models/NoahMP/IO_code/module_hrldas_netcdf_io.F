@@ -590,7 +590,7 @@ contains
        longitude, xland, seaice, msftx, msfty, &
        local_crocus_opt, glacinfo, glact, vis_icealb)
     implicit none
-    character(len=*),          intent(in)  :: wrfinput_flnm
+    character(len=256),       intent(in)  :: wrfinput_flnm
     integer,                   intent(in)  :: xstart, xend, ystart, yend
     integer,                   intent(in)  :: iswater
     integer,                   intent(in)  :: islake
@@ -629,7 +629,7 @@ contains
     ! Open the NetCDF file.
     if (rank == 0) then
 #ifdef HYDRO_D
-       write(*,'("wrfinput_flnm: ''", A, "''")') trim(wrfinput_flnm)
+       print *,"wrfinput_flnm: ", trim(wrfinput_flnm)
 #endif
     endif
 #ifdef _PARALLEL_
@@ -696,10 +696,14 @@ contains
        if (ierr == 0) then
           glacinfo = nint(xdum)
        else
-          stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas()"// &
-               " - crocus_opt on but netcdf read of glacinfo returned non-zero"
+          error stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas() - crocus_opt on but netcdf read of glacinfo returned non-zero"
        end if
        ! Get Glacier thickness (glact)
+       ! debugging to see if allocation would fix issue
+       ! if (allocated(glact) .eqv. .false.) then
+       !    allocate(glact(xstart:xend,ystart:yend))
+       ! end if
+
        call get_2d_netcdf("glacier_thickness", ncid, glact,   units, xstart, xend, ystart, yend, NOT_FATAL, ierr)
        if (ierr /= 0) then
           glact = 0.0
@@ -723,9 +727,9 @@ contains
 
     ! Close the NetCDF file
     ierr = nf90_close(ncid)
-    if (ierr /= 0) stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas()"// &
-                        " - MODULE_NOAHLSM_HRLDAS_INPUT: NF90_CLOSE"
-
+    if (ierr /= 0) then
+       error stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas()- MODULE_NOAHLSM_HRLDAS_INPUT: NF90_CLOSE"
+    end if
     ! Make sure vegtyp and soltyp are consistent when it comes to water points,
     ! by setting soil category to water when vegetation category is water, and
     ! vice-versa.
@@ -1298,6 +1302,7 @@ contains
     real, dimension(xstart:xend,ystart:yend), intent(out) :: array
     character(len=256), intent(out) :: units
     integer :: iret, varid
+    integer  :: start_indices(2), count(2)
     character(len=24), parameter :: name = "ISLTYP"
 
     units = " "
@@ -1305,7 +1310,9 @@ contains
     iret = nf90_inq_varid(ncid,  trim(name),  varid)
     call error_handler(iret, "Problem finding variable '"//trim(name)//"' in the wrfinput file.")
 
-    iret = nf90_get_var(ncid, varid, array, (/xstart, ystart/), (/xend-xstart+1, yend-ystart+1/))
+    start_indices = [xstart, ystart]
+    count = [xend-xstart+1, yend-ystart+1]
+    iret = nf90_get_var(ncid, varid, array, start_indices, count)
     call error_handler(iret, "Problem retrieving variable "//trim(name)//" from the wrfinput file.")
 
   end subroutine get_soilcat_netcdf
@@ -1332,13 +1339,15 @@ contains
     logical, intent(in) :: fatal_if_error
     integer, intent(out), volatile :: ierr
 #ifdef MPP_LAND
-    real, volatile :: g_array(global_nx,global_ny)
+    ! real, volatile :: g_array(global_nx,global_ny)
+    real, allocatable :: g_array(:,:)
 #endif
 
     ierr = 0
 
 #ifdef MPP_LAND
     if(my_id .eq. 0) then
+       allocate(g_array(global_nx,global_ny))
 #endif
     iret = nf90_inq_varid(ncid,  name,  varid)
     if (iret /= 0) then
