@@ -45,7 +45,7 @@ module bmi_wrf_hydro_nwm_bind_c_mod
     end function wrf_hydro_update_until_c
 
     ! Perform teardown tasks for the model.
-    module function wrf_hydro_finalize_c(this) &
+    module function wrf_hydro_finalize_c() &
          result(bmi_status) &
          bind(c, name="finalize")
       integer(c_int) :: bmi_status

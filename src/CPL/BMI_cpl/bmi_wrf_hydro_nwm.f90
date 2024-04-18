@@ -839,7 +839,6 @@ contains
   module procedure stat_check
     if (bmi_status == BMI_FAILURE) then
        print *, "- WARNING BMI_FAILURE: calling backtrace"
-       call backtrace
        if (present(advance)) then
           if (advance .eqv. .false.) then
              error stop "STOPPING ON BMI_FAILURE"
