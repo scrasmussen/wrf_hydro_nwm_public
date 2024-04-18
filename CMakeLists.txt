@@ -26,6 +26,9 @@ set(CMAKE_SKIP_BUILD_RPATH  FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# enable ctests
+enable_testing()
+
 #message ("-- MPI Include directories: " ${MPI_INCLUDE_PATH} )
 #message ("-- MPI C COMPILER : " ${MPI_C_COMPILER} )
 #message ("-- MPI CXX COMPILER : " ${MPI_CXX_COMPILER} )
@@ -46,7 +49,7 @@ set (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/src/cmake-modules)
 set (NETCDF_F90 "YES")
 set (NETCDF_F77 "YES")
 find_package(NetCDF REQUIRED)
-message("-- NetCDF Include Dir: ${NETCDF_INCLUDES}")
+message("-- NetCDF Include Dir(s): ${NETCDF_INCLUDES_F77} ${NETCDF_INCLUDES_F90}")
 
 # set user controled enviorment variables
 set (HYDRO_LSM $ENV{HYDRO_LSM} CACHE STRING "Name of the Land Surface Model to Use")
@@ -221,8 +224,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "PGI.*") OR (CMAKE_Fortran_COMPILER_I
 elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "Cray*"))
     message ("-- Using Cray")
     set (CMAKE_Fortran_FLAGS "-eZ -ffree -ef -h alias=none -h fp1 -hbyteswapio")
-    set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
-    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g") # -traceback")
+    set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -G2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -G0") # -traceback")
 else ()
     message ("CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
     message ("Fortran compiler: " ${Fortran_COMPILER_NAME})
@@ -243,7 +246,9 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/Run)
 #add common include directores need in the build
 include_directories(AFTER ${PROJECT_BINARY_DIR}/mods)
 include_directories(AFTER ${MPI_INCLUDE_PATH})
-include_directories(AFTER ${NETCDF_INCLUDES})
+# include_directories(AFTER ${NETCDF_INCLUDES})  # NOTE: We don't need the C include for netCDF
+include_directories(AFTER ${NETCDF_INCLUDES_F77})
+include_directories(AFTER ${NETCDF_INCLUDES_F90})
 include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
 
 # make an if statement
