@@ -1,4 +1,7 @@
 # add Makefile target to setup test runs
+if (BMI STREQUAL "1" OR MODFLOW STREQUAL "1")
+  add_subdirectory("bmi")
+endif()
 # --- croton test options: {Gridded, Gridded_no_lakes, NWM, Reach, ReachLakes}
 add_custom_target(croton
   COMMAND bash
@@ -32,12 +35,3 @@ add_executable(fortran_ctest_should_not_fail
   should_not_fail.f90)
 add_test(NAME fortran_ctest_should_not_fail
   COMMAND fortran_ctest_should_not_fail)
-
-
-# --- bmi ctests ---
-add_test(NAME wrf_hydro_bmi_test
-  COMMAND wrf_hydro_bmi.exe
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/Run)
-
-set_tests_properties(wrf_hydro_bmi_test
-  PROPERTIES DEPENDS setup_wrf_hydro_testcase)
