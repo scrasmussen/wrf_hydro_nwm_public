@@ -1,4 +1,8 @@
-# add Makefile targets to setup test runs
+# add Makefile target to setup test runs
+if (BMI STREQUAL "1" OR MODFLOW STREQUAL "1")
+  add_subdirectory("bmi")
+endif()
+
 # Croton Test Options: {Gridded, Gridded_no_lakes, NWM, Reach, ReachLakes}
 set(croton_testcases "gridded" "gridded_no_lakes" "nwm" "nwm_ana"
   "nwm_long_range" "reach" "reach_lakes")
