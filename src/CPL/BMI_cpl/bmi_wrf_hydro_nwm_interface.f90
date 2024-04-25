@@ -93,6 +93,25 @@ module bmi_wrf_hydro_nwm_mod
           set_value_at_indices_double
      ! non-BMI procedures
      procedure :: print_model_info
+
+     ! parallel BMI procedures
+     generic :: parallel_initialize => &
+          parallel_initialize_mpi!, &
+          ! parallel_initialize_mpif08
+     procedure :: parallel_initialize_mpi
+     ! procedure :: parallel_initialize_mpif08
+     procedure :: get_grid_partition_size
+     procedure :: get_grid_partition_range
+     procedure :: get_grid_global_node_nr
+     procedure :: get_grid_global_edge_nr
+     procedure :: get_grid_global_face_nr
+     procedure :: get_grid_node_partition
+     procedure :: get_grid_edge_partition
+     procedure :: get_grid_face_partition
+     procedure :: get_grid_partition_node_count
+     procedure :: get_grid_partition_edge_count
+     procedure :: get_grid_partition_face_count
+
   end type bmi_wrf_hydro_nwm
 
   interface
@@ -504,6 +523,113 @@ module bmi_wrf_hydro_nwm_mod
       integer, dimension(:), intent(out) :: nodes_per_face
       integer :: bmi_status
     end function wrf_hydro_grid_nodes_per_face
+
+    ! ------------------------------------
+    ! Parallel BMI procedures
+    ! ------------------------------------
+    module function parallel_initialize_mpi(this, comm) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: comm
+      integer :: bmi_status
+    end function parallel_initialize_mpi
+
+    ! module function parallel_initialize_mpif08(this, comm) &
+    !    result(bmi_status)
+    !   use mpi_f08
+    !   class(bmi_wrf_hydro_nwm), intent(in) :: this
+    !   type(MPI_COMM), intent(in) :: comm
+    !   integer :: bmi_status
+    ! end function parallel_initialize_mpif08
+
+    module function get_grid_partition_size(this, grid, size) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: size
+      integer :: bmi_status
+    end function get_grid_partition_size
+
+    module function get_grid_partition_range(this, grid, start, end) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: start(:)
+      integer, intent(out) :: end(:)
+      integer :: bmi_status
+    end function get_grid_partition_range
+
+    module function get_grid_global_node_nr(this, grid, global_index) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: global_index(:)
+      integer :: bmi_status
+    end function get_grid_global_node_nr
+
+    module function get_grid_global_edge_nr(this, grid, global_index) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: global_index(:)
+      integer :: bmi_status
+    end function get_grid_global_edge_nr
+
+    module function get_grid_global_face_nr(this, grid, global_index) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: global_index(:)
+      integer :: bmi_status
+    end function get_grid_global_face_nr
+
+    module function get_grid_node_partition(this, grid, partition) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: partition(:)
+      integer :: bmi_status
+    end function get_grid_node_partition
+
+    module function get_grid_edge_partition(this, grid, partition) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: partition(:)
+      integer :: bmi_status
+    end function get_grid_edge_partition
+
+    module function get_grid_face_partition(this, grid, partition) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: partition(:)
+      integer :: bmi_status
+    end function get_grid_face_partition
+
+    module function get_grid_partition_node_count(this, grid, count) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: count(:)
+      integer :: bmi_status
+    end function get_grid_partition_node_count
+
+    module function get_grid_partition_edge_count(this, grid, count) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: count(:)
+      integer :: bmi_status
+    end function get_grid_partition_edge_count
+
+    module function get_grid_partition_face_count(this, grid, count) &
+      result(bmi_status)
+      class(bmi_wrf_hydro_nwm), intent(in) :: this
+      integer, intent(in) :: grid
+      integer, intent(out) :: count(:)
+      integer :: bmi_status
+    end function get_grid_partition_face_count
 
     ! ------------------------------------
     ! Non-BMI procedures

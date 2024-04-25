@@ -873,4 +873,62 @@ contains
     end select
   end procedure ! wrf_hydro_var_itemsize
 
+  module procedure parallel_initialize_mpi
+    use module_cpl_land, only : HYDRO_COMM_WORLD
+    bmi_status = BMI_SUCCESS
+    HYDRO_COMM_WORLD = comm
+  end procedure ! wrf_hydro_parallel_initialize_mpi
+  ! module procedure parallel_initialize_mpif08
+  !   use module_cpl_land, only : HYDRO_COMM_WORLD
+  !   bmi_status = BMI_SUCCESS
+  !   HYDRO_COMM_WORLD = comm%MPI_VAL
+  !   print  *, "FIN PARALLLEL INIT"
+  ! end procedure ! wrf_hydro_parallel_initialize_mpif08
+
+  module procedure get_grid_partition_size
+    use module_cpl_land, only : HYDRO_COMM_WORLD
+    bmi_status = this%get_grid_size(grid, size)
+  end procedure ! get_grid_partition_size
+
+  module procedure get_grid_partition_range
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_partition_range
+
+  module procedure get_grid_global_node_nr
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_global_node_nr
+
+  module procedure get_grid_global_edge_nr
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_global_edge_nr
+
+  module procedure get_grid_global_face_nr
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_global_face_nr
+
+  module procedure get_grid_node_partition
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_node_partition
+
+  module procedure get_grid_edge_partition
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_edge_partition
+
+  module procedure get_grid_face_partition
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_face_partition
+
+  module procedure get_grid_partition_node_count
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_partition_node_count
+
+  module procedure get_grid_partition_edge_count
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_partition_edge_count
+
+  module procedure get_grid_partition_face_count
+    bmi_status = BMI_FAILURE
+  end procedure ! get_grid_partition_face_count
+
+
 end submodule bmi_wrf_hydro_nwm_smod
