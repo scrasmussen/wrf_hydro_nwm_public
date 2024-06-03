@@ -110,8 +110,8 @@ program wrf_hydro_nwm_bmi_driver
 
         ! --- update soldrain value
         ! soldrain = x_flat * time_step_conv
-        soldrain = soldrain + 0.01 ! test update_value
-        call stat_check(wrf_hydro%set_value("soldrain", pack(soldrain, .true.)))
+        ! soldrain = soldrain + 0.01 ! test update_value
+        ! call stat_check(wrf_hydro%set_value("soldrain", pack(soldrain, .true.)))
 
         ! update current_time
         call stat_check(wrf_hydro%update())
