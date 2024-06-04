@@ -58,7 +58,8 @@ program wrf_hydro_nwm_bmi_driver
   call stat_check(wrf_hydro%get_time_step(time_step))
   call stat_check(modflow%get_time_step(mf_time_step))
   call stat_check(wrf_hydro%get_time_units(time_unit))
-  call stat_check(wrf_hydro%get_start_time(mf_current_time))
+  ! call stat_check(wrf_hydro%get_start_time(mf_current_time))
+  call stat_check(modflow%get_start_time(mf_current_time))
   ! call stat_check(modflow%get_time_units(mf_time_unit)) ! hardcoded, need to update
   ! call stat_check(modflow%get_output_item_count(modflow_output_item_count))
   print *, "time steps:", time_step, mf_time_step
