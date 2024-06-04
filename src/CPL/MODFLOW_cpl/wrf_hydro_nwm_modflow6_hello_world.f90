@@ -6,6 +6,8 @@ program wrf_hydro_nwm_bmi_driver
   use bmi_modflow_mod, only : modflow6, bmi_modflow, BMI_LENCOMPONENTNAME
   use iso_c_binding, only : c_char, C_NULL_CHAR
   use mf6bmiUtil, only:  BMI_LENVARADDRESS
+  use mf6bmiGrid, only: get_grid_nodes_per_face
+
   implicit none
 
   type(bmi_wrf_hydro_nwm) :: wrf_hydro
@@ -22,16 +24,22 @@ program wrf_hydro_nwm_bmi_driver
   ! soldrain
   integer :: soldrain_grid, soldrain_rank, soldrain_size
   real, allocatable :: soldrain(:,:), soldrain_flat(:)
+  real, allocatable :: soldrain_flat_daysum(:), soldrain_flat_daysum_flip(:)
+  real :: soldrainavesum, dxdy=250. ! this needes to be input automatically
   integer, allocatable :: soldrain_grid_shape(:)
   integer :: soldrain_grid_shape_const(2)
 
   ! modflow
   integer :: modflow_output_item_count
   integer :: x_grid, x_rank, x_size
+  integer :: rch_grid, rch_rank
   integer, allocatable :: x_grid_shape(:)
   integer :: x_grid_shape_const(1)
   double precision, allocatable :: x(:,:), x_flat(:)
-
+  double precision, allocatable :: rch_flat(:), rch_flat_flipped(:)
+  integer, allocatable :: nodes_per_face(:)
+  integer :: nx, ny, ii, jj, kk
+  double precision, allocatable :: grid_x(:), grid_y(:)
 
   wrf_hydro = wrf_hydro_nwm()
   modflow = modflow6()
@@ -63,8 +71,7 @@ program wrf_hydro_nwm_bmi_driver
   call stat_check(wrf_hydro%get_grid_shape(soldrain_grid, soldrain_grid_shape))
   soldrain_grid_shape_const = soldrain_grid_shape
   call stat_check(wrf_hydro%get_grid_size(soldrain_grid, soldrain_size))
-  allocate(soldrain_flat(soldrain_size))
-  allocate(soldrain(soldrain_grid_shape(1), soldrain_grid_shape(2)))
+
   ! --- done setting up soldrain variables
 
   ! --- setup modflow x variable
@@ -73,7 +80,23 @@ program wrf_hydro_nwm_bmi_driver
   call stat_check(modflow%get_grid_shape(x_grid, x_grid_shape))
   x_grid_shape_const = x_grid_shape
   call stat_check(modflow%get_grid_size(x_grid, x_size))
+
+  call stat_check(modflow%get_var_grid("RECHARGE", rch_grid))
+  call stat_check(modflow%get_grid_rank(rch_grid, rch_rank))
+  call stat_check(modflow%get_grid_x(rch_grid, grid_x))
+  call stat_check(modflow%get_grid_y(rch_grid, grid_y))  
+
+  nx = size(grid_x) - 1
+  ny = size(grid_y) - 1
+
   allocate(x_flat(x_size))
+  allocate(rch_flat(x_size))
+  allocate(rch_flat_flipped(x_size))
+  allocate(soldrain_flat(soldrain_size))
+  allocate(soldrain_flat_daysum(soldrain_size))
+  allocate(soldrain_flat_daysum_flip(x_size))
+  allocate(soldrain(soldrain_grid_shape(1), soldrain_grid_shape(2)))
+  
   ! allocate(x(x_grid_shape(1), x_grid_shape(2)))
   ! --- done setting up x variable
 
@@ -90,13 +113,23 @@ program wrf_hydro_nwm_bmi_driver
      call stat_check(modflow%get_time_step(mf_time_step))
      time_step_conv = time_step / mf_time_step
 
+    soldrainavesum = 0.
+	soldrain_flat_daysum(:) = 0.
+	soldrain_flat_daysum_flip(:) = 0.
 
 
      ! get current values
      call stat_check(modflow%get_value("X", x_flat))
+     call stat_check(modflow%get_value("RECHARGE", rch_flat))
      ! x = reshape(x_flat, x_grid_shape_const)
+	 
 
-     do while (current_time < mf_current_time .and. &
+     call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
+
+     soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
+	 soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
+
+    do while (current_time < mf_current_time .and. &
           current_time < end_time)
         call stat_check(wrf_hydro%get_current_time(current_time))
         call stat_check(modflow%get_current_time(mf_current_time))
@@ -107,6 +140,11 @@ program wrf_hydro_nwm_bmi_driver
 
         call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
         soldrain = reshape(soldrain_flat, soldrain_grid_shape_const)
+        soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
+		soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
+
+
+
 
         ! --- update soldrain value
         ! soldrain = x_flat * time_step_conv
@@ -115,7 +153,17 @@ program wrf_hydro_nwm_bmi_driver
 
         ! update current_time
         call stat_check(wrf_hydro%update())
-     end do
+    end do
+
+    kk=1
+    do ii = ny, 1, -1
+    do jj = 1, nx
+       soldrain_flat_daysum_flip(kk)=soldrain_flat_daysum((ii-1)*nx+jj)
+       kk = kk + 1
+	end do	
+	end do
+
+	call stat_check(modflow%set_value("RECHARGE", soldrain_flat_daysum_flip/24./1.E3))
 
   end do
 
