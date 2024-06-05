@@ -35,11 +35,15 @@ program wrf_hydro_nwm_bmi_driver
   integer :: rch_grid, rch_rank
   integer, allocatable :: x_grid_shape(:)
   integer :: x_grid_shape_const(1)
+  integer :: nx, ny, ii, jj, kk
   double precision, allocatable :: x(:,:), x_flat(:)
   double precision, allocatable :: rch_flat(:), rch_flat_flipped(:)
-  integer, allocatable :: nodes_per_face(:)
-  integer :: nx, ny, ii, jj, kk
   double precision, allocatable :: grid_x(:), grid_y(:)
+
+  print *, "----------------------------------------"
+  print *, "   Starting WRF-Hydro/MODFLOW BMI ...   "  
+  print *, "----------------------------------------"
+
 
   wrf_hydro = wrf_hydro_nwm()
   modflow = modflow6()
@@ -101,34 +105,70 @@ program wrf_hydro_nwm_bmi_driver
   ! allocate(x(x_grid_shape(1), x_grid_shape(2)))
   ! --- done setting up x variable
 
-  end_time = 4
-  print *, "TESTING: Setting end_time to", end_time
+  ! end_time = 4
+  ! print *, "TESTING: Setting end_time to", end_time
+
+  print *, "wrf_hydro: Setting current_time ", current_time
+  print *, "wrf_hydro: Setting end_time     ", end_time
+  print *, "wrf_hydro: Setting time_step    ", time_step
+  print *, " "
+  print *, "modflow:   Setting mf_current_time to ", mf_current_time
+  print *, "modflow:   Setting mf_time_step to    ", mf_time_step
+  
+  print *, "x_grid       , x_rank      ", x_grid, x_rank
+  print *, "x_grid_shape , x_size      ", x_grid_shape, x_size
+  print *, "size(grid_x) , size(grid_y)", size(grid_x), size(grid_y)
+  print *, " "
 
   do while (current_time < end_time)
-     ! update models
-     call stat_check(wrf_hydro%update())
-     call stat_check(modflow%update())
-     ! update current_time
-     call stat_check(wrf_hydro%get_current_time(current_time))
-     call stat_check(modflow%get_current_time(mf_current_time))
-     call stat_check(modflow%get_time_step(mf_time_step))
-     time_step_conv = time_step / mf_time_step
+    ! update models
+    call stat_check(wrf_hydro%update())
+    call stat_check(modflow%update())
+    ! update current_time
+    call stat_check(wrf_hydro%get_current_time(current_time))
+    call stat_check(modflow%get_current_time(mf_current_time))
+    call stat_check(modflow%get_time_step(mf_time_step))
+    time_step_conv = time_step / mf_time_step
 
     soldrainavesum = 0.
 	soldrain_flat_daysum(:) = 0.
 	soldrain_flat_daysum_flip(:) = 0.
 
 
-     ! get current values
-     call stat_check(modflow%get_value("X", x_flat))
-     call stat_check(modflow%get_value("RECHARGE", rch_flat))
-     ! x = reshape(x_flat, x_grid_shape_const)
+    ! get current values
+    call stat_check(modflow%get_value("X", x_flat))
+    call stat_check(modflow%get_value("RECHARGE", rch_flat))
+    ! x = reshape(x_flat, x_grid_shape_const)
 	 
 
-     call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
+    call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
 
-     soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
-	 soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
+    soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
+	soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
+
+    print *, "****************************************"
+    print *, "wrf_hydro: Setting current_time ", current_time
+    print *, "wrf_hydro: Setting end_time     ", end_time
+    print *, "wrf_hydro: Setting time_step    ", time_step
+    print *, " "
+    print *, "modflow:   Setting mf_current_time to ", mf_current_time
+    print *, "modflow:   Setting mf_time_step to    ", mf_time_step
+
+	print *, " "
+	print *, "X ave: ", SUM(x_flat)/size(x_flat)
+	print *, "RCHA ave     : ", SUM(rch_flat)/size(x_flat)*dxdy*dxdy
+	print *, "RCHA min, max: ", minval(rch_flat)*dxdy*dxdy, maxval(rch_flat)*dxdy*dxdy
+
+	! print *, "SIMVALS_flipped ave     : ", SUM(SIMVALS_flat_flipped)/size(x_flat)
+	! print *, "SIMVALS_flipped min, max: ", minval(SIMVALS_flat_flipped), maxval(SIMVALS_flat_flipped)	
+
+	print *, "soldrain ave:             ", SUM(soldrain_flat)/size(soldrain_flat)
+	print *, "soldrain sum of ave:      ", soldrainavesum
+	print *, "soldrain_flat_daysum ave: ", &
+		      SUM(soldrain_flat_daysum)/size(soldrain_flat_daysum)
+
+    print *, "****************************************"
+	print *, " "
 
     do while (current_time < mf_current_time .and. &
           current_time < end_time)
@@ -136,14 +176,17 @@ program wrf_hydro_nwm_bmi_driver
         call stat_check(modflow%get_current_time(mf_current_time))
         time_step_conv = time_step / mf_time_step
         print *, "[", int(current_time), "/", int(mf_current_time), "]", &
-             " time_steps =", real(time_step), real(mf_time_step), &
-             "conv", real(time_step_conv)
+                 " time_steps =", real(time_step), real(mf_time_step), &
+                 "conv", real(time_step_conv)
 
         call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
         soldrain = reshape(soldrain_flat, soldrain_grid_shape_const)
         soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
 		soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
-
+	    print *, "soldrain ave: ", SUM(soldrain_flat)/size(soldrain_flat)
+	    print *, "soldrain sum of ave: ", soldrainavesum
+		print *, "soldrain_flat_daysum ave: ", &
+		          SUM(soldrain_flat_daysum)/size(soldrain_flat_daysum)
 
 
 
@@ -154,7 +197,16 @@ program wrf_hydro_nwm_bmi_driver
 
         ! update current_time
         call stat_check(wrf_hydro%update())
+		print *, " "
     end do
+
+    print *, "==========="
+	print *, "soldrain_flat_daysum ave unit: m3perhour: ", &
+				SUM(soldrain_flat_daysum*dxdy*dxdy/24./1.E3)/size(soldrain_flat_daysum)
+	print *, "soldrain_flat_daysum ave unit: mperhour : ", &
+				SUM(soldrain_flat_daysum/24./1.E3)/size(soldrain_flat_daysum)
+    print *, "==========="
+	print *, " "
 
     kk=1
     do ii = ny, 1, -1
