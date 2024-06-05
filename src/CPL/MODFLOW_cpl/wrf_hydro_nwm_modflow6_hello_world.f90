@@ -29,6 +29,13 @@ program wrf_hydro_nwm_bmi_driver
   integer, allocatable :: soldrain_grid_shape(:)
   integer :: soldrain_grid_shape_const(2)
 
+  ! moddrain
+  integer :: moddrain_grid, moddrain_rank, moddrain_size
+  real, allocatable :: moddrain(:,:), SIMVALS_flipped(:,:)
+  real, allocatable :: moddrain_flat(:), moddrain_flat_daysum(:)
+  integer, allocatable :: moddrain_grid_shape(:)
+  integer :: moddrain_grid_shape_const(2)
+
   ! modflow
   integer :: modflow_output_item_count
   integer :: x_grid, x_rank, x_size
@@ -37,6 +44,7 @@ program wrf_hydro_nwm_bmi_driver
   integer :: x_grid_shape_const(1)
   integer :: nx, ny, ii, jj, kk
   double precision, allocatable :: x(:,:), x_flat(:)
+  double precision, allocatable :: SIMVALS_flat(:), SIMVALS_flat_flipped(:)  
   double precision, allocatable :: rch_flat(:), rch_flat_flipped(:)
   double precision, allocatable :: grid_x(:), grid_y(:)
 
@@ -76,8 +84,14 @@ program wrf_hydro_nwm_bmi_driver
   call stat_check(wrf_hydro%get_grid_shape(soldrain_grid, soldrain_grid_shape))
   soldrain_grid_shape_const = soldrain_grid_shape
   call stat_check(wrf_hydro%get_grid_size(soldrain_grid, soldrain_size))
-
   ! --- done setting up soldrain variables
+
+  ! --- setup moddrain variables
+  call stat_check(wrf_hydro%get_var_grid("moddrain", moddrain_grid))
+  call stat_check(wrf_hydro%get_grid_rank(moddrain_grid, moddrain_rank))
+  call stat_check(wrf_hydro%get_grid_shape(moddrain_grid, moddrain_grid_shape))
+  moddrain_grid_shape_const = moddrain_grid_shape
+  call stat_check(wrf_hydro%get_grid_size(moddrain_grid, moddrain_size))
 
   ! --- setup modflow x variable
   call stat_check(modflow%get_var_grid("X", x_grid))
@@ -101,7 +115,9 @@ program wrf_hydro_nwm_bmi_driver
   allocate(soldrain_flat_daysum(soldrain_size))
   allocate(soldrain_flat_daysum_flip(x_size))
   allocate(soldrain(soldrain_grid_shape(1), soldrain_grid_shape(2)))
-  
+  allocate(moddrain(moddrain_grid_shape(1), moddrain_grid_shape(2)))
+  allocate(SIMVALS_flipped(moddrain_grid_shape(1), moddrain_grid_shape(2)))
+
   ! allocate(x(x_grid_shape(1), x_grid_shape(2)))
   ! --- done setting up x variable
 
@@ -138,9 +154,12 @@ program wrf_hydro_nwm_bmi_driver
     ! get current values
     call stat_check(modflow%get_value("X", x_flat))
     call stat_check(modflow%get_value("RECHARGE", rch_flat))
-    ! x = reshape(x_flat, x_grid_shape_const)
-	 
 
+    call stat_check(modflow%get_grid_flipped("SIMVALS", SIMVALS_flat_flipped))
+    ! 1-D to 2-D before setting WRF-Hydro grid
+	! DRN is negative in MODFLOW
+	SIMVALS_flipped = reshape(-SIMVALS_flat_flipped, moddrain_grid_shape_const)
+	 
     call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
 
     soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
@@ -159,8 +178,8 @@ program wrf_hydro_nwm_bmi_driver
 	print *, "RCHA ave     : ", SUM(rch_flat)/size(x_flat)*dxdy*dxdy
 	print *, "RCHA min, max: ", minval(rch_flat)*dxdy*dxdy, maxval(rch_flat)*dxdy*dxdy
 
-	! print *, "SIMVALS_flipped ave     : ", SUM(SIMVALS_flat_flipped)/size(x_flat)
-	! print *, "SIMVALS_flipped min, max: ", minval(SIMVALS_flat_flipped), maxval(SIMVALS_flat_flipped)	
+	print *, "SIMVALS_flipped ave     : ", SUM(SIMVALS_flat_flipped)/size(soldrain_flat)
+	print *, "SIMVALS_flipped min, max: ", minval(SIMVALS_flat_flipped), maxval(SIMVALS_flat_flipped)	
 
 	print *, "soldrain ave:             ", SUM(soldrain_flat)/size(soldrain_flat)
 	print *, "soldrain sum of ave:      ", soldrainavesum
@@ -180,7 +199,7 @@ program wrf_hydro_nwm_bmi_driver
                  "conv", real(time_step_conv)
 
         call stat_check(wrf_hydro%get_value("soldrain", soldrain_flat))
-        soldrain = reshape(soldrain_flat, soldrain_grid_shape_const)
+        ! soldrain = reshape(soldrain_flat, soldrain_grid_shape_const)
         soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
 		soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
 	    print *, "soldrain ave: ", SUM(soldrain_flat)/size(soldrain_flat)
@@ -188,7 +207,9 @@ program wrf_hydro_nwm_bmi_driver
 		print *, "soldrain_flat_daysum ave: ", &
 		          SUM(soldrain_flat_daysum)/size(soldrain_flat_daysum)
 
-
+		!unit change: m3/hour to m -----> I think it is m3/hour to m/hour
+        moddrain = (SIMVALS_flipped*24./dxdy/dxdy) * time_step_conv
+        call stat_check(wrf_hydro%set_value("moddrain", pack(moddrain, .true.)))
 
         ! --- update soldrain value
         ! soldrain = x_flat * time_step_conv
@@ -203,8 +224,10 @@ program wrf_hydro_nwm_bmi_driver
     print *, "==========="
 	print *, "soldrain_flat_daysum ave unit: m3perhour: ", &
 				SUM(soldrain_flat_daysum*dxdy*dxdy/24./1.E3)/size(soldrain_flat_daysum)
-	print *, "soldrain_flat_daysum ave unit: mperhour : ", &
+	print *, "soldrain_flat_daysum ave unit: mperhour:  ", &
 				SUM(soldrain_flat_daysum/24./1.E3)/size(soldrain_flat_daysum)
+	print *, "moddrain_flat        ave unit: mperhour:  ", &
+				SUM(SIMVALS_flat_flipped/dxdy/dxdy)/size(SIMVALS_flat_flipped)	
     print *, "==========="
 	print *, " "
 
