@@ -181,7 +181,7 @@ CONTAINS
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  SMSTOT    ! total soil water [mm][not used]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  SFCRUNOFF ! accumulated surface runoff [m]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  UDRUNOFF  ! accumulated sub-surface runoff [m]
-	REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  ACMODDRAIN  ! accumulated modflow MODDRAIN [m]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  ACMODDRAIN ! accumulated modflow MODDRAIN [m]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  ALBEDO    ! total grid albedo []
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  SNOWC     ! snow cover fraction []
     REAL,    DIMENSION( ims:ime, 1:nsoil, jms:jme ), INTENT(INOUT) ::  SMOIS     ! volumetric soil moisture [m3/m3]
@@ -366,7 +366,7 @@ CONTAINS
     REAL                                :: SMCWTD       ! soil moisture content in the layer to the water table when deep
     REAL                                :: DEEPRECH     ! recharge to the water table when deep
     REAL                                :: RECH         ! recharge to the water table (diagnostic)
-	REAL                                :: MODEXCSS    ! MODFLOW Excess satauration [mm?]
+    REAL                                :: MODEXCSS     ! MODFLOW Excess satauration [mm?]
     REAL, DIMENSION(-2:NSOIL)           :: ZSNSO        ! snow layer depth [m]
     REAL, DIMENSION(-2:              0) :: SNICE        ! snow layer ice [mm]
     REAL, DIMENSION(-2:              0) :: SNLIQ        ! snow layer liquid water [mm]
@@ -1002,7 +1002,7 @@ CONTAINS
                                   ! move NOAHMP_GLACIER to after CROCUS
                                   ! for temperatre glacier, set top soil temp to 272
           ZP_TG(1) = 272.0
-          ! Why is this if block here? Not sure top condition would ever trigger  
+          ! Why is this if block here? Not sure top condition would ever trigger
           ! given we are already in an if block requiring ZP_SNOWDZ(1,1) .gt. 0.0. (AD)
           IF (ZP_SNOWDZ(1,1) .eq. 0.0 .and. ZP_SRSNOW(1) .eq. 0.0) THEN
           ELSE
@@ -1349,7 +1349,7 @@ CONTAINS
              SMSTOT   (I,J)                = 0.0  ! [maintained as Noah consistency]
              SFCRUNOFF(I,J)                = SFCRUNOFF(I,J) + RUNSF * DT
              UDRUNOFF (I,J)                = UDRUNOFF(I,J)  + RUNSB * DT
-			 ACMODDRAIN(I,J)               = ACMODDRAIN(I,J) + MODEXCSS
+             ACMODDRAIN(I,J)               = ACMODDRAIN(I,J) + MODEXCSS
 #ifdef WRF_HYDRO
              if(present(ACCPRCP)) ACCPRCP  (I,J)                = ACCPRCP(I,J) + PRCP * DT
              if(present(ACCECAN)) ACCECAN  (I,J)                = ACCECAN(I,J) + ECAN * DT

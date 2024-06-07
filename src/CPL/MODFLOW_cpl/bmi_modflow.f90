@@ -198,8 +198,8 @@ contains
     bmi_status = get_modflow_var_address(c_var_address, grid)
     bmi_status = this%get_grid_size(grid, grid_size)
     allocate(f_var(grid_size))
-	! f_var = reshape(src, shape(f_var))
-	f_var = pack(src, .true.)
+    ! f_var = reshape(src, shape(f_var))
+    f_var = pack(src, .true.)
     f_var_ptr => f_var
     c_var_ptr = c_loc(f_var_ptr)
 
@@ -221,11 +221,11 @@ contains
     integer, target, allocatable, dimension(:) :: f_var
     integer, allocatable :: grid_shape(:)
     integer :: grid, grid_size
-	! print *, "I am here II"
+    ! print *, "I am here II"
     bmi_status = this%get_var_grid(name, grid)
     bmi_status = get_modflow_var_address(c_var_address, grid)
     bmi_status = this%get_grid_size(grid, grid_size)
-	print *, "There you go! grid_size of ibounds: ", grid, grid_size
+    print *, "There you go! grid_size of ibounds: ", grid, grid_size
     allocate(f_var(grid_size))
     f_var_ptr => f_var
     c_var_ptr = c_loc(f_var_ptr)
@@ -262,42 +262,41 @@ contains
   ! Get the grid flipped when array orientation is opposite between two components.
   ! here betweeh MODFLOW and WRF-Hydro  module procedure modflow_grid_flipped
   module procedure modflow_grid_flipped
-  
-    use KindModule, only: I4B
-	use BaseDisModule, only: DisBaseType
-	use GwfDisModule, only: GwfDisType
-	use DrnModule, only: DrnType
-	use ListsModule, only: basemodellist
-	use BaseModelModule, only: BaseModelType, GetBaseModelFromList
-	use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
-	use BndModule, only: BndType, GetBndFromList
-	use GwfModule, only: GwfModelType
-	use GwtModule, only: GwtModelType
- 
-    double precision, allocatable :: grid_x(:), grid_y(:)
-	double precision, allocatable, dimension(:) :: src, src_, src_flipped
-	character(len=LENBOUNDNAME) :: bndName
-	integer(I4B) :: ngwfpack, iterm
-    integer(I4B) :: grid, grid_size, nx, ny, i, ii, jj, kk, nxny, ip, idx1, idx2, idx3
-	
-    class(BaseModelType), pointer :: baseModel => null()
-	type(GwfModelType), pointer :: gwfmodel => null()
-	class(BndType), pointer :: packobj => null()
-	class(NumericalModelType), pointer :: numericalModel
-	
-    bmi_status = this%get_var_grid(name, grid)
-	bmi_status = this%get_grid_size(grid, grid_size)
-	
-	bmi_status = this%get_grid_x(grid, grid_x)
-	bmi_status = this%get_grid_y(grid, grid_y)
-	
-	nx = size(grid_x) - 1
-	ny = size(grid_y) - 1
-	nxny = nx*ny
 
-	allocate(src(grid_size))
-	
-	print *, "nx, ny, ", nx, ny, grid_size
+    use KindModule, only: I4B
+    use BaseDisModule, only: DisBaseType
+    use DrnModule, only: DrnType
+    use ListsModule, only: basemodellist
+    use BaseModelModule, only: BaseModelType, GetBaseModelFromList
+    use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
+    use BndModule, only: BndType, GetBndFromList
+    use GwfModule, only: GwfModelType
+    use GwtModule, only: GwtModelType
+
+    double precision, allocatable :: grid_x(:), grid_y(:)
+    double precision, allocatable, dimension(:) :: src, src_, src_flipped
+    character(len=LENBOUNDNAME) :: bndName
+    integer(I4B) :: ngwfpack, iterm
+    integer(I4B) :: grid, grid_size, nx, ny, i, ii, jj, kk, nxny, ip, idx1, idx2, idx3
+
+    class(BaseModelType), pointer :: baseModel => null()
+    type(GwfModelType), pointer :: gwfmodel => null()
+    class(BndType), pointer :: packobj => null()
+    class(NumericalModelType), pointer :: numericalModel
+
+    bmi_status = this%get_var_grid(name, grid)
+    bmi_status = this%get_grid_size(grid, grid_size)
+
+    bmi_status = this%get_grid_x(grid, grid_x)
+    bmi_status = this%get_grid_y(grid, grid_y)
+
+    nx = size(grid_x) - 1
+    ny = size(grid_y) - 1
+    nxny = nx*ny
+
+    allocate(src(grid_size))
+
+    print *, "nx, ny, ", nx, ny, grid_size
 
     if (name .eq. "SIMVALS") then
         bndName = "DRN"
@@ -306,63 +305,63 @@ contains
        error stop "bndName is not found"
 
     end if
-	
-    bmi_status = this%get_value("SIMVALS", src)
-	print *, "SIMVALS ave, min, max: ", SUM(src)/size(src), minval(src), maxval(src)
 
-	allocate(src_(nxny))
-	allocate(src_flipped(nxny))
-	allocate(dst(nxny))
-	src_        = 0.
-	src_flipped = 0.
-	  
+    bmi_status = this%get_value("SIMVALS", src)
+    print *, "SIMVALS ave, min, max: ", SUM(src)/size(src), minval(src), maxval(src)
+
+    allocate(src_(nxny))
+    allocate(src_flipped(nxny))
+    allocate(dst(nxny))
+    src_        = 0.
+    src_flipped = 0.
+
     print *, "grid_size_red, grid_size_ful: ", grid_size, nxny
-	
+
     print *, "basemodellist%Count: ", basemodellist%Count()
 
     do i = 1, basemodellist%Count()
       baseModel => GetBaseModelFromList(basemodellist, i)
-	  numericalModel => GetNumericalModelFromList(basemodellist, i)
-	  
-	  print *, "model name elements: ", baseModel%name
-	  
-	  select type (baseModel)
+      numericalModel => GetNumericalModelFromList(basemodellist, i)
+
+      print *, "model name elements: ", baseModel%name
+
+      select type (baseModel)
       type is (GwfModelType)
-           gwfmodel => baseModel
+         gwfmodel => baseModel
       end select
     end do
 
     ngwfpack = gwfmodel%bndlist%Count()
-	iterm = 1
+    iterm = 1
     do ip = 1, ngwfpack
-	   packobj => GetBndFromList(gwfmodel%bndlist, ip)
-	   print *, "gwfmodel%bndlist%Count(), ngwfpack", ngwfpack
-	   
-	   if (trim(packobj%packName) == bndName) then
-			
-         print *, "iterm, ip: ", iterm, ip
-	     print *, "packobj%packName ", trim(packobj%packName)
+       packobj => GetBndFromList(gwfmodel%bndlist, ip)
+       print *, "gwfmodel%bndlist%Count(), ngwfpack", ngwfpack
+
+       if (trim(packobj%packName) == bndName) then
+
+          print *, "iterm, ip: ", iterm, ip
+          print *, "packobj%packName ", trim(packobj%packName)
 
          ! mapping reduced size array to full array
          if (grid_size < nxny) then
-	  
-	     do ii = 1, grid_size
-			idx1 = packobj%nodelist(ii)
-			
-			
-			! if MODFLOW idomain is all 1 (box) these two function below are the same
-			! if there are inactive domain cell ----> two functions are different
-            idx2 = packobj%dis%get_nodeuser(idx1)
-			idx3 = packobj%dis%get_nodenumber(idx1, 0)
 
-			if (idx2 .ne. idx3) print *, "ATTENTION! get_nodeuser AND get_nodenumber ARE DIFFERENT!", &
-			                                idx2, idx3
-            src_(idx2) = src(ii)
-	     end do
-         src = src_
+            do ii = 1, grid_size
+               idx1 = packobj%nodelist(ii)
+
+
+               ! if MODFLOW idomain is all 1 (box) these two function below are the same
+               ! if there are inactive domain cell ----> two functions are different
+               idx2 = packobj%dis%get_nodeuser(idx1)
+               idx3 = packobj%dis%get_nodenumber(idx1, 0)
+
+               if (idx2 .ne. idx3) print *, "ATTENTION! get_nodeuser AND get_nodenumber ARE DIFFERENT!", &
+                    idx2, idx3
+               src_(idx2) = src(ii)
+            end do
+            src = src_
          end if
-	   end if
-	   iterm = iterm + 1
+      end if
+      iterm = iterm + 1
     end do
 
     kk=1
@@ -370,10 +369,10 @@ contains
     do jj = 1, nx
        src_flipped(kk)=src((ii-1)*nx+jj)
        kk = kk + 1
-	end do	
-	end do
+    end do
+  end do
 
-	dst = src_flipped
+  dst = src_flipped
 
   end procedure ! modflow_grid_flipped
 
@@ -597,81 +596,81 @@ contains
   ! Get the x-coordinates of the nodes of a computational grid.
   module procedure modflow_grid_x
     use mf6bmiGrid, only: get_var_grid
-	use MemoryManagerModule, only: mem_setptr
-	use MemoryHelperModule, only: create_mem_path
-	use KindModule, only: I4B
-	use mf6bmiUtil, only: get_model_name
-	use ConstantsModule, only: LENMODELNAME
-	
-	! use mf6bmiGrid, only: bmif_get_var_grid
-	character(c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
-	integer(kind=c_int) :: var_grid
+    use MemoryManagerModule, only: mem_setptr
+    use MemoryHelperModule, only: create_mem_path
+    use KindModule, only: I4B
+    use mf6bmiUtil, only: get_model_name
+    use ConstantsModule, only: LENMODELNAME
+
+    ! use mf6bmiGrid, only: bmif_get_var_grid
+    character(c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
+    integer(kind=c_int) :: var_grid
     real(kind=c_double), allocatable :: c_grid_x(:)
     integer :: grid_rank
     integer(I4B), dimension(:), pointer, contiguous :: grid_shape_x
     ! integer(I4B), dimension(1) :: grid_shape_x
-	integer(I4B) :: x_size, i
+    integer(I4B) :: x_size, i
     character(len=LENMODELNAME) :: model_name
-	
-	bmi_status = get_modflow_var_address(c_var_address, grid)
-	bmi_status = get_var_grid(c_var_address, var_grid)
-	
-	model_name = get_model_name(var_grid)
+
+    bmi_status = get_modflow_var_address(c_var_address, grid)
+    bmi_status = get_var_grid(c_var_address, var_grid)
+
+    model_name = get_model_name(var_grid)
 
     bmi_status = this%get_grid_rank(grid, grid_rank)
 
-	call mem_setptr(grid_shape_x, "MSHAPE", create_mem_path(model_name, 'DIS'))
-	! print *, "grid_shape_x: ", grid_shape_x
+    call mem_setptr(grid_shape_x, "MSHAPE", create_mem_path(model_name, 'DIS'))
+    ! print *, "grid_shape_x: ", grid_shape_x
 
-	x_size = grid_shape_x(size(grid_shape_x)) + 1
-	! print *, "grid_shape_x(size(grid_shape_x))", grid_shape_x(size(grid_shape_x)), x_size
-	
+    x_size = grid_shape_x(size(grid_shape_x)) + 1
+    ! print *, "grid_shape_x(size(grid_shape_x))", grid_shape_x(size(grid_shape_x)), x_size
+
     allocate(c_grid_x(x_size))
     allocate(x(x_size))
-	
-	c_grid_x(1:x_size) = [(i, i=0, x_size - 1)]
-	x = c_grid_x
+
+    c_grid_x(1:x_size) = [(i, i=0, x_size - 1)]
+    x = c_grid_x
   end procedure ! modflow_grid_x
 
   ! Get the y-coordinates of the nodes of a computational grid.
   module procedure modflow_grid_y
     use mf6bmiGrid, only: get_var_grid
-	use MemoryManagerModule, only: mem_setptr
-	use MemoryHelperModule, only: create_mem_path
-	use KindModule, only: I4B
-	use mf6bmiUtil, only: get_model_name
-	use ConstantsModule, only: LENMODELNAME
-	
-	! use mf6bmiGrid, only: bmif_get_var_grid
-	character(c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
-	integer(kind=c_int) :: var_grid
+    use MemoryManagerModule, only: mem_setptr
+    use MemoryHelperModule, only: create_mem_path
+    use KindModule, only: I4B
+    use mf6bmiUtil, only: get_model_name
+    use ConstantsModule, only: LENMODELNAME
+
+    ! use mf6bmiGrid, only: bmif_get_var_grid
+    character(c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
+    integer(kind=c_int) :: var_grid
     real(kind=c_double), allocatable :: c_grid_y(:)
     integer :: grid_rank
     integer(I4B), dimension(:), pointer, contiguous :: grid_shape_y
     ! integer(I4B), dimension(1) :: grid_shape_y
-	integer(I4B) :: y_size, i
+    integer(I4B) :: y_size, i
     character(len=LENMODELNAME) :: model_name
-	
-	bmi_status = get_modflow_var_address(c_var_address, grid)
-	bmi_status = get_var_grid(c_var_address, var_grid)
-	
-	model_name = get_model_name(var_grid)
+
+    bmi_status = get_modflow_var_address(c_var_address, grid)
+    bmi_status = get_var_grid(c_var_address, var_grid)
+
+    model_name = get_model_name(var_grid)
 
     bmi_status = this%get_grid_rank(grid, grid_rank)
 
-	call mem_setptr(grid_shape_y, "MSHAPE", create_mem_path(model_name, 'DIS'))
-	! print *, "grid_shape_y: ", grid_shape_y
+    call mem_setptr(grid_shape_y, "MSHAPE", create_mem_path(model_name, 'DIS'))
+    ! print *, "grid_shape_y: ", grid_shape_y
 
-	y_size = grid_shape_y(size(grid_shape_y) - 1) + 1
-	! print *, "grid_shape_y(size(grid_shape_y) - 1)", grid_shape_y(size(grid_shape_y) - 1), y_size
+    y_size = grid_shape_y(size(grid_shape_y) - 1) + 1
+    ! print *, "grid_shape_y(size(grid_shape_y) - 1)", grid_shape_y(size(grid_shape_y) - 1), y_size
 
     allocate(c_grid_y(y_size))
     allocate(y(y_size))
 
-	c_grid_y(1:y_size) = [(i, i=y_size - 1, 0, -1)]
-	! print *, c_grid_y
-	
-	y = c_grid_y
+    c_grid_y(1:y_size) = [(i, i=y_size - 1, 0, -1)]
+    ! print *, c_grid_y
+
+    y = c_grid_y
   end procedure ! modflow_grid_y
 
   ! Get the z-coordinates of the nodes of a computational grid.
@@ -904,33 +903,33 @@ contains
 
     if (grid == 1) then
        allocate(character(len("X")+1) :: f_var_name)
-	   allocate(character(len("")+1) :: f_subcomponent_name)
+       allocate(character(len("")+1) :: f_subcomponent_name)
        f_var_name = "X"//c_null_char
-	   f_subcomponent_name = ""//c_null_char
+       f_subcomponent_name = ""//c_null_char
     else if (grid == 2) then
        allocate(character(len("head")+1) :: f_var_name)
        f_var_name = "head"//c_null_char
     else if (grid == 3) then
        allocate(character(len("RECHARGE")+1) :: f_var_name)
-	   
-	   ! This (subcomponent/package name; here RCH) should be read 
-	   ! from modflow_subset.nam (f_component_name//".nam")
-	   ! similar to f_component_name above
-	   
-	   allocate(character(len("RCH")+1) :: f_subcomponent_name)
+
+       ! This (subcomponent/package name; here RCH) should be read
+       ! from modflow_subset.nam (f_component_name//".nam")
+       ! similar to f_component_name above
+
+       allocate(character(len("RCH")+1) :: f_subcomponent_name)
        f_var_name = "RECHARGE"//c_null_char
-	   f_subcomponent_name = "RCH"//c_null_char
+       f_subcomponent_name = "RCH"//c_null_char
     else if (grid == 7) then
        allocate(character(len("SIMVALS")+1) :: f_var_name)
-	   allocate(character(len("DRN")+1) :: f_subcomponent_name)
+       allocate(character(len("DRN")+1) :: f_subcomponent_name)
        f_var_name = "SIMVALS"//c_null_char
-	   f_subcomponent_name = "DRN"//c_null_char
+       f_subcomponent_name = "DRN"//c_null_char
     else
        print *, "ERROR: grid", grid, "was not found"
        error stop "grid is not found"
     end if
     c_var_name = f_to_c_str(f_var_name )
-	c_subcomponent_name = f_to_c_str(f_subcomponent_name )
+    c_subcomponent_name = f_to_c_str(f_subcomponent_name )
 
     bmi_status = get_var_address(&
          c_component_name(1:len(f_component_name)), &
