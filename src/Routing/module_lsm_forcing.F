@@ -3259,7 +3259,7 @@ end subroutine read_hydro_forcing_mpp1
 
   end subroutine READSNOW_FORC_mpp
 
-  subroutine read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+  subroutine read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain,moddrain)
 
       implicit none
       logical :: fexist
@@ -3268,7 +3268,7 @@ end subroutine read_hydro_forcing_mpp1
       character(len=19) :: outdate
       character(len=256) :: inflnm, inflnm2
       real :: dt
-      real, dimension(ix,jx):: infxsrt,infxsrt2,soldrain,soldrain2
+      real, dimension(ix,jx):: infxsrt,infxsrt2,soldrain,soldrain2,moddrain,moddrain2
       integer :: ncid, ierr
       character(len=256) :: units
 #ifdef MPP_LAND
@@ -3323,6 +3323,12 @@ end subroutine read_hydro_forcing_mpp1
            call get_2d_netcdf("UGDRNOFF",    ncid, gArr, units, global_nx, global_ny, .TRUE., ierr)
         endif
         call decompose_data_real (gArr,soldrain)
+
+        if(my_id .eq. io_id) then
+           call get_2d_netcdf("MODDRAIN",    ncid, gArr, units, global_nx, global_ny, .TRUE., ierr)
+        endif
+        call decompose_data_real (gArr,moddrain)
+
         if(my_id .eq. io_id) then
             ierr = nf90_close(ncid)
         endif
@@ -3330,6 +3336,7 @@ end subroutine read_hydro_forcing_mpp1
         ierr = nf90_open(trim(inflnm), NF90_NOWRITE, ncid)
         call get_2d_netcdf("SFCRNOFF",    ncid, infxsrt, units,  ix, jx, .TRUE., ierr)
         call get_2d_netcdf("UGDRNOFF",    ncid, soldrain, units,  ix, jx, .TRUE., ierr)
+        call get_2d_netcdf("MODDRAIN",    ncid, moddrain, units,  ix, jx, .TRUE., ierr)
         ierr = nf90_close(ncid)
 #endif
 !       read file2
@@ -3343,6 +3350,12 @@ end subroutine read_hydro_forcing_mpp1
            call get_2d_netcdf("UGDRNOFF",    ncid, gArr, units, global_nx, global_ny, .TRUE., ierr)
         endif
         call decompose_data_real (gArr,soldrain2)
+
+        if(my_id .eq. io_id) then
+           call get_2d_netcdf("MODDRAIN",    ncid, gArr, units, global_nx, global_ny, .TRUE., ierr)
+        endif
+        call decompose_data_real (gArr,moddrain2)
+
         if(my_id .eq. io_id) then
            ierr = nf90_close(ncid)
         endif
@@ -3350,11 +3363,13 @@ end subroutine read_hydro_forcing_mpp1
         ierr = nf90_open(trim(inflnm2), NF90_NOWRITE, ncid)
         call get_2d_netcdf("SFCRNOFF",    ncid, infxsrt2, units,  ix, jx, .TRUE., ierr)
         call get_2d_netcdf("UGDRNOFF",    ncid, soldrain2, units,  ix, jx, .TRUE., ierr)
+        call get_2d_netcdf("MODDRAIN",    ncid, moddrain2, units,  ix, jx, .TRUE., ierr)
         ierr = nf90_close(ncid)
 #endif
 
         infxsrt = infxsrt2 - infxsrt
         soldrain = soldrain2 - soldrain
+        moddrain = moddrain2 - moddrain
 
    end subroutine read_ldasout
 
@@ -3426,14 +3441,14 @@ end subroutine read_hydro_forcing_mpp1
    end subroutine read_ldasout_seq
 end module module_lsm_forcing
 
-     subroutine read_forc_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+     subroutine read_forc_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain,moddrain)
       use module_lsm_forcing, only: read_ldasout
       implicit none
       integer :: ix,jx
       character(len=*) :: olddate,hgrid,indir
       real :: dt
-      real, dimension(ix,jx):: infxsrt,soldrain
-      call read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+      real, dimension(ix,jx):: infxsrt,soldrain,moddrain
+      call read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain,moddrain)
     end subroutine read_forc_ldasout
 
     subroutine read_forc_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)

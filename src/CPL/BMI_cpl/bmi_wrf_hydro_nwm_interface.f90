@@ -444,7 +444,7 @@ module bmi_wrf_hydro_nwm_mod
     module function wrf_hydro_grid_x(this, grid, x) result(bmi_status)
       class(bmi_wrf_hydro_nwm), intent(in) :: this
       integer, intent(in) :: grid
-      double precision, dimension(:), intent(out) :: x
+      double precision, dimension(:), intent(out), allocatable :: x
       integer :: bmi_status
     end function wrf_hydro_grid_x
 
@@ -452,7 +452,7 @@ module bmi_wrf_hydro_nwm_mod
     module function wrf_hydro_grid_y(this, grid, y) result(bmi_status)
       class(bmi_wrf_hydro_nwm), intent(in) :: this
       integer, intent(in) :: grid
-      double precision, dimension(:), intent(out) :: y
+      double precision, dimension(:), intent(out), allocatable :: y
       integer :: bmi_status
     end function wrf_hydro_grid_y
 

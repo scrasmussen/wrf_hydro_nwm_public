@@ -2,8 +2,9 @@ module bmi_modflow_mod
   use bmif_2_0
   use mf6bmi, only: BMI_LENCOMPONENTNAME
   use mf6bmiUtil, only: BMI_LENVARADDRESS
+  use ConstantsModule, only: LENBOUNDNAME
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_int, c_char, &
-       c_null_char
+       c_null_char, c_double
   implicit none
 
   integer, parameter :: input_item_count = 2
@@ -49,6 +50,7 @@ module bmi_modflow_mod
      procedure :: get_grid_x => modflow_grid_x
      procedure :: get_grid_y => modflow_grid_y
      procedure :: get_grid_z => modflow_grid_z
+     procedure :: get_grid_flipped => modflow_grid_flipped
      procedure :: get_grid_node_count => modflow_grid_node_count
      procedure :: get_grid_edge_count => modflow_grid_edge_count
      procedure :: get_grid_face_count => modflow_grid_face_count
@@ -430,7 +432,7 @@ module bmi_modflow_mod
     module function modflow_grid_x(this, grid, x) result(bmi_status)
       class(bmi_modflow), intent(in) :: this
       integer, intent(in) :: grid
-      double precision, dimension(:), intent(out) :: x
+      double precision, dimension(:), intent(out), allocatable :: x
       integer :: bmi_status
     end function modflow_grid_x
 
@@ -438,7 +440,7 @@ module bmi_modflow_mod
     module function modflow_grid_y(this, grid, y) result(bmi_status)
       class(bmi_modflow), intent(in) :: this
       integer, intent(in) :: grid
-      double precision, dimension(:), intent(out) :: y
+      double precision, dimension(:), intent(out), allocatable :: y
       integer :: bmi_status
     end function modflow_grid_y
 
@@ -449,6 +451,17 @@ module bmi_modflow_mod
       double precision, dimension(:), intent(out) :: z
       integer :: bmi_status
     end function modflow_grid_z
+
+    ! Get the grid flipped when array orientation is opposite between two components.
+    ! here betweeh MODFLOW and WRF-Hydro
+    ! module function modflow_grid_flipped(this, name, src, dst) result(bmi_status)
+    module function modflow_grid_flipped(this, name, dst) result(bmi_status)
+      class(bmi_modflow), intent(in) :: this
+      character(len=*), intent(in) :: name
+      ! double precision, intent(in) :: src(:)
+      double precision, dimension(:), intent(out), allocatable :: dst
+      integer :: bmi_status
+    end function modflow_grid_flipped
 
     ! Get the number of nodes in an unstructured grid.
     module function modflow_grid_node_count(this, grid, count) result(bmi_status)
