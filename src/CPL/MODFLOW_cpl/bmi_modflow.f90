@@ -185,7 +185,7 @@ contains
 
   ! Set new values for a real model variable.
   module procedure modflow_set_float
-    ! print *, "I am here III"
+
     ! bmi_status = BMI_FAILURE
     use mf6bmi, only: set_value_double
     character(c_char), dimension(BMI_LENVARADDRESS) :: c_var_address
@@ -221,7 +221,7 @@ contains
     integer, target, allocatable, dimension(:) :: f_var
     integer, allocatable :: grid_shape(:)
     integer :: grid, grid_size
-	! print *, "I am here II"
+
     bmi_status = this%get_var_grid(name, grid)
     bmi_status = get_modflow_var_address(c_var_address, grid)
     bmi_status = this%get_grid_size(grid, grid_size)
@@ -308,7 +308,8 @@ contains
     end if
 	
     bmi_status = this%get_value("SIMVALS", src)
-	print *, "SIMVALS ave, min, max: ", SUM(src)/size(src), minval(src), maxval(src)
+	print *, "SIMVALS ave:      ", SUM(src)/size(src)
+	print *, "SIMVALS min, max: ", minval(src), maxval(src)
 
 	allocate(src_(nxny))
 	allocate(src_flipped(nxny))

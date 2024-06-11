@@ -123,7 +123,9 @@ program wrf_hydro_nwm_bmi_driver
 
   ! end_time = 4
   ! print *, "TESTING: Setting end_time to", end_time
-
+  print *, " "
+  print *, "****************************************"
+  print *, " "
   print *, "wrf_hydro: Setting current_time ", current_time
   print *, "wrf_hydro: Setting end_time     ", end_time
   print *, "wrf_hydro: Setting time_step    ", time_step
@@ -134,6 +136,8 @@ program wrf_hydro_nwm_bmi_driver
   print *, "x_grid       , x_rank      ", x_grid, x_rank
   print *, "x_grid_shape , x_size      ", x_grid_shape, x_size
   print *, "size(grid_x) , size(grid_y)", size(grid_x), size(grid_y)
+  print *, " "
+  print *, "****************************************"
   print *, " "
 
   do while (current_time < end_time)
@@ -165,7 +169,9 @@ program wrf_hydro_nwm_bmi_driver
     soldrainavesum = soldrainavesum + SUM(soldrain_flat)/size(soldrain_flat)
 	soldrain_flat_daysum = soldrain_flat_daysum + soldrain_flat
 
+	print *, " "
     print *, "****************************************"
+	print *, " "
     print *, "wrf_hydro: Setting current_time ", current_time
     print *, "wrf_hydro: Setting end_time     ", end_time
     print *, "wrf_hydro: Setting time_step    ", time_step
@@ -186,6 +192,7 @@ program wrf_hydro_nwm_bmi_driver
 	print *, "soldrain_flat_daysum ave: ", &
 		      SUM(soldrain_flat_daysum)/size(soldrain_flat_daysum)
 
+	print *, " "
     print *, "****************************************"
 	print *, " "
 
@@ -221,13 +228,17 @@ program wrf_hydro_nwm_bmi_driver
 		print *, " "
     end do
 
+	print *, " "
     print *, "==========="
+	print *, " "
 	print *, "soldrain_flat_daysum ave unit: m3perhour: ", &
 				SUM(soldrain_flat_daysum*dxdy*dxdy/24./1.E3)/size(soldrain_flat_daysum)
 	print *, "soldrain_flat_daysum ave unit: mperhour:  ", &
 				SUM(soldrain_flat_daysum/24./1.E3)/size(soldrain_flat_daysum)
 	print *, "moddrain_flat        ave unit: mperhour:  ", &
-				SUM(SIMVALS_flat_flipped/dxdy/dxdy)/size(SIMVALS_flat_flipped)	
+				SUM(SIMVALS_flat_flipped/dxdy/dxdy)/size(SIMVALS_flat_flipped)
+	print *, "RCHA                 ave unit: mperhour:  ", SUM(rch_flat)/size(x_flat)
+	print *, " "
     print *, "==========="
 	print *, " "
 
