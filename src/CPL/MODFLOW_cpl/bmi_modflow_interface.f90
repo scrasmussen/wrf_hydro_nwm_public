@@ -453,7 +453,7 @@ module bmi_modflow_mod
     end function modflow_grid_z
 
     ! Get the grid flipped when array orientation is opposite between two components.
-	! here betweeh MODFLOW and WRF-Hydro
+    ! here betweeh MODFLOW and WRF-Hydro
     ! module function modflow_grid_flipped(this, name, src, dst) result(bmi_status)
     module function modflow_grid_flipped(this, name, dst) result(bmi_status)
       class(bmi_modflow), intent(in) :: this

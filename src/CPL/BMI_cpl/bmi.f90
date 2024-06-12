@@ -470,6 +470,7 @@ module bmif_2_0
       import :: bmi
       class(bmi), intent(in) :: this
       integer, intent(in) :: grid
+      ! todo: remove allocatable to match standard
       double precision, dimension(:), intent(out), allocatable :: x
       integer :: bmi_status
     end function bmif_get_grid_x
@@ -479,6 +480,7 @@ module bmif_2_0
       import :: bmi
       class(bmi), intent(in) :: this
       integer, intent(in) :: grid
+      ! todo: remove allocatable to match standard
       double precision, dimension(:), intent(out), allocatable :: y
       integer :: bmi_status
     end function bmif_get_grid_y
