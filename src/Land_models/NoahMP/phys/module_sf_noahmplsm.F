@@ -7577,9 +7577,9 @@ ENDIF   ! CROPTYPE == 0
     SH2O(NSOIL)  = MIN(EPORE,SH2O(NSOIL))
    END IF
 
-   ! I added 
+   ! I added (NO NEED: WPLUS WOULD BE ADDED TO SURF RUNOFF AFTER SSTEP)
    
-   IF(WPLUS > 0.0) QDRAIN = QDRAIN + WPLUS/DT
+   ! IF(WPLUS > 0.0) QDRAIN = QDRAIN + WPLUS/DT
 
    ! Negative soil moisture check
    IF ( ANY(SH2O < 0.0) ) THEN
