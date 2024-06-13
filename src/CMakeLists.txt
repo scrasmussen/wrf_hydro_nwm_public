@@ -120,6 +120,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
     add_dependencies(wrfhydro.exe wrf_hydro_bmi.exe)
     # add_dependencies(wrfhydro.exe wrf_hydro_modflow.exe)
     add_dependencies(wrfhydro.exe modflow_hello_world.exe)
+    add_dependencies(wrfhydro.exe wrf_hydro-modflow-driver.exe)
 
     target_link_libraries(module_NoahMP_hrldas
         wrfhydro_lib)
@@ -174,6 +175,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
 	# COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi_cpp.exe ${CMAKE_BINARY_DIR}/Run/
 	# COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro_modflow.exe ${CMAKE_BINARY_DIR}/Run/
 	COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/modflow_hello_world.exe ${CMAKE_BINARY_DIR}/Run/
+	COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro-modflow-driver.exe ${CMAKE_BINARY_DIR}/Run/
 	)
 
 elseif(HYDRO_LSM MATCHES "Noah")
