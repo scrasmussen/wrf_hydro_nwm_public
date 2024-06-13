@@ -25,6 +25,11 @@ contains
 
   ! --------------------------------------------------------------------
 
+  module procedure parallel_initialize
+    use mf6xmi, only: xmi_initialize_mpi
+    bmi_status = xmi_initialize_mpi(comm)
+  end procedure ! parallel_initialize
+
   ! Get the name of the model.
   module procedure modflow_component_name
     use mf6bmi, only: bmi_get_component_name
@@ -44,16 +49,24 @@ contains
   module procedure modflow_initialize
     use mf6bmi, only: bmi_initialize
     use SimVariablesModule, only: simfile
+    use SimVariablesModule, only: simulation_mode
+    use mpi
     integer :: unit, err
     logical :: found
     character(len=256) :: line
     character(len=64) :: foo
     integer :: s_start, s_end, s_len
-    bmi_status = bmi_initialize()
+    integer :: rank, ierr, i
+    ! TODO: make sure the following would work
+    ! if (trim(simulation_mode) /= 'parallel')
+    !   bmi_status = bmi_initialize()
+    ! end if
 
     ! GOALZ :: get third
     !   gwf6  ex-gwf-fhb.nam  ex-gwf-fhb
     !   gwf6  modflow_subset.nam  modflow_subset
+    print *, "=== BMI: STARTING MODFLOW INIT ==="
+    print *, "simulation_mode =", trim(simulation_mode)
 
     ! read simfile to extract component name
     open(newunit=unit, file=simfile, status='old', action='read', iostat=err)
@@ -78,7 +91,21 @@ contains
        print *, "ERROR: Did not find 'BEGIN models' in", simfile
        error stop 1
     end if
-    read(unit, '(A)', iostat=err) line
+
+    ! TODO: make sure the following would work
+    ! if (trim(simulation_mode) == 'parallel')
+    !   call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    !   do i=0,rank
+    !     read(unit, '(A)', iostat=err) line
+    !   end do
+    ! else
+    !  read(unit, '(A)', iostat=err) line
+    ! end if
+    print *, "simulation_mode =", trim(simulation_mode)
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    do i=0,rank
+       read(unit, '(A)', iostat=err) line
+    end do
     close(unit)
 
     ! handle component name
@@ -416,12 +443,14 @@ contains
   !---------------------------------------------------------------------
   ! Start time of the model.
   module procedure modflow_start_time
-    bmi_status = BMI_FAILURE
+    use mf6bmi, only: get_start_time
+    bmi_status = get_start_time(time)
   end procedure ! modflow_start_time
 
   ! End time of the model.
   module procedure modflow_end_time
-    bmi_status = BMI_FAILURE
+    use mf6bmi, only: get_start_time
+    bmi_status = get_start_time(time)
   end procedure ! modflow_end_time
 
   ! Time step of the model.

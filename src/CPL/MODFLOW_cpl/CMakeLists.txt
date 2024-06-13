@@ -23,6 +23,14 @@ target_link_libraries(modflow_hello_world.exe
   modflow
   ${CMAKE_THREAD_LIBS_INIT})
 
+add_executable(wrf_hydro-modflow-driver.exe
+  wrf_hydro_nwm_modflow6_driver.f90)
+target_link_libraries(wrf_hydro-modflow-driver.exe
+  bmi_wrf_hydro_nwm
+  bmi_modflow
+  modflow
+  ${CMAKE_THREAD_LIBS_INIT})
+
 target_include_directories(bmi_modflow
   PUBLIC ${modflow_lib_dir}/libmf6.so.p/
   ${modflow_lib_dir}/../src/libmf6core.a.p/

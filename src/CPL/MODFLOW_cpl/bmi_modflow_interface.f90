@@ -1,6 +1,6 @@
 module bmi_modflow_mod
   use bmif_2_0
-  use mf6bmi, only: BMI_LENCOMPONENTNAME
+  use mf6bmiUtil, only: BMI_LENCOMPONENTNAME
   use mf6bmiUtil, only: BMI_LENVARADDRESS
   use ConstantsModule, only: LENBOUNDNAME
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_int, c_char, &
@@ -100,9 +100,17 @@ module bmi_modflow_mod
           set_value_at_indices_double
      ! non-BMI procedures
      ! procedure :: print_model_info
+     procedure :: parallel_initialize
   end type bmi_modflow
 
   interface
+
+    module function parallel_initialize(this, comm) &
+      result(bmi_status)
+      class(bmi_modflow), intent(in) :: this
+      integer, intent(in) :: comm
+      integer :: bmi_status
+    end function parallel_initialize
 
     ! Perform startup tasks for the model.
     module function modflow_initialize(this, config_file) result(bmi_status)
