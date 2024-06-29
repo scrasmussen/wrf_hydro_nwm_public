@@ -30,7 +30,7 @@ contains
           end if
 
           if (j < y_np) then
-             end_y(index+1) = start_y(index+1+y_np) - 1
+             end_y(index+1) = start_y(index+1+x_np) - 1
           else
              end_y(index+1) = ny
           end if
