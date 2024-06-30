@@ -9,8 +9,8 @@ import sys
 
 def main():
     print('--- Starting Python Decomposition Tool---')
-    np_int = parseCLA()
-    np_int = int(np_int)
+    np_s = parseCLA()
+    np_int = int(np_s)
 
     print("Reporting decomposition of", np_int, "processes")
 
