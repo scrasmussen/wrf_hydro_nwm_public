@@ -1,3 +1,3 @@
 [submodule "src/Land_models/NoahMP"]
 	path = src/Land_models/NoahMP
-	url = git@github.com:scrasmussen/noahmp.git
+	url = git@github.com:NCAR/noahmp.git
