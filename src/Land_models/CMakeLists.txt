@@ -21,7 +21,7 @@ add_library(noahmp_hrldas_lib
   ${noahmp_drivers_hrldas_dir}/EnergyVarOutTransferMod.F90
   ${noahmp_drivers_hrldas_dir}/ForcingVarInTransferMod.F90
   ${noahmp_drivers_hrldas_dir}/ForcingVarOutTransferMod.F90
-  ${noahmp_drivers_hrldas_dir}/module_domain.F90
+  # ${noahmp_drivers_hrldas_dir}/module_domain.F90
   ${noahmp_drivers_hrldas_dir}/module_ra_gfdleta.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpGroundwaterInitMod.F90
   ${noahmp_drivers_hrldas_dir}/NoahmpInitMainMod.F90
