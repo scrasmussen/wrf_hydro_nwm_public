@@ -1378,15 +1378,47 @@ end subroutine land_driver_ini
      end if
 
 #else
-     call READFORC_HRLDAS(noah_lsm%INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, noah_lsm%OLDDATE, &
-          noah_lsm%xstart, noah_lsm%XEND, noah_lsm%YSTART, noah_lsm%YEND, &
-          noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
-	  noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
-	  noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
-	  noah_lsm%forcing_name_LF, &
-          noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), noah_lsm%V_PHY(:,1,:), &
-	  noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, &
-          noah_lsm%VEGFRA, noah_lsm%update_veg, noah_lsm%LAI, noah_lsm%update_lai)
+     if(noah_lsm%forc_typ .eq. 4) then
+        write(*,*) "Farshid, noah_lsm%forc_typ=4, ITIMESTEP", noah_lsm%ITIMESTEP
+        ! Impose a fixed diurnal cycle...
+        ! assumes model timestep is 1 hr
+        ! assumes K=1 is 12z (Ks or ~ sunrise)
+        ! First Precip...
+        IF (noah_lsm%ITIMESTEP.EQ.2) THEN
+            noah_lsm%RAINBL_tmp =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
+		    ! PRCP1 =0./3600.0      !units mm/s  (Simulates <1"/hr for first 10 hours...)
+        ELSEIF (noah_lsm%ITIMESTEP.GT.1) THEN
+			! PRCP1 =0./3600.0      !units mm/s
+		! ELSE
+            noah_lsm%RAINBL_tmp = 0.
+        END IF
+            ! PRCP1 = 0.
+            ! PRCP1 =10./3600.0      !units mm/s
+            ! Other Met. Vars...
+        noah_lsm%T_PHY(:,1,:)=290.0 + 3.0*(cos((2*3.1416*noah_lsm%ITIMESTEP/24.0)-12.0*2*3.1416/24.0))
+        noah_lsm%QV_CURR(:,1,:) = 0.01
+        noah_lsm%U_PHY(:,1,:) = 1.0
+        noah_lsm%V_PHY = 1.0
+        noah_lsm%P8W(:,1,:) = 100000.0
+        noah_lsm%GLW=400.0 + 25.0*(cos((2*3.1416*noah_lsm%ITIMESTEP/24.0)-12.0*2*3.1416/24.0))
+        noah_lsm%SWDOWN=450.0 + 450.0*(cos((2*3.1416*noah_lsm%ITIMESTEP/24.0)-12.0*2*3.1416/24.0))
+
+        ! print *, "PCP", PRCP1 
+	 
+	 else
+        write(*,*) "Farshid, noah_lsm%forc_typ!=4"
+        call READFORC_HRLDAS(noah_lsm%INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, noah_lsm%OLDDATE, &
+             noah_lsm%xstart, noah_lsm%XEND, noah_lsm%YSTART, noah_lsm%YEND, &
+             noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
+	         noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
+	         noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
+	         noah_lsm%forcing_name_LF, &
+             noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), noah_lsm%V_PHY(:,1,:), &
+	         noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, &
+             noah_lsm%VEGFRA, noah_lsm%update_veg, noah_lsm%LAI, noah_lsm%update_lai)	 
+	 
+	 endif
+
 
      ! =REFACTOR= THIS WAS IN NOAHMPR
      ! if(maxval(noah_lsm%VEGFRA) .le. 1) noah_lsm%VEGFRA = noah_lsm%VEGFRA * 100
