@@ -508,11 +508,13 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
       !TML:Added print statement to test qlos function;
       !comment out to prevent excessive file sizes when running model
       !print*, "qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D", qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D
-      if((qloss*dt)/D > ((ql*dt)/D - C4)) then
-           qloss = ql - C4*(D/dt)
-           if (qloss < 0) then
-              print*, 'WARNING CHANNEL LOSS IS NEGATIVE',qloss
-           endif
+      if (ChannK /= 0) then
+         if((qloss*dt)/D > ((ql*dt)/D - C4)) then
+            qloss = ql - C4*(D/dt)
+            if (qloss < 0) then
+               print*, 'WARNING CHANNEL LOSS IS NEGATIVE',qloss
+            endif
+         endif
       endif
 
 ! ----------------------------------------------------------------
@@ -1599,7 +1601,7 @@ end subroutine drive_CHANNEL
                                          nudgeWAdvance,                      &
                                          nudge_apply_upstream_muskingumCunge
 #endif
-
+      use module_channel_diversions, only: calculate_diversion
 
        implicit none
 
@@ -1958,6 +1960,8 @@ do nt = 1, nsteps
          !              tmpQLINK(k,2) = MUSKINGCUNGE(k,Qup, Quc, QLINK(k,1), &
          !                  QLateral(k), DTRT_CH, So(k),  CHANLEN(k), &
          !                  MannN(k), ChSSlp(k), Bw(k), Tw(k) )
+
+         call calculate_diversion(LINKID(k), -1_int64, Qup, Quc, tmpQLINK(k,2))
 
 #ifdef WRF_HYDRO_NUDGING
          call nudge_apply_upstream_muskingumCunge( Qup,  Quc,  nudge(k),  k )
