@@ -1,48 +1,36 @@
 .. vim: syntax=rst
+.. role:: raw-html(raw)
+   :format: html
 
 APPENDICES
 ==========
 
 This section contains supplementary information.
 
-A1. Example of Dependency Installation for Ubuntu 18.04 LTS
+A1. Example of Dependency Installation for Ubuntu 24.04 LTS
 -----------------------------------------------------------
 
 The example below uses the GNU compilers and Open MPI. Commands are
-issued as root user in the bash shell.
+issued as root user in the bash shell.::
 
-+-----------------------------------------------------------------------+
-| ##################################                                    |
-|                                                                       |
-| ### Get libraries available through apt-get                           |
-|                                                                       |
-| ##################################                                    |
-|                                                                       |
-| apt-get update                                                        |
-|                                                                       |
-| apt-get install wget bzip2 \\                                         |
-|                                                                       |
-| ca-certificates vim hibhdf5-dev \\                                    |
-|                                                                       |
-| gfortran g++ m4 make libswitch-perl \\                                |
-|                                                                       |
-| git tcsh libopenmpi-dev \\                                            |
-|                                                                       |
-| libnetcdff-dev libnetcdf-dev \\                                       |
-|                                                                       |
-| netcdf-bin                                                            |
-|                                                                       |
-| ##################################                                    |
-|                                                                       |
-| ### Check netCDF installs (optional)                                  |
-|                                                                       |
-| ##################################                                    |
-|                                                                       |
-| nf-config --all                                                       |
-|                                                                       |
-| nc-config --all                                                       |
-+=======================================================================+
-+-----------------------------------------------------------------------+
+   ###############################################
+   ### Get libraries available through apt-get ###
+   ###############################################
+
+   apt-get update
+
+   apt-get install wget bzip2 ca-certificates \
+                   gfortran g++ m4 make git \
+                   libopenmpi-dev libhdf5-dev \
+                   libnetcdff-dev libnetcdf-dev \
+                   netcdf-bin
+
+   ###############################################
+   ### Check netCDF installs (optional)        ###
+   ###############################################
+
+   nf-config --all
+   nc-config --all
 
 .. _section-11:
 
@@ -85,214 +73,181 @@ the WRF-Hydro workflow to work with Noah:
 
 .. _section-13:
 
-A3. Noah namelist.hrldas File with Description of Options
----------------------------------------------------------
+A3. Noah `namelist.hrldas` File with Description of Options
+-----------------------------------------------------------
 
 Below is an annotated namelist.hrldas file for running with the Noah
-land surface model. Notes and descriptions are indicated with <<-- and
+land surface model. Notes and descriptions are indicated with <-- and
 blue text.
 
-+-----------------------------------------------------------------------+
-| | **&NOAHLSM_OFFLINE**                                                |
-| | HRLDAS_CONSTANTS_FILE = "./DOMAIN/wrfinput_d01" <<-- Path to        |
-|   wrfinput file containing initialization data for the LSM. This is   |
-|   required even for a warm start where a restart file is provided.    |
-| | INDIR = "./FORCING" <<-- Path to atmospheric forcing data           |
-|   directory.                                                          |
-| | OUTDIR = "./" <<-- Generally leave this as-is (output goes to base  |
-|   run directory); redirected output only applies to LSM output files  |
-|   and can cause issues when running coupled to WRF-Hydro.             |
-| | START_YEAR = 2013 <<-- Simulation start year                        |
-| | START_MONTH = 09 <<-- Simulation start month\ **                    |
-|   **\ START_DAY = 01 <<-- Simulation start day                        |
-| | START_HOUR = 00 <<-- Simulation start hour\ **                      |
-|   **\ START_MIN = 00 <<-- Simulation start min                        |
-| | RESTART_FILENAME_REQUESTED = "RESTART.2013090100_DOMAIN1" <<-- Path |
-|   to LSM restart file if using; this contains a "warm" model state    |
-|   from a previous model run. Comment if not a restart simulation.     |
-| | ! Specification of simulation length in days OR hours               |
-|                                                                       |
-| | KDAY = 1440 <<-- Number of days for simulation; can specify this OR |
-|   KHOUR.                                                              |
-| | !KHOUR = 1 <<-- Number of hours for simulation; can specify this OR |
-|   KDAY.                                                               |
-|                                                                       |
-| | ! Timesteps in units of seconds                                     |
-| | FORCING_TIMESTEP = 3600 <<-- Timestep for forcing input data (in    |
-|   seconds)                                                            |
-| | NOAH_TIMESTEP = 3600 <<-- Timestep the LSM to cycle (in seconds)    |
-| | OUTPUT_TIMESTEP = 86400 <<-- Timestep for LSM outputs, LDASOUT (in  |
-|   seconds)                                                            |
-|                                                                       |
-| | :mark:`! Land surface model restart file write frequency`           |
-| | RESTART_FREQUENCY_HOURS = 6 <<-- Timestep for LSM restart files to  |
-|   be generated (in hours). A value of -99999 will simply output       |
-|   restarts on the start of each month, useful for longer model runs.  |
-|   Restart files are generally quite large, so be cognizant of storage |
-|   space and runtime impacts when specifying.                          |
-| | ! Split output after split_output_count output times.               |
-| | SPLIT_OUTPUT_COUNT = 1 <<-- Number of timesteps to put in a single  |
-|   output file. This option must be 1 for NWM output configurations.   |
-|                                                                       |
-| | :mark:`! Soil layer specification`                                  |
-| | NSOIL=4 <<-- Number of soil layers                                  |
-| | ZSOIL(1) = 0.10 <<-- Thickness of top soil layer (m)                |
-| | ZSOIL(2) = 0.30 <<-- Thickness of second soil layer (m)             |
-| | ZSOIL(3) = 0.60 <<-- Thickness of third soil layer (m)              |
-| | ZSOIL(4) = 1.00 <<-- Thickness of bottom soil layer (m)             |
-|                                                                       |
-| | :mark:`! Forcing data measurement heights`                          |
-| | ZLVL = 2.0 <<-- Height of input temperature and humidity            |
-|   measurement/estimate                                                |
-| | ZLVL_WIND = 10.0 <<-- Height of input wind speed                    |
-|   measurement/estimate                                                |
-|                                                                       |
-| | IZ0TLND = 0 <<-- Switch to control land thermal roughness length.   |
-|   Option 0 is the default, non-vegetation dependent value and option  |
-|   1 introduces a vegetation dependence.                               |
-| | SFCDIF_OPTION = 0 <<-- Option to use the newer, option 1, or older, |
-|   option 0, SFCDIF routine. The default value is 0.                   |
-| | UPDATE_SNOW_FROM_FORCING = .FALSE. <<-- Option to activate or       |
-|   deactivate updating the snow­cover fields from available analyses.   |
-|   The default option is true.                                         |
-|                                                                       |
-| ! -------- Section: Select atmospheric forcing input file format,     |
-| FORC_TYP -------- !                                                   |
-|                                                                       |
-| ! Specification of forcing data: 1=HRLDAS-hr format,                  |
-|                                                                       |
-| ! 2=HRLDAS-min format, 3=WRF,4=Idealized, 5=Ideal w/ Spec.Precip.,    |
-|                                                                       |
-| | ! 6=HRLDAS-hrl y fomat w/ Spec. Precip, 7=WRF w/ Spec. Precip       |
-| | FORC_TYP = 3                                                        |
-| | /                                                                   |
-+=======================================================================+
-+-----------------------------------------------------------------------+
+.. code-block:: fortran
+
+   &NOAHLSM_OFFLINE
+   HRLDAS_CONSTANTS_FILE = "./DOMAIN/wrfinput_d01" !<<-- Path to wrfinput file containing initialization data
+                                                   ! for the LSM. This is required even for a warm start
+                                                   ! where a restart file is provided.
+
+   INDIR = "./FORCING" !<-- Path to atmospheric forcing data directory.
+   OUTDIR = "./" !<-- Generally leave this as-is (output goes to base run directory);
+                 ! redirected output only applies to LSM output files and can cause
+                 ! issues when running coupled to WRF-Hydro.
+   START_YEAR = 2013 !<-- Simulation start year
+   START_MONTH = 09 !<-- Simulation start month
+   START_DAY = 01 !<-- Simulation start day
+   START_HOUR = 00 !<-- Simulation start hour
+   START_MIN = 00 !<-- Simulation start min
+   RESTART_FILENAME_REQUESTED = "RESTART.2013090100_DOMAIN1" !<-- Path to LSM restart file if using; this contains a
+                                                             ! "warm" model state from a previous model run.
+                                                             ! Comment out if not a restart simulation.
+
+   ! Specification of simulation length in days hours
+   KHOUR = 24 !<-- Number of hours for simulation;
+
+   ! Timesteps in units of seconds
+   FORCING_TIMESTEP = 3600 !<-- Timestep for forcing input data (in seconds)
+   NOAH_TIMESTEP = 3600 !<-- Timestep the LSM to cycle (in seconds)
+   OUTPUT_TIMESTEP = 86400 !<-- Timestep for LSM outputs, LDASOUT (in seconds)
+
+   ! Land surface model restart file write frequency
+   RESTART_FREQUENCY_HOURS = 6 !<-- Timestep for LSM restart files to be generated (in hours). A value of -99999
+                               ! will simply output restarts on the start of each month, useful for longer
+                               ! model runs. Restart files are generally quite large, so be cognizant of
+                               ! storage space and runtime impacts when specifying.
+   ! Split output after split_output_count output times.
+   SPLIT_OUTPUT_COUNT = 1 !<-- Number of timesteps to put in a single output file. This option
+                          ! must be 1 for NWM output configurations.
+
+   ! Soil layer specification
+   NSOIL=4 !<-- Number of soil layers
+   ZSOIL(1) = 0.10 !<-- Thickness of top soil layer (m)
+   ZSOIL(2) = 0.30 !<-- Thickness of second soil layer (m)
+   ZSOIL(3) = 0.60 !<-- Thickness of third soil layer (m)
+   ZSOIL(4) = 1.00 !<-- Thickness of bottom soil layer (m)
+
+   ! Forcing data measurement heights
+   ZLVL = 2.0 !<-- Height of input temperature and humidity measurement/estimate
+   ZLVL_WIND = 10.0 !<-- Height of input wind speed measurement/estimate
+
+   IZ0TLND = 0 !<-- Switch to control land thermal roughness length. Option 0 is the default,
+               ! non-vegetation dependent value and option 1 introduces a vegetation dependence.
+   SFCDIF_OPTION = 0 !<-- Option to use the newer, option 1, or older,
+   option 0, SFCDIF routine. The default value is 0.
+   UPDATE_SNOW_FROM_FORCING = .FALSE. !<-- Option to activate or deactivate updating the snow­cover
+                                      ! fields from available analyses. The default option is true.
+
+   ! -------- Section: Select atmospheric forcing input file format, FORC_TYP -------- !
+   ! Specification of forcing data: 1=HRLDAS-hr format, 2=HRLDAS-min format,
+   ! 3=WRF,4=Idealized, 5=Ideal w/ Spec.Precip.,
+   ! 6=HRLDAS-hrly fomat w/ Spec. Precip, 7=WRF w/ Spec. Precip
+   FORC_TYP = 3
+   /
 
 .. _section-14:
 
-A4. Noah-MP namelist.hrldas File with Description of Options
-------------------------------------------------------------
+A4. Noah-MP `namelist.hrldas` File with Description of Options
+--------------------------------------------------------------
 
 Below is an annotated namelist.hrldas file for running with the Noah-MP
-land surface model. Do note that the file says “&NOAHLSM_OFFLINE”
+land surface model. Do note that the file says ``&NOAHLSM_OFFLINE``
 however it is for use with the Noah-MP LSM. This namelist statement
 happens to be hardcoded and thus not easily changed. Notes and
-descriptions are indicated with <<--and blude text when after sections
-being described. When the beginning of sections are annotated, they
-being with ! --------- Following Section -------- !. See the official
-HRLDAS namelist description here:
+descriptions are indicated with <-- and blue text when after sections
+being described. See the official HRLDAS namelist description here:
 https://github.com/NCAR/hrldas-release/blob/release/HRLDAS/run/README.namelist
 
-+-----------------------------------------------------------------------+
-| | &NOAHLSM_OFFLINE                                                    |
-| | HRLDAS_SETUP_FILE = "./DOMAIN/wrfinput_d01" <<-- Path to wrfinput   |
-|   file containing initialization data for the LSM. This is required   |
-|   even for a warm start where a restart file is provided.             |
-| | INDIR = "./FORCING" <<-- Path to atmospheric forcing data           |
-|   directory.                                                          |
-|                                                                       |
-| | SPATIAL_FILENAME = "./DOMAIN/soil_properties.nc" <<-- Path to       |
-|   optional 2d/3d soil and vegetation parameter file. If you are using |
-|   this option, you must also use a binary compiled with               |
-|   SPATIAL_SOIL=1. If using the traditional parameter lookup tables,   |
-|   compile with SPATIAL_SOIL=0 and comment out this option.            |
-| | OUTDIR = "./" <<-- Generally leave this as-is (output goes to base  |
-|   run directory); redirected output only applies to LSM output files  |
-|   and can cause issues when running coupled to WRF-Hydro.             |
-| | START_YEAR = 2013 <<-- Simulation start year                        |
-| | START_MONTH = 09 <<-- Simulation start month\ **                    |
-|   **\ START_DAY = 12 <<-- Simulation start day                        |
-| | START_HOUR = 04 <<-- Simulation start hour\ **                      |
-|   **\ START_MIN = 00 <<-- Simulation start min                        |
-| | RESTART_FILENAME_REQUESTED = "RESTART.2013091204_DOMAIN1" <<-- Path |
-|   to LSM restart file if using; this contains a "warm" model state    |
-|   from a previous model run. Comment if not a restart simulation.     |
-| | ! Specification of simulation length in days OR hours               |
-|                                                                       |
-| | KDAY = 1 <<-- Number of days for simulation; can specify this OR    |
-|   KHOUR.                                                              |
-| | !KHOUR = 8 <<-- Number of hours for simulation; can specify this OR |
-|   KDAY.\ **                                                           |
-|   **                                                                  |
-|                                                                       |
-| ! -------- Following Section: Noah-MP physics options -------- !      |
-|                                                                       |
-| :mark:`! Physics options (see the documentation for details)`         |
-|                                                                       |
-| | DYNAMIC_VEG_OPTION = 4                                              |
-| | CANOPY_STOMATAL_RESISTANCE_OPTION = 1                               |
-| | BTR_OPTION = 1                                                      |
-| | RUNOFF_OPTION = 3                                                   |
-| | SURFACE_DRAG_OPTION = 1                                             |
-| | FROZEN_SOIL_OPTION = 1                                              |
-| | SUPERCOOLED_WATER_OPTION = 1                                        |
-| | RADIATIVE_TRANSFER_OPTION = 3                                       |
-| | SNOW_ALBEDO_OPTION = 2                                              |
-| | PCP_PARTITION_OPTION = 1                                            |
-| | TBOT_OPTION = 2                                                     |
-| | TEMP_TIME_SCHEME_OPTION = 3                                         |
-| | GLACIER_OPTION = 2                                                  |
-| | SURFACE_RESISTANCE_OPTION = 4                                       |
-|                                                                       |
-| | :mark:`! Timesteps in units of seconds`                             |
-| | FORCING_TIMESTEP = 3600 <<-- Timestep for forcing input data (in    |
-|   seconds)                                                            |
-| | NOAH_TIMESTEP = 3600 <<-- Timestep the LSM to cycle (in seconds)    |
-| | OUTPUT_TIMESTEP = 86400 <<-- Timestep for LSM outputs, LDASOUT (in  |
-|   seconds)                                                            |
-|                                                                       |
-| | :mark:`! Land surface model restart file write frequency`           |
-| | RESTART_FREQUENCY_HOURS = 2 <<-- Timestep for LSM restart files to  |
-|   be generated (in hours). A value of -99999 will simply output       |
-|   restarts on the start of each month, useful for longer model runs.  |
-|   Restart files are generally quite large, so be cognizant of storage |
-|   space and runtime impacts when specifying.                          |
-| | ! Split output after split_output_count output times.               |
-| | SPLIT_OUTPUT_COUNT = 1 <<-- Number of timesteps to put in a single  |
-|   output file. This option must be 1 for NWM output configurations.   |
-|                                                                       |
-| | :mark:`! Soil layer specification`                                  |
-| | NSOIL=4 <<-- Number of soil layers                                  |
-| | soil_thick_input(1) = 0.10 <<-- Thickness of top soil layer (m)     |
-| | soil_thick_input(2) = 0.30 <<-- Thickness of second soil layer (m)  |
-| | soil_thick_input(3) = 0.60 <<-- Thickness of third soil layer (m)   |
-| | soil_thick_input(4) = 1.00 <<-- Thickness of bottom soil layer (m)  |
-|                                                                       |
-| | :mark:`! Forcing data measurement height for winds, temp, humidity` |
-| | ZLVL = 10.0 <<-- Height of input wind speed                         |
-|                                                                       |
-| ! -------- Following Section: Restart IO file formats -------- !      |
-|                                                                       |
-| Options to specify whether restart files (both read in and output)    |
-| should be in binary or netCDF format. Generally recommend using       |
-| netCDF format (option 0) for both. -->>                               |
-|                                                                       |
-| | :mark:`! Restart file format options`                               |
-| | rst_bi_in = 0 ! 0: use netcdf input restart file                    |
-| | ! 1: use parallel io for reading multiple                           |
-|                                                                       |
-| | ! restart files (1 per core)                                        |
-| | rst_bi_out = 0 ! 0: use netcdf output restart file                  |
-| | ! 1: use parallel io for outputting multiple                        |
-|                                                                       |
-| ! restart files (1 per core)                                          |
-|                                                                       |
-| | /                                                                   |
-| | &WRF_HYDRO_OFFLINE                                                  |
-|                                                                       |
-| ! Specification of forcing data: 1=HRLDAS-hr format,                  |
-|                                                                       |
-| ! 2=HRLDAS-min format, 3=WRF, 4=Idealized, 5=Ideal w/ Spec.Precip.,   |
-|                                                                       |
-| ! 6=HRLDAS-hrl y fomat w/ Spec. Precip,                               |
-|                                                                       |
-| | ! 7=WRF w/ Spec.Precip                                              |
-| | FORC_TYP = 1                                                        |
-|                                                                       |
-| /                                                                     |
-+=======================================================================+
-+-----------------------------------------------------------------------+
+.. code-block:: fortran
+
+   &NOAHLSM_OFFLINE
+   HRLDAS_SETUP_FILE = "./DOMAIN/wrfinput_d01" !<-- Path to wrfinput file containing initialization
+                                               ! data for the LSM. This is required even for a warm
+                                               ! start where a restart file is provided.
+   INDIR = "./FORCING" !<-- Path to atmospheric forcing data directory.
+
+   SPATIAL_FILENAME = "./DOMAIN/soil_properties.nc" !<-- Path to optional 2d/3d soil and vegetation
+                                                    ! parameter file. If you are using this option,
+                                                    ! you must also use a binary compiled with
+                                                    ! SPATIAL_SOIL=1. If using the traditional
+                                                    ! parameter lookup tables, compile with
+                                                    ! SPATIAL_SOIL=0 and comment out this option.
+   OUTDIR = "./" !<-- Generally leave this as-is (output goes to base run directory); redirected
+                 ! output only applies to LSM output files
+                 ! and can cause issues when running coupled to WRF-Hydro.
+   START_YEAR = 2013 !<-- Simulation start year
+   START_MONTH = 09 !<-- Simulation start month
+   START_DAY = 12 !<-- Simulation start day
+   START_HOUR = 04 !<-- Simulation start hour
+   START_MIN = 00 !<-- Simulation start min
+   RESTART_FILENAME_REQUESTED = "RESTART.2013091204_DOMAIN1" !<-- Path to LSM restart file if using;
+                                                             ! this contains a "warm" model state
+                                                             ! from a previous model run. Comment out
+                                                             ! if not a restart simulation.
+   ! Specification of simulation length in days OR hours
+   KHOUR = 24 !<-- Number of hours for simulation
+
+   ! -------- Following Section: Noah-MP physics options -------- !
+
+   ! Physics options (see the documentation for details)
+
+   DYNAMIC_VEG_OPTION = 4
+   CANOPY_STOMATAL_RESISTANCE_OPTION = 1
+   BTR_OPTION = 1
+   RUNOFF_OPTION = 3
+   SURFACE_DRAG_OPTION = 1
+   FROZEN_SOIL_OPTION = 1
+   SUPERCOOLED_WATER_OPTION = 1
+   RADIATIVE_TRANSFER_OPTION = 3
+   SNOW_ALBEDO_OPTION = 2
+   PCP_PARTITION_OPTION = 1
+   TBOT_OPTION = 2
+   TEMP_TIME_SCHEME_OPTION = 3
+   GLACIER_OPTION = 2
+   SURFACE_RESISTANCE_OPTION = 4
+
+   ! Timesteps in units of seconds
+   FORCING_TIMESTEP = 3600 !<-- Timestep for forcing input data (in seconds)
+   NOAH_TIMESTEP = 3600 !<-- Timestep the LSM to cycle (in seconds)
+   OUTPUT_TIMESTEP = 86400 !<-- Timestep for LSM outputs, LDASOUT (in seconds)
+
+   ! Land surface model restart file write frequency
+   RESTART_FREQUENCY_HOURS = 2 !<-- Timestep for LSM restart files to be generated (in hours).
+                               ! A value of -99999 will simply output restarts on the start of
+                               ! each month, useful for longer model runs. Restart files are
+                               ! generally quite large, so be cognizant of storage space and
+                               ! runtime impacts when specifying.
+   ! Split output after split_output_count output times.
+   SPLIT_OUTPUT_COUNT = 1 !<-- Number of timesteps to put in a single
+   output file. This option must be 1 for NWM output configurations.
+
+   ! Soil layer specification
+   NSOIL=4 !<-- Number of soil layers
+   soil_thick_input(1) = 0.10 !<-- Thickness of top soil layer (m)
+   soil_thick_input(2) = 0.30 !<-- Thickness of second soil layer (m)
+   soil_thick_input(3) = 0.60 !<-- Thickness of third soil layer (m)
+   soil_thick_input(4) = 1.00 !<-- Thickness of bottom soil layer (m)
+
+   ! Forcing data measurement height for winds, temp, humidity
+   ZLVL = 10.0 !<-- Height of input wind speed
+
+   ! -------- Following Section: Restart IO file formats -------- !
+
+   ! Options to specify whether restart files (both read in and output)
+   ! should be in binary or netCDF format. Generally recommend using
+   ! netCDF format (option 0) for both.
+
+   ! Restart file format options
+   rst_bi_in = 0  !<-- 0: use netcdf input restart file 1: use parallel io for reading multiple
+                  ! restart files (1 per core)
+   rst_bi_out = 0 !<-- 0: use netcdf output restart file 1: use parallel io for outputting multiple
+                  ! restart files (1 per core)
+   /
+
+   &WRF_HYDRO_OFFLINE
+
+   ! Specification of forcing data: 1=HRLDAS-hr format, 2=HRLDAS-min format,
+   ! 3=WRF, 4=Idealized, 5=Ideal w/ Spec.Precip.,
+   ! 6=HRLDAS-hrly fomat w/ Spec. Precip, 7=WRF w/ Spec.Precip
+   FORC_TYP = 1
+   /
 
 .. _section-15:
 
@@ -2009,7 +1964,7 @@ those used in the current configuration of the National Water Model
 
 **Figure A15.2.** Illustration of Noah-MP physics permutations and those
 used in the configuration of the National Water Model (NWM) as of March
-2018. |image43|
+1.    |image43|
 
 |image44|
 
