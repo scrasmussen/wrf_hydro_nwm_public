@@ -20,7 +20,7 @@ issued as root user in the bash shell.::
    apt-get update
 
    apt-get install wget bzip2 ca-certificates \
-                   gfortran g++ m4 make git \
+                   gfortran g++ cmake git \
                    libopenmpi-dev libhdf5-dev \
                    libnetcdff-dev libnetcdf-dev \
                    netcdf-bin
@@ -605,7 +605,7 @@ for additional information.
    +--------------------+-------------------------------------------------+
    | FXEXP_DAT          | Soil evaporation exponent used in DEVAP         |
    +--------------------+-------------------------------------------------+
-   | CSOIL_DATA         | Soil heat capacity [J/m\ :sup:`3`/K]            |
+   | CSOIL_DATA         | Soil heat capacity [:math:`J/m^3/K`]            |
    +--------------------+-------------------------------------------------+
    | SALP_DATA          | Shape parameter of distribution function of     |
    |                    | snow cover                                      |
@@ -618,7 +618,8 @@ for additional information.
    +--------------------+-------------------------------------------------+
    | FRZK_DATA          | Frozen ground parameter                         |
    +--------------------+-------------------------------------------------+
-   | ZBOT_DATA          | Depth of lower boundary soil temperature [m]    |
+   | ZBOT_DATA          | Depth of lower boundary soil temperature        |
+   |                    | [:math:`m`]                                     |
    +--------------------+-------------------------------------------------+
    | CZIL_DATA          | Parameter used in the calculation of the        |
    |                    | roughness length for heat                       |
@@ -682,7 +683,7 @@ for additional information.
    | NROOT             | Number of soil layers (from the top) reached by         |
    |                   | vegetation roots                                        |
    +-------------------+---------------------------------------------------------+
-   | RS                | Minimum stomatal resistance [s/m]                       |
+   | RS                | Minimum stomatal resistance [`s/m`]                     |
    +-------------------+---------------------------------------------------------+
    | RGL               | Parameter used in radiation stress function             |
    +-------------------+---------------------------------------------------------+
@@ -691,7 +692,7 @@ for additional information.
    | SNUP              | Threshold water-equivalent snow depth [m] that implies  |
    |                   | 100% snow cover                                         |
    +-------------------+---------------------------------------------------------+
-   | MAXALB            | Upper bound on maximum albedo over deep snow [%]        |
+   | MAXALB            | Upper bound on maximum albedo over deep snow [`\%`]     |
    +-------------------+---------------------------------------------------------+
    | LAIMIN            | Minimum leaf area index through the year                |
    |                   | [dimensionless]                                         |
@@ -712,12 +713,12 @@ for additional information.
    |                   | 0.0 to 1.0]                                             |
    +-------------------+---------------------------------------------------------+
    | Z0MIN             | Minimum background roughness length through the year    |
-   |                   | [m]                                                     |
+   |                   | [`m`]                                                   |
    +-------------------+---------------------------------------------------------+
    | Z0MAX             | Maximum background roughness length through the year    |
-   |                   | [m]                                                     |
+   |                   | [`m`]                                                   |
    +-------------------+---------------------------------------------------------+
-   | TOPT_DATA         | Optimum transpiration air temperature [K]               |
+   | TOPT_DATA         | Optimum transpiration air temperature [`K`]             |
    +-------------------+---------------------------------------------------------+
    | CMCMAX_DATA       | Maximum canopy water capacity [volumetric fraction]     |
    |                   |                                                         |
@@ -725,7 +726,7 @@ for additional information.
    | CFACTR_DATA       | Parameter used in the canopy interception calculation   |
    |                   | [dimensionless]                                         |
    +-------------------+---------------------------------------------------------+
-   | RSMAX_DATA        | Maximal stomatal resistance [s/m]                       |
+   | RSMAX_DATA        | Maximal stomatal resistance [`s/m`]                     |
    +-------------------+---------------------------------------------------------+
    | BARE              | The land-use category representing bare ground (used to |
    |                   | set the vegetation fraction to zero) [land-use category |
@@ -780,7 +781,7 @@ land surface model.
    +---------------+------------------------------------------------------+
    | FRZK_DATA     | Frozen ground parameter                              |
    +---------------+------------------------------------------------------+
-   | ZBOT_DATA     | Depth of lower boundary soil temperature [m]         |
+   | ZBOT_DATA     | Depth of lower boundary soil temperature [:math:`m`] |
    +---------------+------------------------------------------------------+
    | CZIL_DATA     | Parameter used in the calculation of the roughness   |
    |               | length for heat                                      |
@@ -1411,8 +1412,8 @@ A13.1 RESTART_MP File Variable Table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
-   Noah-MP restarts are written in ``subroutine lsm_restart()`` in :program:`module_NoahMP_hrldas_driver.F90`.
-   Noah-MP variables are defined in ``subroutine noahmplsm()`` in :program:`module_sf_noahmpdrv.F90`
+   Noah-MP restarts are written in ``subroutine lsm_restart()`` in :program:`module_NoahMP_hrldas_driver.F`.
+   Noah-MP variables are defined in ``subroutine noahmplsm()`` in :program:`module_sf_noahmpdrv.F`
 
 `RESTART\_MP` file variable descriptions
 
@@ -1735,37 +1736,38 @@ WRF-Hydro model code is configurable into the National Water Model
 configurations that runs in operations at the National Center for
 Environmental Prediction (NCEP).
 
-“\ *The NWM is an hourly cycling uncoupled analysis and forecast system
-that provides streamflow for 2.7 million river reaches and other
-hydrologic information on 1km and 250m grids. The model provides
-complementary hydrologic guidance at current NWS River Forecast Center
-(RFC) river forecast locations and significantly expanded guidance
-coverage and type in underserved locations.*
+.. pull-quote::
+   :caption: Excerpt from NOUS41 KWBC 061735 PNSWSH NWS Office of Science and
+             Technology Integration
 
-*The NWM ingests forcing from a variety of sources including Multi-Radar
-Multi-Sensor (MRMS) radar-gauge observed precipitation data and
-High-Resolution Rapid Refresh (HRRR), Rapid Refresh (RAP), Global
-Forecast System (GFS) and Climate Forecast System (CFS) Numerical
-Weather Prediction (NWP) forecast data. USGS real-time streamflow
-observations are assimilated and all NWM configurations benefit from the
-inclusion of ~5500 reservoirs. The core of the NWM system is the
-National Center for Atmospheric Research (NCAR)-supported community
-Weather Research and Forecasting (WRF)-Hydro hydrologic model. WRF-Hydro
-is configured to use the Noah Multi-*
+   “\ *The NWM is an hourly cycling uncoupled analysis and forecast system
+   that provides streamflow for 2.7 million river reaches and other
+   hydrologic information on 1km and 250m grids. The model provides
+   complementary hydrologic guidance at current NWS River Forecast Center
+   (RFC) river forecast locations and significantly expanded guidance
+   coverage and type in underserved locations.*
 
-*Parameterization (Noah-MP) Land Surface Model (LSM) to simulate land
-surface processes. Separate water routing modules perform diffusive wave
-surface routing and saturated subsurface flow routing on a 250m grid,
-and Muskingum-Cunge channel routing down NHDPlusV2 stream reaches. River
-analyses and forecasts are provided across a domain encompassing the
-continental U.S. and hydrologically-contributing areas, while land
-surface output is available on a larger domain that extends beyond the
-continental U.S. into Canada and Mexico (roughly from latitude 19N to
-58N). In addition, NWM forcing datasets are provided on this domain at a
-resolution of 1km.*\ ”
+   *The NWM ingests forcing from a variety of sources including Multi-Radar
+   Multi-Sensor (MRMS) radar-gauge observed precipitation data and
+   High-Resolution Rapid Refresh (HRRR), Rapid Refresh (RAP), Global
+   Forecast System (GFS) and Climate Forecast System (CFS) Numerical
+   Weather Prediction (NWP) forecast data. USGS real-time streamflow
+   observations are assimilated and all NWM configurations benefit from the
+   inclusion of ~5500 reservoirs. The core of the NWM system is the
+   National Center for Atmospheric Research (NCAR)-supported community
+   Weather Research and Forecasting (WRF)-Hydro hydrologic model. WRF-Hydro
+   is configured to use the Noah Multi-*
 
-Excerpt from NOUS41 KWBC 061735 PNSWSH NWS Office of Science and
-Technology Integration
+   *Parameterization (Noah-MP) Land Surface Model (LSM) to simulate land
+   surface processes. Separate water routing modules perform diffusive wave
+   surface routing and saturated subsurface flow routing on a 250m grid,
+   and Muskingum-Cunge channel routing down NHDPlusV2 stream reaches. River
+   analyses and forecasts are provided across a domain encompassing the
+   continental U.S. and hydrologically-contributing areas, while land
+   surface output is available on a larger domain that extends beyond the
+   continental U.S. into Canada and Mexico (roughly from latitude 19N to
+   58N). In addition, NWM forcing datasets are provided on this domain at a
+   resolution of 1km.*\ ”
 
 For more information regarding the operational configuration, input, and
 output data of the National Water Model see the Office of Water

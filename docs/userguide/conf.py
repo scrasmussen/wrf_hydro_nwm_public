@@ -10,6 +10,8 @@ try:
 except:
     pass
 html_static_path = ['_static']
+html_css_files = ['ug_theme.css']
+
 #these are enforced by rstdoc, but keep them for sphinx-build
 numfig = 0
 smartquotes = 0
@@ -21,6 +23,3 @@ default_role = 'math'
 pygments_style = 'sphinx'
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 master_doc = 'index'
-
-def setup(app):
-    app.add_css_file('ug_theme.css')
