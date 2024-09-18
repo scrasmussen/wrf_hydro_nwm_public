@@ -1822,9 +1822,10 @@ website <http://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/NWM_parameters/>`
 The namelists for all the configurations are also being distributed with
 the model code.
 
-**Figure A15.4** Below are sample NWM configuration namelists
+.. rubric::
+   Below are sample NWM configuration namelists for both the LSM (NoahMP) and WRF-Hydro:
 
- **namelist.hrldas (sample NWM configuration)**
+`namelist.hrldas` (sample NWM configuration)
 
 .. code-block:: fortran
 
@@ -1896,528 +1897,247 @@ the model code.
 
    /
 
-**hydro.namelist (sample NWM configuration)**
+`hydro.namelist` (sample NWM configuration)
 
 .. code-block:: fortran
 
- &HYDRO_nlist
+   &HYDRO_nlist
 
- !!!! ---------------------- SYSTEM COUPLING -----------------------
- !!!!
+   !!!! ---------------------- SYSTEM COUPLING -----------------------
+   !!!!
 
- ! Specify what is being coupled: 1=HRLDAS (offline Noah-LSM), 2=WRF, 3=NASA/LIS, 4=CLM
+   ! Specify what is being coupled: 1=HRLDAS (offline Noah-LSM), 2=WRF, 3=NASA/LIS, 4=CLM
+   sys_cpl = 1
 
- sys_cpl = 1
+   !!!! ------------------- MODEL INPUT DATA FILES -------------------
+   !!!!
 
- !!!! ------------------- MODEL INPUT DATA FILES -------------------
- !!!!
+   ! Specify land surface model gridded input data file (e.g.: "geo_em.d01.nc")
+   GEO_STATIC_FLNM = "./DOMAIN/geo_em.d01_1km.nc"
 
- ! Specify land surface model gridded input data file (e.g.: "geo_em.d01.nc")
- GEO_STATIC_FLNM = "./DOMAIN/geo_em.d01_1km.nc"
+   ! Specify the high-resolution routing terrain input data file (e.g.: "Fulldom_hires.nc")
+   GEO_FINEGRID_FLNM = "./DOMAIN/Fulldom_hires_netcdf_250m.nc"
 
- ! Specify the high-resolution routing terrain input data file (e.g.: "Fulldom_hires.nc")
- GEO_FINEGRID_FLNM = "./DOMAIN/Fulldom_hires_netcdf_250m.nc"
+   ! Specify the spatial hydro parameters file (e.g.: "hydro2dtbl.nc")
+   ! If you specify a filename and the file does not exist, it will becreated for you.
+   HYDROTBL_F = "./DOMAIN/HYDRO_TBL_2D.nc"
 
- ! Specify the spatial hydro parameters file (e.g.: "hydro2dtbl.nc")
- ! If you specify a filename and the file does not exist, it will becreated for you.
+   ! Specify spatial metadata file for land surface grid. (e.g.: "GEOGRID_LDASOUT_Spatial_Metadata.nc")
+   LAND_SPATIAL_META_FLNM = "./DOMAIN/WRF_Hydro_NWM_geospatial_data_template_land_GIS.nc"
 
- HYDROTBL_F = "./DOMAIN/HYDRO_TBL_2D.nc"
+   ! Specify the name of the restart file if starting from restart...comment out with '!' if not...
+   RESTART_FILE = 'HYDRO_RST.2018-06-01_00:00_DOMAIN1'
 
- ! Specify spatial metadata file for land surface grid. (e.g.:
- "GEOGRID_LDASOUT_Spatial_Metadata.nc")
+   !!!! --------------------- MODEL SETUP OPTIONS --------------------
+   !!!!
 
- LAND_SPATIAL_META_FLNM =
- "./DOMAIN/WRF_Hydro_NWM_geospatial_data_template_land_GIS.nc"
+   ! Specify the domain or nest number identifier...(integer)
+   IGRID = 1
 
- ! Specify the name of the restart file if starting from
- restart...comment out with '!' if not...
+   ! Specify the restart file write frequency...(minutes)
+   ! A value of -99999 will output restarts on the first day of the month only.
+   rst_dt = 60
 
- RESTART_FILE = 'HYDRO_RST.2018-06-01_00:00_DOMAIN1'
+   ! Reset the LSM soil states from the high-res routing restart file (1=overwrite, 0=no overwrite)
+   ! NOTE: Only turn this option on if overland or subsurface rotuing is active!
+   rst_typ = 1
 
- !!!! --------------------- MODEL SETUP OPTIONS --------------------
- !!!!
+   ! Restart file format control
 
- ! Specify the domain or nest number identifier...(integer)
+   rst_bi_in = 0 !0: use netcdf input restart file (default)
+   !1: use parallel io for reading multiple restart files, 1 per core
 
- IGRID = 1
+   rst_bi_out = 0 !0: use netcdf output restart file (default)
+   !1: use parallel io for outputting multiple restart files, 1 per core
 
- ! Specify the restart file write frequency...(minutes)
- ! A value of -99999 will output restarts on the first day of the month only.
+   ! Restart switch to set restart accumulation variables to 0 (0=no reset, 1=yes reset to 0.0)
+   RSTRT_SWC = 1
 
- rst_dt = 60
+   ! Specify baseflow/bucket model initialization...(0=cold start from table, 1=restart file)
+   GW_RESTART = 1
 
- ! Reset the LSM soil states from the high-res routing restart file (1=overwrite, 0=no overwrite)
- ! NOTE: Only turn this option on if overland or subsurface rotuing is active!
+   !!!! -------------------- MODEL OUTPUT CONTROL --------------------
+   !!!!
 
- rst_typ = 1
+   ! Specify the output file write frequency...(minutes)
+   out_dt = 60
 
- ! Restart file format control
+   ! Specify the number of output times to be contained within each output history file...(integer)
+   ! SET = 1 WHEN RUNNING CHANNEL ROUTING ONLY/CALIBRATION SIMS!!!
+   ! SET = 1 WHEN RUNNING COUPLED TO WRF!!!
+   SPLIT_OUTPUT_COUNT = 1
 
- rst_bi_in = 0 !0: use netcdf input restart file (default)
+   ! Specify the minimum stream order to output to netcdf point file...(integer)
+   ! Note: lower value of stream order produces more output.
+   order_to_write = 1
 
- !1: use parallel io for reading multiple restart files, 1 per core
+   ! Flag to turn on/off new I/O routines: 0 = deprecated output routines (use when running with Noah LSM),
+   ! 1 = with scale/offset/compression, ! 2 = with scale/offset/NO compression,
+   ! 3 = compression only, 4 = no scale/offset/compression (default)
+   io_form_outputs = 2
 
- rst_bi_out = 0 !0: use netcdf output restart file (default)
+   ! Realtime run configuration option:
+   ! 0=all (default), 1=analysis, 2=short-range, 3=medium-range, 4=long-range, 5=retrospective,
+   ! 6=diagnostic (includes all of 1-4 outputs combined)
+   io_config_outputs = 1
 
- !1: use parallel io for outputting multiple restart files, 1 per core
+   ! Option to write output files at time 0 (restart cold start time): 0=no, 1=yes (default)
+   t0OutputFlag = 1
 
- ! Restart switch to set restart accumulation variables to 0 (0=no
- reset, 1=yes reset to 0.0)
+   ! Options to output channel & bucket influxes. Only active for UDMP_OPT=1.
+   ! Nonzero choice requires that out_dt above matches NOAH_TIMESTEP in namelist.hrldas.
+   ! 0=None (default), 1=channel influxes (qSfcLatRunoff, qBucket)
+   ! 2=channel+bucket fluxes (qSfcLatRunoff, qBucket, qBtmVertRunoff_toBucket)
+   ! 3=channel accumulations (accSfcLatRunoff, accBucket) \*\*NOT TESTED\*\*
 
- RSTRT_SWC = 1
+   output_channelBucket_influx = 2
 
- ! Specify baseflow/bucket model initialization...(0=cold start from
- table, 1=restart file)
+   ! Output netcdf file control
+   CHRTOUT_DOMAIN = 1 ! Netcdf point timeseries output at all channel points (1d)
+                      ! 0 = no output, 1 = output
 
- GW_RESTART = 1
+   CHANOBS_DOMAIN = 0 ! Netcdf point timeseries at forecast points or gage points (defined in Routelink)
+   ! 0 = no output, 1 = output at forecast points or gage points.
 
- !!!! -------------------- MODEL OUTPUT CONTROL --------------------
- !!!!
+   CHRTOUT_GRID = 0 ! Netcdf grid of channel streamflow values (2d)
+                    ! 0 = no output, 1 = output
+                    ! NOTE: Not available with reach-based routing
 
- ! Specify the output file write frequency...(minutes)
+   LSMOUT_DOMAIN = 0 ! Netcdf grid of variables passed between LSM and routing components (2d)
+                     ! 0 = no output, 1 = output
+                     ! NOTE: No scale_factor/add_offset available
 
- out_dt = 60
+   RTOUT_DOMAIN = 1 ! Netcdf grid of terrain routing variables on routing grid (2d)
+                    ! 0 = no output, 1 = output
 
- ! Specify the number of output times to be contained within each
- output history file...(integer)
+   output_gw = 0 ! Netcdf GW output, 0 = no output, 1 = output
+   outlake = 1 ! Netcdf grid of lake values (1d), 0 = no output, 1 = output
 
- ! SET = 1 WHEN RUNNING CHANNEL ROUTING ONLY/CALIBRATION SIMS!!!
+   frxst_pts_out = 0 ! ASCII text file of forecast points or gage points (defined in Routelink)
+                     ! 0 = no output, 1 = output
 
- ! SET = 1 WHEN RUNNING COUPLED TO WRF!!!
+   !!!! ------------ PHYSICS OPTIONS AND RELATED SETTINGS ------------
+   !!!!
 
- SPLIT_OUTPUT_COUNT = 1
+   ! Specify the number of soil layers (integer) and the depth of the bottom of each layer... (meters)
+   ! Notes: In Version 1 of WRF-Hydro these must be the same as in the namelist.input file.
+   ! Future versions will permit this to be different.
+   NSOIL=4
+   ZSOIL8(1) = -0.10
+   ZSOIL8(2) = -0.40
+   ZSOIL8(3) = -1.00
+   ZSOIL8(4) = -2.00
 
- ! Specify the minimum stream order to output to netcdf point
- file...(integer)
+   ! Specify the grid spacing of the terrain routing grid...(meters)
+   DXRT = 250.0
 
- ! Note: lower value of stream order produces more output.
+   ! Specify the integer multiple between the land model grid and the terrain routing grid...(integer)
+   AGGFACTRT = 4
 
- order_to_write = 1
+   ! Specify the channel routing model timestep...(seconds)
+   DTRT_CH = 300
 
- ! Flag to turn on/off new I/O routines: 0 = deprecated output
- routines (use when running with Noah LSM),
+   ! Specify the terrain routing model timestep...(seconds)
+   DTRT_TER = 10
 
- ! 1 = with scale/offset/compression, ! 2 = with scale/offset/NO
- compression,
+   ! Switch to activate subsurface routing...(0=no, 1=yes)
+   SUBRTSWCRT = 1
 
- ! 3 = compression only, 4 = no scale/offset/compression (default)
+   ! Switch to activate surface overland flow routing...(0=no, 1=yes)
+   OVRTSWCRT = 1
 
- io_form_outputs = 2
+   ! Specify overland flow routing option: 1=Steepest Descent (D8) 2=CASC2D (not active)
+   ! NOTE: Currently subsurface flow is only steepest descent
+   rt_option = 1
 
- ! Realtime run configuration option:
+   ! Switch to activate channel routing...(0=no, 1=yes)
+   CHANRTSWCRT = 1
 
- ! 0=all (default), 1=analysis, 2=short-range, 3=medium-range,
- 4=long-range, 5=retrospective,
+   ! Specify channel routing option: 1=Muskingam-reach, 2=Musk.-Cunge-reach, 3=Diff.Wave-gridded
+   channel_option = 2
 
- ! 6=diagnostic (includes all of 1-4 outputs combined)
+   ! Specify the reach file for reach-based routing options (e.g.: "Route_Link.nc")
+   route_link_f = "./DOMAIN/RouteLink_NHDPLUS.nc"
 
- io_config_outputs = 1
+   ! If using channel_option=2, activate the compound channel formulation? (Default=.FALSE.)
+   compound_channel = .TRUE.
 
- ! Option to write output files at time 0 (restart cold start time):
- 0=no, 1=yes (default)
+   ! Specify the lake parameter file (e.g.: "LAKEPARM.nc").
+   ! Note REQUIRED if lakes are on.
+   route_lake_f = "./DOMAIN/LAKEPARM_NHDPLUS.nc"
 
- t0OutputFlag = 1
+   ! Switch to activate baseflow bucket model...(0=none, 1=exp. bucket, 2=pass-through)
+   GWBASESWCRT = 1
 
- ! Options to output channel & bucket influxes. Only active for
- UDMP_OPT=1.
+   ! Groundwater/baseflow 2d mask specified on land surface model grid (e.g.: "GWBASINS.nc")
+   ! Note: Only required if baseflow model is active (1 or 2) and UDMP_OPT=0.
+   gwbasmskfil = "./DOMAIN/GWBASINS.nc"
 
- ! Nonzero choice requires that out_dt above matches NOAH_TIMESTEP in
- namelist.hrldas.
+   ! Groundwater bucket parameter file (e.g.: "GWBUCKPARM.nc")
+   GWBUCKPARM_file = "./DOMAIN/GWBUCKPARM_CONUS.nc"
 
- ! 0=None (default), 1=channel influxes (qSfcLatRunoff, qBucket)
+   ! User defined mapping, such NHDPlus: 0=no (default), 1=yes
+   UDMP_OPT = 1
 
- ! 2=channel+bucket fluxes (qSfcLatRunoff, qBucket,
- qBtmVertRunoff_toBucket)
+   ! If on, specify the user-defined mapping file (e.g.: "spatialweights.nc")
+   udmap_file = "./DOMAIN/spatialweights_250m_all_basins.nc"
 
- ! 3=channel accumulations (accSfcLatRunoff, accBucket) \**\* NOT
- TESTED \**\*
+   /
 
- output_channelBucket_influx = 2
+   &NUDGING_nlist
 
- ! Output netcdf file control
+   ! Path to the "timeslice" observation files.
+   timeSlicePath = "./nudgingTimeSliceObs/"
+   nudgingParamFile = "./DOMAIN/nudgingParams.nc"
 
- CHRTOUT_DOMAIN = 1 ! Netcdf point timeseries output at all channel
- points (1d)
+   ! Nudging restart file = "nudgingLastObsFile"
+   ! nudgingLastObsFile defaults to '', which will look for nudgingLastObs.YYYY-mm-dd_HH:MM:SS.nc
+   ! \*\*AT THE INITALIZATION TIME OF THE RUN\*\*. Set to a missing file to use no restart.
 
- ! 0 = no output, 1 = output
+   !nudgingLastObsFile = '/a/nonexistent/file/gives/nudging/cold/start'
 
- CHANOBS_DOMAIN = 0 ! Netcdf point timeseries at forecast points or
- gage points (defined in Routelink)
+   !! Parallel input of nudging timeslice observation files?
+   readTimesliceParallel = .TRUE.
 
- ! 0 = no output, 1 = output at forecast points or gage points.
+   ! temporalPersistence defaults to true, only runs if necessary params present.
+   temporalPersistence = .TRUE.
 
- CHRTOUT_GRID = 0 ! Netcdf grid of channel streamflow values (2d)
+   ! The total number of last (obs, modeled) pairs to save in nudgingLastObs for
+   ! removal of bias. This is the maximum array length. (This option is active when persistBias=FALSE)
+   ! (Default=960=10days @15min obs resolution, if all the obs are present and longer if not.)
+   nLastObs = 480
 
- ! 0 = no output, 1 = output
+   ! If using temporalPersistence the last observation persists by default.
+   ! This option instead persists the bias after the last observation.
+   persistBias = .TRUE.
 
- ! NOTE: Not available with reach-based routing
+   ! AnA (FALSE) vs Forecast (TRUE) bias persistence.
+   ! If persistBias: Does the window for calculating the bias end at
+   ! model init time (=t0)?
+   ! FALSE = window ends at model time (moving),
+   ! TRUE = window ends at init=t0(fcst) time.
+   ! (If commented out, Default=FALSE)
+   ! Note: Perfect restart tests require this option to be .FALSE.
+   biasWindowBeforeT0 = .FALSE.
 
- LSMOUT_DOMAIN = 0 ! Netcdf grid of variables passed between LSM and
- routing components (2d)
+   ! If persistBias: Only use this many last (obs, modeled) pairs. (If Commented out, Default=-1*nLastObs)
+   ! > 0: apply an age-based filter, units=hours.
+   ! = 0: apply no additional filter, use all available/usable obs.
+   ! < 0: apply an count-based filter, units=count
+   maxAgePairsBiasPersist = 3
 
- ! 0 = no output, 1 = output
+   ! If persistBias: The minimum number of last (obs, modeled) pairs, with age less than
+   ! maxAgePairsBiasPersist, required to apply a bias correction. (default=8)
+   minNumPairsBiasPersist = 1
 
- ! NOTE: No scale_factor/add_offset available
+   ! If persistBias: give more weight to observations closer in time? (default=FALSE)
+   invDistTimeWeightBias = .TRUE.
 
- RTOUT_DOMAIN = 1 ! Netcdf grid of terrain routing variables on
- routing grid (2d)
+   ! If persistBias: "No constructive interference in bias correction?", Reduce the bias adjustment
+   ! when the model and the bias adjustment have the same sign relative to the modeled flow at t0?
+   ! (default=FALSE)
+   ! Note: Perfect restart tests require this option to be .FALSE.
+   noConstInterfBias = .TRUE.
 
- ! 0 = no output, 1 = output
+   /
 
- output_gw = 0 ! Netcdf GW output
-
- ! 0 = no output, 1 = output
-
- outlake = 1 ! Netcdf grid of lake values (1d)
-
- ! 0 = no output, 1 = output
-
- frxst_pts_out = 0 ! ASCII text file of forecast points or gage points
- (defined in Routelink)
-
- ! 0 = no output, 1 = output
-
- !!!! ------------ PHYSICS OPTIONS AND RELATED SETTINGS ------------
- !!!!
-
- ! Specify the number of soil layers (integer) and the depth of the
- bottom of each layer... (meters)
-
- ! Notes: In Version 1 of WRF-Hydro these must be the same as in the
- namelist.input file.
-
- ! Future versions will permit this to be different.
-
- NSOIL=4
-
- ZSOIL8(1) = -0.10
-
- ZSOIL8(2) = -0.40
-
- ZSOIL8(3) = -1.00
-
- ZSOIL8(4) = -2.00
-
- ! Specify the grid spacing of the terrain routing grid...(meters)
-
- DXRT = 250.0
-
- ! Specify the integer multiple between the land model grid and the
- terrain routing grid...(integer)
-
- AGGFACTRT = 4
-
- ! Specify the channel routing model timestep...(seconds)
-
- DTRT_CH = 300
-
- ! Specify the terrain routing model timestep...(seconds)
-
- DTRT_TER = 10
-
- ! Switch to activate subsurface routing...(0=no, 1=yes)
-
- SUBRTSWCRT = 1
-
- ! Switch to activate surface overland flow routing...(0=no, 1=yes)
-
- OVRTSWCRT = 1
-
- ! Specify overland flow routing option: 1=Steepest Descent (D8)
- 2=CASC2D (not active)
-
- ! NOTE: Currently subsurface flow is only steepest descent
-
- rt_option = 1
-
- ! Switch to activate channel routing...(0=no, 1=yes)
-
- CHANRTSWCRT = 1
-
- ! Specify channel routing option: 1=Muskingam-reach,
- 2=Musk.-Cunge-reach, 3=Diff.Wave-gridded
-
- channel_option = 2
-
- ! Specify the reach file for reach-based routing options (e.g.:
- "Route_Link.nc")
-
- route_link_f = "./DOMAIN/RouteLink_NHDPLUS.nc"
-
- ! If using channel_option=2, activate the compound channel
- formulation? (Default=.FALSE.)
-
- compound_channel = .TRUE.
-
- ! Specify the lake parameter file (e.g.: "LAKEPARM.nc").
-
- ! Note REQUIRED if lakes are on.
-
- route_lake_f = "./DOMAIN/LAKEPARM_NHDPLUS.nc"
-
- ! Switch to activate baseflow bucket model...(0=none, 1=exp. bucket,
- 2=pass-through)
-
- GWBASESWCRT = 1
-
- ! Groundwater/baseflow 2d mask specified on land surface model grid
- (e.g.: "GWBASINS.nc")
-
- !Note: Only required if baseflow model is active (1 or 2) and
- UDMP_OPT=0.
-
- !gwbasmskfil = "./DOMAIN/GWBASINS.nc"
-
- ! Groundwater bucket parameter file (e.g.: "GWBUCKPARM.nc")
-
- GWBUCKPARM_file = "./DOMAIN/GWBUCKPARM_CONUS.nc"
-
- ! User defined mapping, such NHDPlus: 0=no (default), 1=yes
-
- UDMP_OPT = 1
-
- ! If on, specify the user-defined mapping file (e.g.:
- "spatialweights.nc")
-
- udmap_file = "./DOMAIN/spatialweights_250m_all_basins.nc"
-
- /
-
- &NUDGING_nlist
-
- ! Path to the "timeslice" observation files.
-
- timeSlicePath = "./nudgingTimeSliceObs/"
-
- nudgingParamFile = "./DOMAIN/nudgingParams.nc"
-
- ! Nudging restart file = "nudgingLastObsFile"
-
- ! nudgingLastObsFile defaults to '', which will look for
- nudgingLastObs.YYYY-mm-dd_HH:MM:SS.nc
-
- ! \**AT THE INITALIZATION TIME OF THE RUN*\*. Set to a missing file
- to use no restart.
-
- !nudgingLastObsFile = '/a/nonexistent/file/gives/nudging/cold/start'
-
- !! Parallel input of nudging timeslice observation files?
-
- readTimesliceParallel = .TRUE.
-
- ! temporalPersistence defaults to true, only runs if necessary params
- present.
-
- temporalPersistence = .TRUE.
-
- ! The total number of last (obs, modeled) pairs to save in
- nudgingLastObs for
-
- ! removal of bias. This is the maximum array length. (This option is
- active when persistBias=FALSE)
-
- ! (Default=960=10days @15min obs resolution, if all the obs are
- present and longer if not.)
-
- nLastObs = 480
-
- ! If using temporalPersistence the last observation persists by
- default.
-
- ! This option instead persists the bias after the last observation.
-
- persistBias = .TRUE.
-
- ! AnA (FALSE) vs Forecast (TRUE) bias persistence.
-
- ! If persistBias: Does the window for calculating the bias end at
-
- ! model init time (=t0)?
-
- ! FALSE = window ends at model time (moving),
-
- ! TRUE = window ends at init=t0(fcst) time.
-
- ! (If commented out, Default=FALSE)
-
- ! Note: Perfect restart tests require this option to be .FALSE.
-
- biasWindowBeforeT0 = .FALSE.
-
- ! If persistBias: Only use this many last (obs, modeled) pairs. (If
- Commented out, Default=-1*nLastObs)
-
- ! > 0: apply an age-based filter, units=hours.
-
- ! = 0: apply no additional filter, use all available/usable obs.
-
- ! < 0: apply an count-based filter, units=count
-
- maxAgePairsBiasPersist = 3
-
- ! If persistBias: The minimum number of last (obs, modeled) pairs,
- with age less than
-
- ! maxAgePairsBiasPersist, required to apply a bias correction.
- (default=8)
-
- minNumPairsBiasPersist = 1
-
- ! If persistBias: give more weight to observations closer in time?
- (default=FALSE)
-
- invDistTimeWeightBias = .TRUE.
-
- ! If persistBias: "No constructive interference in bias correction?",
- Reduce the bias adjustment
-
- ! when the model and the bias adjustment have the same sign relative
- to the modeled flow at t0?
-
- ! (default=FALSE)
-
- ! Note: Perfect restart tests require this option to be .FALSE.
-
- noConstInterfBias = .TRUE.
-
- /
-
-
-.. _section-24:
-
-.. |image1| image:: media/image50.png
-   :width: 5.35821in
-   :height: 3.74412in
-.. |image2| image:: media/image7.png
-   :width: 7in
-   :height: 2.5in
-.. |image3| image:: media/image65.png
-   :width: 5.34236in
-   :height: 2.75625in
-.. |image4| image:: media/image53.png
-   :width: 3.71875in
-   :height: 2.94631in
-.. |image5| image:: media/image60.png
-   :width: 5.95556in
-   :height: 2.71736in
-.. |image6| image:: media/image51.png
-   :width: 6.92708in
-   :height: 4.70833in
-.. |image7| image:: media/image14.png
-   :width: 7in
-   :height: 3.13889in
-.. |image8| image:: media/image68.png
-   :width: 7.44792in
-   :height: 1.86458in
-.. |Subsfc_fig| image:: media/image55.png
-   :width: 3.96223in
-   :height: 2.73438in
-.. |image9| image:: media/image52.png
-   :width: 2.62321in
-   :height: 0.37612in
-.. |image10| image:: media/image30.png
-   :width: 1.43229in
-   :height: 0.6875in
-.. |image11| image:: media/image69.png
-   :width: 2.30208in
-   :height: 0.38542in
-.. |image12| image:: media/image59.png
-   :width: 2in
-   :height: 0.48958in
-.. |figure3_1overlandflowrouting.jpg| image:: media/image13.jpg
-   :width: 2.98438in
-   :height: 2.7482in
-.. |image13| image:: media/image56.png
-   :width: 1.65808in
-   :height: 0.6195in
-.. |image14| image:: media/image63.png
-   :width: 1.22973in
-   :height: 0.47396in
-.. |image15| image:: media/image61.png
-   :width: 0.92654in
-   :height: 0.40104in
-.. |image16| image:: media/image67.png
-   :width: 1.88787in
-   :height: 0.60938in
-.. |image17| image:: media/image49.png
-   :width: 4.67708in
-   :height: 1.90625in
-.. |image18| image:: media/image11.png
-   :width: 0.19792in
-   :height: 0.19792in
-.. |image19| image:: media/image34.png
-   :width: 1.00972in
-   :height: 0.40556in
-.. |image20| image:: media/image32.png
-   :width: 2.38681in
-   :height: 0.41528in
-.. |image21| image:: media/image40.png
-   :width: 0.14167in
-   :height: 0.15069in
-.. |image22| image:: media/image37.png
-   :width: 0.77361in
-   :height: 0.5in
-.. |image23| image:: media/image36.png
-   :width: 1in
-   :height: 0.40556in
-.. |image24| image:: media/image42.png
-   :width: 1.64167in
-   :height: 0.44306in
-.. |image25| image:: media/image41.png
-   :width: 0.70764in
-   :height: 0.23611in
-.. |image26| image:: media/image43.png
-   :width: 0.70764in
-   :height: 0.23611in
-.. |image27| image:: media/image44.png
-   :width: 2.46696in
-   :height: 0.46723in
-.. |image28| image:: media/image45.png
-   :width: 0.32813in
-   :height: 0.32813in
-.. |image29| image:: media/image21.png
-   :width: 2.26389in
-   :height: 0.52847in
-.. |image30| image:: media/image4.png
-   :width: 1.14167in
-   :height: 0.26389in
-.. |image31| image:: media/image3.png
-   :width: 3.61319in
-   :height: 0.30208in
-.. |image32| image:: media/image54.png
-   :width: 5.48438in
-   :height: 1.67871in
-.. |image33| image:: media/image12.png
-   :width: 1.10417in
-   :height: 0.30208in
-.. |image34| image:: media/image16.png
-   :width: 1.30208in
-   :height: 0.30208in
-.. |image35| image:: media/image2.png
-   :width: 1.13056in
-   :height: 0.46875in
-.. |image36| image:: media/image64.png
-   :width: 2.25872in
-   :height: 1.66875in
-.. |image37| image:: media/image66.png
-   :width: 2.2587in
-   :height: 1.9223in
-.. |image38| image:: media/image62.png
-   :width: 1.77083in
-   :height: 1.58333in
-.. |image39| image:: media/image38.png
-   :width: 7.71908in
-   :height: 4.78646in
-.. |image40| image:: media/image35.png
-   :width: 7in
-   :height: 3.70833in
-.. |image41| image:: media/image15.png
-.. |image42| image:: media/image17.png
-   :width: 7in
-   :height: 5.22222in
-.. |image43| image:: media/image39.png
-   :width: 7.42188in
-   :height: 5.5852in
-.. |image44| image:: media/image25.png
-   :width: 4.09546in
-   :height: 3.05729in
