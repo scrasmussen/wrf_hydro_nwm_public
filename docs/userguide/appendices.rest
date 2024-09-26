@@ -573,7 +573,7 @@ description in the namelist which precedes the option.
    noConstInterfBias = .FALSE. !<-- Tactical response to phase errors.
    /
 
-
+.. _section-A6:
 .. _section-16:
 
 A6. Noah land surface model parameter tables
@@ -734,6 +734,8 @@ for additional information.
    |                   | portion of urban land-use points [land-use category     |
    |                   | index]                                                  |
    +-------------------+---------------------------------------------------------+
+
+.. _section-A7:
 
 A7. Noah-MP land surface model parameter tables
 -----------------------------------------------

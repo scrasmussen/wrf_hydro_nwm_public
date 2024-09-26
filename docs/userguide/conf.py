@@ -11,6 +11,7 @@ except:
     pass
 html_static_path = ['_static']
 html_css_files = ['ug_theme.css']
+numfig_secnum_depth = 2
 
 #these are enforced by rstdoc, but keep them for sphinx-build
 numfig = 0

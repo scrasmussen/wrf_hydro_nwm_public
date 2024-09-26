@@ -318,7 +318,7 @@ resolution routing calculations:
 
 In the model code, fine-grid values bearing the same name as these with
 an “RT” extension are created for each native land surface model grid
-cell (e.g. INFXSRT vs INFXS).
+cell (e.g. ``INFXSRT`` vs ``INFXS``).
 
 To preserve the structure of the spatial variability of soil moisture
 content on the sub-grid from one model time step to the next, simple,
@@ -330,20 +330,21 @@ schemes are executed using the fine grid values.
 Following execution of the routing schemes the fine-grid values are
 aggregated back to the native land surface model grid. The aggregation
 procedure used is a simple linear average of the fine-grid components.
-For example the aggregation of surface head (SFHEAD) from the fine grid
+For example the aggregation of surface head (``SFHEAD``) from the fine grid
 to the native land surface model grid would be:
 
-:math:``\ :math:`{SFHEAD}_{i,j}\  = \ \frac{\Sigma\Sigma\ {SFHEADRT}_{irt,jrt}}{{AGGFACTRT}^{2}}`
-(3.0)
+.. rst-class:: center
 
-where, i\ :sub:`rt` and j\ :sub:`rt` are the indices of all of the grid
-cells residing within the native land model grid cell i,j. The following
+   :math:`{SFHEAD}_{i,j}\  = \ \frac{\Sigma\Sigma\ {SFHEADRT}_{irt,jrt}}{AGGFACTRT^2}`
+   (3.0)
+
+where, `i_{rt}` and `j_{rt}` are the indices of all of the grid
+cells residing within the native land model grid cell `i`,\ `j`. The following
 variables are aggregated and, where applicable, update land surface
 model variable values:
 
-SFHEAD- surface head (or, equivalently, depth of ponded water)
-
-SMC - soil moisture content for each soil layer
+   | SFHEAD - surface head (or, equivalently, depth of ponded water)
+   | SMC - soil moisture content for each soil layer
 
 These updated values are then used on the next iteration of the land
 surface model.
@@ -397,20 +398,20 @@ store the relationship between grid features and polygons or perform
 regridding from one grid to another. The Earth System Modeling Framework
 (ESMF) offers high performance computing (HPC) software for building and
 coupling weather, climate, and related models. ESMF provides the
-ESMF_RegridWeightGen utility for parallel generation of interpolation
+:program:`ESMF_RegridWeightGen` utility for parallel generation of interpolation
 weights between two grid files in netCDF format. These utilities will
 work for structured (rectilinear) and unstructured grids. The NCAR
-Command Language (NCL) has supported the EMSF_RegridWeightGen tool since
+Command Language (NCL) has supported the :program:`ESMF_RegridWeightGen` tool since
 version 6.1.0. Another commonly used tool in the atmospheric sciences
 are the Climate Data Operators (CDO), which offer 1\ :sup:`st` and 2\ :sup:`nd`\-
-order conservative regridding (remapcon, remapcon2) and regrid weight
-generation (gencon, gencon2) based on the work of *Jones (1999)*. All of
+order conservative regridding (:program:`remapcon`, :program:`remapcon2`) and regrid weight
+generation (:program:`gencon`, :program:`gencon2`) based on the work of *Jones (1999)*. All of
 the above-mentioned utilities require SCRIP grid description files to
 perform the remapping. The SCRIP standard format for correspondence
 stores geometry information for regridding, while the tools mentioned
 here store just the spatial weights. Thus, WRF-Hydro spatial
 correspondence files are more generic, with compact file sizes, and may
-be used for non gridded data.
+be used for non-gridded data.
 
 This script quantifies the polygon to polygon correspondence between
 geometries in two separate features (grid cells represented by polygons
@@ -432,16 +433,20 @@ There are uses for this utility that range outside of the hydrological
 sciences, and this utility may be of broader interest to the geospatial
 community. Although interpolation packages exist, this method allows for
 storage of the correspondence information for future use in a small-file
-size. User’s wanting to create custom spatial weight interpolation files
+size. Users wanting to create custom spatial weight interpolation files
 for WRF-Hydro need to refer to the *WRF-Hydro GIS Pre-processing
 Toolkit* and documentation. For reference, variable descriptions of the
-contents of the spatial weights file is located in Appendix
-`A11 <#a11.-spatial-weights-input-file-variable-description>`__.\ |image8|
+contents of the spatial weights file is located in :ref:`section-20`.
 
-**Figure 3.3.** An illustration of implementing user-defined mapping to
-translate from gridded fluxes and states to aggregated catchment fluxes
-and states, which can be passed into, for example, vector-based channel
-routing modules.
+.. _figure3.3:
+.. figure:: media/user-defined-mapping.png
+   :align: center
+   :scale: 90%
+
+   **Figure 3.3.** An illustration of implementing user-defined mapping to
+   translate from gridded fluxes and states to aggregated catchment fluxes
+   and states, which can be passed into, for example, vector-based channel
+   routing modules.
 
 3.4 Subsurface Routing
 ----------------------
@@ -459,7 +464,7 @@ lateral flux and exfiltration processes in WRF-Hydro.
 In the current default implementation of WRF-Hydro with the Noah and
 Noah-MP land surface models, there are four soil layers. The depth of
 the soil layers in WRF-Hydro can be manually specified in the model
-namelist file under the ‘ZSOIL’ variable. Users must be aware that, in
+namelist file under the ``ZSOIL`` variable. Users must be aware that, in
 the present version of WRF-Hydro, total soil column depth and individual
 soil layer thicknesses are constant throughout the entire model domain.
 Future versions under development are relaxing this constraint. However,
@@ -468,27 +473,29 @@ layer depths and these simply need to be specified in the model namelist
 file. Assuming a 2-m soil profile the default soil layer depths (and
 associated water table depths) are specified in Table 3.1.
 
-   **Table 3.1: Depths of 4 soil layers in WRF-Hydro**
+.. table::  **Table 3.1: Depths of 4 soil layers in WRF-Hydro**
+   :align: center
 
-+-------------+-------------------------+-----------------------------+
-| **Layer**   | **Soil Thickness (mm)** | **Z (depth to top of layer) |
-|             |                         | (mm)**                      |
-+=============+=========================+=============================+
-| 1           | 100                     | 0                           |
-+-------------+-------------------------+-----------------------------+
-| 2           | 300                     | 100                         |
-+-------------+-------------------------+-----------------------------+
-| 3           | 600                     | 400                         |
-+-------------+-------------------------+-----------------------------+
-| 4           | 1000                    | 1000                        |
-+-------------+-------------------------+-----------------------------+
+   +-------------+-------------------------+-----------------------------+
+   | **Layer**   | **Soil Thickness (mm)** | **Z (depth to top of layer) |
+   |             |                         | (mm)**                      |
+   +=============+=========================+=============================+
+   | 1           | 100                     | 0                           |
+   +-------------+-------------------------+-----------------------------+
+   | 2           | 300                     | 100                         |
+   +-------------+-------------------------+-----------------------------+
+   | 3           | 600                     | 400                         |
+   +-------------+-------------------------+-----------------------------+
+   | 4           | 1000                    | 1000                        |
+   +-------------+-------------------------+-----------------------------+
 
-..
+.. _figure3.4:
+.. figure:: media/subsurface-flow.png
+   :align: center
+   :scale: 50%
 
-   |Subsfc_fig|
-
-**Figure 3.4** Conceptualization of saturated subsurface flow
-components.
+   **Figure 3.4** Conceptualization of saturated subsurface flow
+   components.
 
 The method used to calculate the lateral flow of saturated soil moisture
 employs a quasi three-dimensional flow representation, which include the
@@ -504,76 +511,110 @@ in the x- and y-directions for the 2-dimensional routing option or
 simply along the steepest D8 pathway.
 
 Using Dupuit-Forchheimer assumptions the rate of saturated subsurface
-flow at time *t* can be calculated as:
+flow at time `t` can be calculated as:
 
-:math:`{\ \ \ \ \ \ \ \ q}_{i,j} = \  - T_{i,j}\ \beta_{i,j}w_{i,j}\ \ \ when\ \beta_{i,j}\  < \ 0`
+.. _eqn3.1:
+.. rst-class:: center
+.. math::
 
-:math:`= \ \ 0\ \ \ \ \ when\ \beta_{i,j}\  > = \ 0`
+   {q}_{i,j} &= - T_{i,j}\beta_{i,j}w_{i,j}\ when\ \beta_{i,j}\  < \ 0 \\
+             &= 0\ when\ \beta_{i,j} > = 0
 
-(3.1)
+   (3.1)
 
-where, *q\ i,j* is the flow rate from cell *i,j*, *T\ i,j* is the
-transmissivity of cell *i,j*, *β\ i,j* is the water table slope and
-*w\ i,j* is the width of the cell which is fixed for a regular grid.
-*β\ i,j* is calculated as the difference in water table depths between
+where, `q_{i,j}` is the flow rate from cell `(i,j)`, `T_{i,j}` is the
+transmissivity of cell `(i,j)`, `\beta_{i,j}` is the water table slope and
+`w_{i,j}` is the width of the cell which is fixed for a regular grid.
+`\beta_{i,j}` is calculated as the difference in water table depths between
 two adjacent grid cells divided by the grid spacing. The method by which
 the water table depth is determined is provided below. Transmissivity is
-a power law function of saturated hydraulic conductivity (*Ksat i,j*)
-and soil thickness (*D\ i,j*) given by:
+a power law function of saturated hydraulic conductivity (`Ksat_{i,j}`)
+and soil thickness (`D_{i,j}`) given by:
 
-:math:`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ T_{i,j}\  = \frac{{Ksat}_{i,j}D_{i,j}}{n_{i,j}}\left( 1 - \frac{z_{i,j}}{D_{i,j}} \right)^{n_{i,j}}\ \ \ when\ z_{i,j}\  < = \ D_{i,j}`
+.. _eqn3.2:
+.. rst-class:: center
+.. math::
 
-:math:`= \ 0\ \ \ \ \ \ \ when\ z_{i,j}\  > \ D_{i,j}\ `
+   T_{i,j} &= \frac{{Ksat}_{i,j}D_{i,j}} {n_{i,j}} \left( 1 - \frac{z_{i,j}}{D_{i,j}} \right)^{n_{i,j}}\ when\ z_{i,j} < = D_{i,j} \\
+           &= 0\ when\ z_{i,j} > D_{i,j}
 
    (3.2)
 
-where, *z\ i,j* is the depth to the water table. *n\ i,j* in Eq. (3.2)
+where, `z_{i,j}` is the depth to the water table. `n_{i,j}` in :ref:`Eq. (3.2) <eqn3.2>`
 is defined as the local power law exponent and is a tunable parameter
 (currently hard-coded to 1 but will be exposed in future versions) that
-dictates the rate of decay of *Ksat\ i,j* with depth. When Eq. (3.2) is
-substituted into (3.1) the flow rate from cell *i,j* to its neighbor in
-the x-direction can be expressed as
+dictates the rate of decay of `Ksat_{i,j}` with depth. When :ref:`Eq. (3.2) <eqn3.2>` is
+substituted into :ref:`Eq. (3.1) <eqn3.1>` the flow rate from cell `(i,j)`
+to its neighbor in the `x`-direction can be expressed as:
 
-|image9| (3.3)
+.. _eqn3.3:
+.. rst-class:: center
+.. math::
+
+   q_{x(i,j)} = \gamma_{x(i,j)} h_{i,j}\ when\ \beta_{x(i,j)} < 0
+
+   (3.3)
 
 where,
 
-:math:`\gamma_{x(i,j)}\  = \  - \left( \frac{w_{i,j}{Ksat}_{i,j}D_{i,j}}{n_{i,j}} \right)\beta_{x(i,j)}`
+.. _eqn3.4:
+.. rst-class:: center
+.. math::
 
-(3.4)\ |image10|
+   \gamma_{x(i,j)} = - \left( \frac{w_{i,j}{Ksat}_{i,j}D_{i,j}}{n_{i,j}} \right)\beta_{x(i,j)}
 
-(3.5)
+   (3.4)
+
+.. _eqn3.5:
+.. rst-class:: center
+.. math::
+
+   h_{i,j} = \left( 1-\frac{z_{i,j}}{D_{i,j}} \right)
+
+   (3.5)
 
 This calculation is repeated for the y-direction when using the
 two-dimensional routing method. The net lateral flow of saturated
-subsurface moisture (*Q\ net*) for cell *i,j* then becomes:
+subsurface moisture (`Q_{net}`) for cell `(i,j)` then becomes:
 
-|image11| (3.6)
+.. _eqn3.6:
+.. rst-class:: center
+.. math::
 
-The mass balance for each cell on a model time step (*Δt*) can then be
-calculated in terms of the change in depth to the water table (*Δz*):
+   Q_{net(i,j)} = h_{i,j} \sum_x{\gamma_{x(i,j)}} + h_{i,j} \sum_y{\gamma_{y(i,j)}}
 
-|image12| (3.7)
+   (3.6)
 
-where, *φ* is the soil porosity, *R* is the soil column recharge rate
+The mass balance for each cell on a model time step (`\Delta t`) can then be
+calculated in terms of the change in depth to the water table (`\Delta z`):
+
+.. _eqn3.7:
+.. rst-class:: center
+.. math::
+
+   \Delta z = \frac{1}{\phi_{(i,j)}} \left[ \frac{Q_{net(i,j)}}{A} - R_{(i,j)} \right] \Delta t
+
+   (3.7)
+
+where, `\phi` is the soil porosity, `R` is the soil column recharge rate
 from infiltration or deep subsurface injection and *A* is the grid cell
-area. In WRF-Hydro, *R*, is implicitly accounted for during the land
+area. In WRF-Hydro, `R`, is implicitly accounted for during the land
 surface model integration as infiltration and subsequent soil moisture
 increase. Assuming there is no deep soil injection of moisture (i.e.
-pressure driven flow from below the lowest soil layer), *R*, in
+pressure driven flow from below the lowest soil layer), `R`, in
 WRF-Hydro is set equal to 0.
 
-The methodology outlined in Equations 3.2-3.7 has no explicit
-information on soil layer structure, as the method treats the soil as a
-single homogeneous column (with an assumed exponential decay of
+The methodology outlined in Equations :ref:`3.2 <eqn3.2>` thru :ref:`3.7 <eqn3.7>`
+has no explicit information on soil layer structure, as the method treats
+the soil as a single homogeneous column (with an assumed exponential decay of
 saturated hydraulic conductivity). Therefore, changes in water table
-depth (*Δz*) need to be remapped to the land surface model soil layers.
+depth (`\Delta z`) need to be remapped to the land surface model soil layers.
 WRF-Hydro specifies the water table depth according to the depth of the
 top of the highest (i.e. nearest to the surface) saturated layer. The
 residual saturated water above the uppermost, saturated soil layer is
 then added to the overall soil water content of the overlying
 unsaturated layer. This computational structure requires accounting
-steps to be performed prior to calculating *Q\ net*.
+steps to be performed prior to calculating `Q_{net}`.
 
 Given the timescale for groundwater movement and limitations in the
 model structure there is significant uncertainty in the time it takes to
@@ -581,40 +622,39 @@ properly spin-up groundwater systems. The main things to consider
 include 1) the specified depth of soil and number and thickness of the
 soil vertical layers and 2) the prescription of the model bottom
 boundary condition. Typically, for simulations with deep soil profiles
-(e.g. > 10 m) the bottom boundary condition is set to a ‘no-flow’
-boundary (SLOPE_DATA = 0.0) in the GENPARM.TBL parameter file (see
-Appendices `A6 <#a6.-noah-land-surface-model-parameter-tables>`__ and
-`A7 <#a7.-noah-mp-land-surface-model-parameter-tables>`__, for a
+(e.g. > 10 `m`) the bottom boundary condition is set to a ‘no-flow’
+boundary (``SLOPE_DATA = 0.0``) in the GENPARM.TBL parameter file (see
+Appendices :ref:`section-a6` and :ref:`section-a7` for a
 description of GENPARM.TBL).
 
 **Relevant code modules:**
 
-Routing/Noah_distr_routing.F
+:file:`Routing/Noah_distr_routing.F90`
 
 **Relevant namelist options:**
 
-hydro.namelist:
+`hydro.namelist`:
 
--  SUBRTSWCRT - Switch to activate subsurface flow routing.
+-  ``SUBRTSWCRT`` - Switch to activate subsurface flow routing.
 
--  DXRT - Specification of the routing grid cell spacing
+-  ``DXRT`` - Specification of the routing grid cell spacing
 
--  AGGFACTR - Subgrid aggregation factor, defined as the ratio of the
+-  ``AGGFACTR`` - Subgrid aggregation factor, defined as the ratio of the
    subgrid resolution to the native land model resolution
 
--  DTRT_TER - Terrain routing grid time step (used for overland and
+-  ``DTRT_TER`` - Terrain routing grid time step (used for overland and
    subsurface routing)
 
 **Relevant domain and parameter files/variables:**
 
--  TOPOGRAPHY in Fulldom_hires.nc - Terrain grid or Digital Elevation
+-  ``TOPOGRAPHY`` in :file:`Fulldom_hires.nc` - Terrain grid or Digital Elevation
    Model (DEM). Note: this grid may be provided at resolutions equal to
    or finer than the native land model resolution.
 
--  LKSATFAC in Fulldom_hires.nc - Multiplier on saturated hydraulic
+-  ``LKSATFAC`` in :file:`Fulldom_hires.nc` - Multiplier on saturated hydraulic
    conductivity in lateral flow direction.
 
--  SATDK, SMCMAX, SMCREF in HYDRO.TBL or hydro2dtbl.nc - Soil properties
+-  ``SATDK``, ``SMCMAX``, ``SMCREF`` in :file:`HYDRO.TBL` or :file:`hydro2dtbl.nc` - Soil properties
    (saturated hydraulic conductivity, porosity, field capacity) used in
    lateral flow routing.
 
@@ -722,7 +762,7 @@ size as shown in Table 3.2.
 
 **Relevant code modules:**
 
-Routing/Noah_distr_routing.F
+Routing/Noah_distr_routing.F90
 
 **Relevant namelist options:**
 
@@ -787,7 +827,7 @@ model outputs).
 **Figure 3.6** Channel routing via the high resolution grid (left) or on
 a vector/link network (right).
 
-The channel routing module module_channel_routing.F allows for the
+The channel routing module module_channel_routing.F90 allows for the
 one-dimensional, distributed routing of streamflow across the domain. An
 optional, switch-activated, level-pool lake/reservoir algorithm is also
 available and is described below in Sections `3.7 <#_3v94x1dwjllp>`__
@@ -830,7 +870,7 @@ levels and potential inundation areas.
 
 **Relevant code modules:**
 
-Routing/ module_channel_routing.F
+Routing/ module_channel_routing.F90
 
 **Relevant namelist options for gridded and reach-based routing:**
 
@@ -1157,7 +1197,7 @@ represented and these are discussed in Sections
 
 **Relevant code modules:**
 
-Routing/ module_channel_routing.F
+Routing/ module_channel_routing.F90
 
 **Relevant namelist options:**
 
@@ -1194,7 +1234,7 @@ hydro.namelist:
 
 .. _section-6:
 
-3.8 Conceptual base flow *model description
+3.8 Conceptual base flow model description
 ---------------------------------------------
 
 Aquifer processes contributing baseflow often operate at depths well
@@ -1204,7 +1244,7 @@ processes. Because these processes contribute to streamflow (typically
 as “baseflow”) a parameterization is often used in order to simulate
 total streamflow values that are comparable with observed streamflow
 from gauging stations. Therefore, a switch-activated baseflow module
-module_GW_baseflow.F has been created which conceptually (i.e. *not*
+module_GW_baseflow.F90 has been created which conceptually (i.e. *not*
 physically-explicit) represents baseflow contributions to streamflow.
 This model option is particularly useful when WRF-Hydro is used for
 long-term streamflow simulation/prediction and baseflow or “low flow”
@@ -1308,7 +1348,7 @@ model calibration.
 
 **Relevant code modules:**
 
-Routing/ module_GW_baseflow.F
+Routing/ module_GW_baseflow.F90
 
 **Relevant namelist options:**
 
