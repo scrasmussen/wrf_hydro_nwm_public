@@ -1,6 +1,8 @@
 .. vim: syntax=rst
 .. include:: media.rest
 
+.. _section-6.0:
+
 6. Description of Output Files from WRF-Hydro
 =============================================
 

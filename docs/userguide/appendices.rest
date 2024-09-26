@@ -13,21 +13,19 @@ A1. Example of Dependency Installation for Ubuntu 24.04 LTS
 The example below uses the GNU compilers and Open MPI. Commands are
 issued as root user in the bash shell.::
 
-   ###############################################
-   ### Get libraries available through apt-get ###
-   ###############################################
+   ##########################################################
+   ###     Get libraries available through apt-get        ###
+   ##########################################################
 
    apt-get update
 
-   apt-get install wget bzip2 ca-certificates \
-                   gfortran g++ cmake git \
-                   libopenmpi-dev libhdf5-dev \
-                   libnetcdff-dev libnetcdf-dev \
-                   netcdf-bin
+   apt-get install wget bzip2 ca-certificates gfortran \
+                   libnetcdff-dev mpi-default-dev \
+                   cmake git netcdf-bin
 
-   ###############################################
-   ### Check netCDF installs (optional)        ###
-   ###############################################
+   ##########################################################
+   ###          Check netCDF installs (optional)          ###
+   ##########################################################
 
    nf-config --all
    nc-config --all
@@ -68,8 +66,6 @@ the WRF-Hydro workflow to work with Noah:
    io_form_outputs = 0 to activate the deprecated output routines.
    Scale/offset and compression options, CF compliance, augmented
    spatial metadata, etc. are not available in this deprecated mode.
-
-.. _section-12:
 
 .. _section-13:
 
@@ -258,6 +254,8 @@ Below is an annotated hydro.namelist file. Annotations follow what is
 being described, indicated with <-- and blue text. Note that
 annotations describing options are meant to accompany the commented
 description in the namelist which precedes the option.
+
+.. _hydro-namelist:
 
 .. code-block:: fortran
 

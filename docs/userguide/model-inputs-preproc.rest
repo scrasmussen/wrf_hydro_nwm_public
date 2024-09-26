@@ -464,7 +464,7 @@ the *WRF-Hydro GIS Pre-processing Toolkit*. See Appendix
 `A12 <#a12.-lake-and-reservoir-parameter-tables-lakeparm.nc>`__ for
 descriptions of the variables within the LAKEPARM.nc file.
 
-.. _section-8:
+.. _section-5.7:
 
 5.7 Specification of meteorological forcing data
 ------------------------------------------------

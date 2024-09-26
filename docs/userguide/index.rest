@@ -1,15 +1,16 @@
 .. vim: syntax=rst
+.. include:: meta.rest
 
 =========================================================
 The NCAR WRF-Hydro® Modeling System Technical Description
 =========================================================
-.. centered:: **Version 5.3.0**
+.. centered:: Version |version_long|
 
-.. centered:: **Originally Created:**
-.. centered:: **April 14, 2013**
+.. centered:: Originally Created:
+.. centered:: April 14, 2013
 
-.. centered:: **Updated:**
-.. centered:: **September 15, 2023**
+.. centered:: Updated:
+.. centered:: September 24, 2024
 
 Until further notice, please cite the WRF-Hydro® modeling system as
 follows:
@@ -17,14 +18,14 @@ follows:
 Gochis, D.J., M. Barlage, R. Cabell, M. Casali, A. Dugger, K.
 FitzGerald, M. McAllister, J. McCreight, A. RafieeiNasab, L. Read, K.
 Sampson, D. Yates, Y. Zhang (2020). *The WRF-Hydro® modeling system
-technical description,* (Version 5.1.1)\ *.* NCAR Technical Note. 107
-pages. Available online at:
-https://ral.ucar.edu/sites/default/files/public/WRFHydroV511TechnicalDescription.pdf.
+technical description,* (Version 5.4)\ *.* NCAR Technical Note. 107
+pages. Available online at: https://wrf-hydro.readthedocs.io/en/latest/
+
 
 **FORWARD**
 
 This Technical Description describes the WRF-Hydro® model coupling
-architecture and physics options, released in Version 5.3 in Oct. 2023.
+architecture and physics options, released in Version 5.4 in Oct. 2024.
 As the WRF-Hydro® modeling system is developed further, this document
 will be continuously enhanced and updated. Please send feedback to
 wrfhydro@ucar.edu .
@@ -93,6 +94,8 @@ Prediction (OWP)
 
 
 .. toctree::
+
+    Front Matter <self>
     introduction
     model-code-config
     model-physics
