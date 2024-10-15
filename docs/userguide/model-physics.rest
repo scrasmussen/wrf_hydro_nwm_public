@@ -6,8 +6,8 @@
 ============================
 
 This chapter describes the physics behind each of the modules in Version
-5.0 of WRF-Hydro and the associated namelist options which are specified
-at “run time”.
+|version_short| of WRF-Hydro and the associated namelist options which are
+specified at “run time”.
 
 3.1 Physics Overview
 --------------------
@@ -658,6 +658,8 @@ description of GENPARM.TBL).
    (saturated hydraulic conductivity, porosity, field capacity) used in
    lateral flow routing.
 
+.. _section-3.5:
+
 3.5 Surface Overland Flow Routing
 ---------------------------------
 
@@ -872,7 +874,7 @@ Details on how each routing method reads these parameters are specified
 in the subsections below.
 
 .. _figure3.7:
-.. figure:: media/image49.png
+.. figure:: media/channel-terms.png
    :align: center
    :figwidth: image
 
@@ -1135,73 +1137,77 @@ factor is given as, *X* =
 (3.28) where *Q* is the estimated discharge, *T\ w* is the water surface
 width, *S\ o* is the channel slope and *dx* is the channel length.
 
-**Relevant domain and parameter files/variables:**
+.. rubric:: Relevant domain and parameter files/variables:
 
--  TOPOGRAPHY in Fulldom_hires.nc - Terrain grid or Digital Elevation
+-  ``TOPOGRAPHY`` in :file:`Fulldom_hires.nc` - Terrain grid or Digital Elevation
    Model (DEM). Note: this grid may be provided at resolutions equal to
    or finer than the native land model resolution.
 
--  CHANNELGRID in Fulldom_hires.nc - Channel network grid identifying
+-  ``CHANNELGRID`` in :file:`Fulldom_hires.nc` - Channel network grid identifying
    the location of stream channel grid cells
 
--  STREAMORDER in Fulldom_hires.nc - Strahler stream order grid
+-  ``STREAMORDER`` in :file:`Fulldom_hires.nc` - Strahler stream order grid
    identifying the stream order for all channel pixels within the
    channel network.
 
--  FLOWDIRECTION in Fulldom_hires.nc - Flow direction grid, which
+-  ``FLOWDIRECTION`` in :file:`Fulldom_hires.nc` - Flow direction grid, which
    explicitly defines flow directions along the channel network in
    gridded routing. This variable dictates where water flows into
    channels from the land surface as well as in the channel. This should
    not be modified independently because it is tied to the DEM.
 
--  frxst_pts (optional) in Fulldom_hires.nc - Forecast point grid, which
+-  ``frxst_pts`` (optional) in :file:`Fulldom_hires.nc` - Forecast point grid, which
    specified selected channel pixels for which channel discharge and
    flow depth are to be output within a netcdf point file (CHANOBS)
    and/or an ASCII timeseries file (frxstpts_out.txt).
 
--  CHANPARM.TBL text or Route_Link.nc netcdf file - Specifies channel
-   parameters by stream order (CHANPARM.TBL, for gridded channel
-   routing) or individual reaches (route_link_f, for reach-based routing
+-  :file:`CHANPARM.TBL` text or :file:`Route_Link.nc` netcdf file - Specifies channel
+   parameters by stream order (:file:`CHANPARM.TBL`, for gridded channel
+   routing) or individual reaches (``route_link_f``, for reach-based routing
    methods)
 
-**\*Note: Reach-based routing is highly sensitive to time step.**
+.. note:: Reach-based routing is highly sensitive to time step.
 
 3.6.3 Compound Channel (currently only functional in NWM)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to represent a simplification of the behavior of a flood wave
 when it exceeds the channel bank, a compound channel formulation was
-added to the NWM (i.e. only active when channel_option =2 and udmp =1).
+added to the NWM (i.e. only active when ``channel_option=2`` and ``udmp=1``).
 A visual representation is shown in Figure 3.9. When the depth of the
-flow exceeds bankfull (d > d\ :sub:`b`), then the wave celerity is given
+flow exceeds bankfull (`d > d_b`), then the wave celerity is given
 as the weighted celerity of the trapezoidal flow and the overbank
 portion of flow. This weighting is based on the cross sectional area of
 each, and allows water to enter the conceptual compound channel, where
-the Manning’s coefficient of the compound channel portion, n\ :sub:`cc`,
-is assumed rougher than the channel n by an unknown factor,
-n\ :sub:`cc`. Based on a set of sensitivity experiments described in
-Read et al., (forthcoming), the default value for in NWMv2.0 and v2.1 is
-n\ :sub:`cc`\ =2*n, such that the floodplain roughness is twice that of
+the Manning's coefficient of the compound channel portion, `n_{cc}`,
+is assumed rougher than the channel `n` by an unknown factor,
+`n_{cc}`. Based on a set of sensitivity experiments described in
+*Read et al., (forthcoming)*, the default value for in NWMv2.0 and v2.1 is
+`n_{cc}=2n`, such that the floodplain roughness is twice that of
 the channel. The introduction of compound channel requires values for
-three more parameters: bankfull depth (d\ :sub:`b`), top widths of the
-trapezoid and the compound channel, T\ :sub:`w` and T\ :sub:`w_cc,`
-respectively. These parameters, in addition to n\ :sub:`cc`, are defined
+three more parameters: bankfull depth (`d_b`), top widths of the
+trapezoid and the compound channel, `T_w` and `T_{w\_cc},`
+respectively. These parameters, in addition to `n_{cc}`, are defined
 in the Route_Link.nc file for the NWM. The default values in NWMv2.0 and
 v2.1 are defined as: (1) was determined using a published equation from
-Blackburn-Lynch et al., 2017, who gathered regional USGS estimations of
+*Blackburn-Lynch et al., 2017*, who gathered regional USGS estimations of
 channel parameters and developed coefficients to describe the
-relationship of drainage area (DA) to T\ :sub:`w` and to channel area
-(A). The aggregated CONUS equation is: T\ :sub:`w` =
-2.44(DA)\ :sup:`0.34` and A = 0.75(DA)\ :sup:`0.53`. Given these,
-d\ :sub:`b` is determined using the standard equation for a trapezoid.
-As a default value, T\ :sub:`w_cc` is a multiplier on T\ :sub:`w`.
-Sensitivity experiments presented in Read et al. (forthcoming) found
-that T\ :sub:`w_cc` =3*T\ :sub:`w` yielded the best streamflow
-performance, all else equal.
+relationship of drainage area (`DA`) to `T_w` and to channel area
+(`A`). The aggregated CONUS equation is: `T_w = 2.44(DA)^{0.34}`
+and `A = 0.75(DA)^{0.53}`. Given these, `d_b` is determined
+using the standard equation for a trapezoid. As a default value,
+`T_{w\_cc}` is a multiplier on `T_w`. Sensitivity experiments
+presented in *Read et al. (forthcoming)* found that `T_{w\_cc}=3*T_w`
+yielded the best streamflow performance, all else being equal.
 
-Figure 3.9. Cross-sectional schematic of trapezoidal channel and compound
-channel in National Water Model, where the dashed lines represent roughness
-of the channel n, and of the compound channel, n\ :sub:`cc` |image32|
+.. _figure3.9:
+.. figure:: media/trapezoid-compound-channel.png
+   :align: center
+   :scale: 50%
+
+   **Figure 3.9** Cross-sectional schematic of trapezoidal channel and compound
+   channel in National Water Model, where the dashed lines represent roughness
+   of the channel n, and of the compound channel, `n_{cc}`
 
 .. _section-3.7:
 
@@ -1216,7 +1222,7 @@ and outflow are estimated using a level-pool routing scheme. The only
 conceptual difference between lakes and reservoirs as represented in
 WRF-Hydro is that reservoirs contain both orifice and weir outlets for
 reservoir discharge while lakes only contain weirs. Note that the user
-must adjust these parameters accordingly - the model makes no
+must adjust these parameters accordingly - the model makes no other
 distinction between a reservoir and a lake.
 
 Fluxes into a lake/reservoir object occur through the channel network
@@ -1226,92 +1232,97 @@ fluxes from lake/reservoir objects to the atmosphere or the land surface
 are currently represented (i.e. there is currently no lake evaporation
 or subsurface exchange between the land surface and lakes and
 reservoirs). The Level Pool scheme tracks water elevation changes over
-time, *h(t)* where water from the reservoir can exit either through weir
-overflow (*Q\ w*) and/or a gate-controlled flow (Q\ :sub:`o`), where
+time, `h(t)` where water from the reservoir can exit either through weir
+overflow (`Q_w`) and/or a gate-controlled flow (`Q_o`), where
 these outflows are functions of the water elevation and spillway
-parameters. Weir flow is given as |image33|\ :sub:`(3.29)` when
-*h>h\ max or Qw(t)* = 0.0 when *h≤h\ max* where, *h\ max* is the maximum
-height before the weir begins to spill (m), *C\ w* is a weir
-coefficient, and *L* is the length of the weir (m). Orifice flow is
-given as\ |image34|, (3.30) where *C\ o* is the orifice coefficient,
-O\ *a i*\ s the orifice area (m\ :sup:`2`), and *g* is the acceleration
-of gravity (m/s\ :sup:`2`). In addition, the level pool scheme is
-designed to track each reservoir’s surface area, *Sa* (km\ :sup:`2`) as
-a function of water depth and the area at full storage, *As*
-(km\ :sup:`2`). Presently, lake/reservoir object is assumed to have
+parameters. Weir flow is given as `Q_w(t) = C_wLh^{\frac{3}{2}}; (3.29)`
+when `h>h_{max}` or `Q_w(t) = 0.0` when `h≤h_{max}` where, `h_{max}` is
+the maximum height before the weir begins to spill (`m`), `C_w` is a weir
+coefficient, and `L` is the length of the weir (`m`). Orifice flow is
+given as `Q_o(t) = C_oO_a\sqrt{2gh}; (3.30)` where `C_o` is the orifice
+coefficient, `O_a` is the orifice area (`m^2`), and `g` is the
+acceleration of gravity (`m/s^2`). In addition, the level pool scheme
+is designed to track each reservoir's surface area, `S_a` (`km^2`) as
+a function of water depth and the area at full storage, `A_s`
+(`km^2`). Presently, a lake/reservoir object is assumed to have
 vertical side walls, such that the surface area is always constant.
 
-|image35|
+.. _figure-3.10:
+.. figure:: media/level-pool.png
+   :align: center
+   :scale: 40%
+.. rst-class:: center
+.. math::
 
-**Figure 3.10** Schematic of Level Pool Routing
+   S_a(t) &= f(h, A_s) \\
+   Q_t(t) &= f(h)
+
+.. rst-class:: center
+
+   **Figure 3.10** Schematic of Level Pool Routing
 
 The following lake/reservoir parameters are required for level-pool
-routing and are defined in the LAKEPARM.nc parameter file. The GIS
+routing and are defined in the :file:`LAKEPARM.nc` parameter file. The GIS
 pre-processing tool can make either of these files and the model will
-read the one specified in the hydro.namelist file:
+read the one specified in the :file:`hydro.namelist` file:
 
--  Weir and Orifice Coefficients (*Co, Cw*)
-
--  Weir Length, *L* (m)
-
--  Orifice Area, *O\ a* (m\ :sup:`2`)
-
--  Reservoir Area, *As* (km\ :sup:`2`)
-
--  Maximum reservoir height at full storage, *h\ max* (*m*)
+   -  Weir and Orifice Coefficients (`Co`, `Cw`)
+   -  Weir Length, `L` (`m`)
+   -  Orifice Area, `O_a` (`m^2`)
+   -  Reservoir Area, `A_s` (`km^2`)
+   -  Maximum reservoir height at full storage, `h_{max}` (`m`)
 
 The lake/reservoir flow routing option is activated when lake objects
 are defined and properly indexed as a data field in the high resolution
 terrain routing grid file. If lake/reservoir objects are present in the
 lake grid (and also within the channel network) then routing through
-those objects will occur if the channel is active AND if channel_option
-= 3 (gridded routing). There are several special requirements for the
+those objects will occur if the channel is active AND if ``channel_option
+= 3`` (gridded routing). There are several special requirements for the
 lake grid and channel routing grids when lakes/reservoirs are to be
-represented and these are discussed in Sections
-`5.4 <#description-of-channel-routing-parameter-files>`__ and
-`5.6 <#description-of-lake-and-reservoir-parameter-tables>`__.
+represented and these are discussed in Sections :ref:`5.4 <section-5.4>`
+and :ref:`5.6 <section 5.6>`.
 
-**Relevant code modules:**
+.. rubric:: Relevant code modules:
 
-Routing/ module_channel_routing.F90
+:file:`Routing/module_channel_routing.F90`
 
-**Relevant namelist options:**
+.. rubric:: Relevant namelist options:
 
-hydro.namelist:
+:file:`hydro.namelist`:
 
--  route_lake_f (optional) - Path to lake parameter file to support
+-  ``route_lake_f`` (optional) - Path to lake parameter file to support
    level-pool reservoir routing methods.
 
-   -  | Note: as mentioned in the paragraph above, if in the
-        GIS-Preprocessing the user created a “gridded” routing stack for
-        channel_option = 3 (i.e. did *not* select to create a
-        Route_Link.nc file for channel_option = 1 or = 2) AND specified
-        a lake file (user provided a reservoir/lake input file), then
-        the Fulldom_hires.nc file will populate the LAKEGRID variable.
-        For this case, the user **must** specify the route_lake_f file.
-      | To turn lakes “off” with channel_option = 3, create another set
-        of Fulldom_hires.nc (“domain”) files without a reservoir input
-        file specified.
+.. note:: As mentioned in the paragraph above, if in the
+   GIS-Preprocessing the user created a “gridded” routing stack for
+   ``channel_option = 3`` (i.e. did *not* select to create a
+   Route_Link.nc file for ``channel_option=1`` or ``=2``) AND specified
+   a lake file (user provided a reservoir/lake input file), then
+   the :file:`Fulldom_hires.nc` file will populate the ``LAKEGRID`` variable.
+   For this case, the user **must** specify the route_lake_f file.
+   To turn lakes “off” with ``channel_option=3``, create another set
+   of :file:`Fulldom_hires.nc` (“domain”) files without a reservoir input
+   file specified.
 
-**Relevant domain and parameter files/variables:**
+.. rubric:: Relevant domain and parameter files/variables:
 
--  CHANNELGRID in Fulldom_hires.nc - Channel network grid identifying
+-  ``CHANNELGRID`` in :file:`Fulldom_hires.nc` - Channel network grid identifying
    the location of stream channel grid cells
 
--  LAKEGRID in Fulldom_hires.nc (optional) - Specifies lake locations on
+-  ``LAKEGRID`` in :file:`Fulldom_hires.nc` (optional) - Specifies lake locations on
    the channel grid (for gridded channel routing methods, i.e.
-   channel_option = 3).
+   ``channel_option=3``).
 
--  Route_Link.nc netCDF file (optional) - Specifies lake associations
-   with channel reaches..
+-  :file:`Route_Link.nc` netCDF file (optional) - Specifies lake associations
+   with channel reaches.
 
--  LAKEPARM.nc netCDF file - Specifies lake parameters for each lake
+-  :file:`LAKEPARM.nc` netCDF file - Specifies lake parameters for each lake
    object specified.
 
 .. _section-3.8:
 
 3.8 Conceptual base flow model description
----------------------------------------------
+------------------------------------------
 
 Aquifer processes contributing baseflow often operate at depths well
 below ground surface. As such, there are often conceptual shortcomings
@@ -1320,29 +1331,29 @@ processes. Because these processes contribute to streamflow (typically
 as “baseflow”) a parameterization is often used in order to simulate
 total streamflow values that are comparable with observed streamflow
 from gauging stations. Therefore, a switch-activated baseflow module
-module_GW_baseflow.F90 has been created which conceptually (i.e. *not*
-physically-explicit) represents baseflow contributions to streamflow.
-This model option is particularly useful when WRF-Hydro is used for
-long-term streamflow simulation/prediction and baseflow or “low flow”
-processes must be properly accounted for. Besides potential calibration
-of the land surface model parameters the conceptual baseflow model does
-not directly impact the performance of the land surface model scheme.
-The new baseflow module is linked to WRF-Hydro through the discharge of
-“deep drainage” from the land surface soil column (sometimes referred to
-as “underground runoff”).
+:file:`module_GW_baseflow.F90` has been created which conceptually
+(i.e. *not* physically-explicit) represents baseflow contributions to
+streamflow. This model option is particularly useful when WRF-Hydro is
+used for long-term streamflow simulation/prediction and baseflow or
+“low flow” processes must be properly accounted for. Besides potential
+calibration of the land surface model parameters the conceptual baseflow
+model does not directly impact the performance of the land surface model
+scheme. The new baseflow module is linked to WRF-Hydro through the
+discharge of “deep drainage” from the land surface soil column (sometimes
+referred to as “underground runoff”).
 
 The baseflow parameterization in WRF-Hydro uses spatially-aggregated
 drainage from the soil profile as recharge to a conceptual groundwater
-reservoir (Fig. 3.10). The unit of spatial aggregation is often taken to
-be that of a catchment or sub-basin within a watershed. Each sub-basin
-has a groundwater reservoir “bucket” with a conceptual depth and
-associated conceptual volumetric capacity. The reservoir operates as a
-simple bucket where outflow (= “baseflow” or “stream inflow”) is
-estimated using an empirically-derived function of recharge. The
-functional type and parameters are determined empirically from offline
-tests using an estimation of baseflow from stream gauge observations and
-model-derived estimates of bucket recharge provided by WRF-Hydro.
-Presently, WRF-Hydro uses either a direct output-equals-input
+reservoir (:ref:`Fig. 3.10 <figure-3.10>`). The unit of spatial
+aggregation is often taken to be that of a catchment or sub-basin within
+a watershed. Each sub-basin has a groundwater reservoir “bucket” with a
+conceptual depth and associated conceptual volumetric capacity. The
+reservoir operates as a simple bucket where outflow (= “baseflow” or
+“stream inflow”) is estimated using an empirically-derived function of
+recharge. The functional type and parameters are determined empirically
+from offline tests using an estimation of baseflow from stream gauge
+observations and model-derived estimates of bucket recharge provided by
+WRF-Hydro. Presently, WRF-Hydro uses either a direct output-equals-input
 "pass-through" relationship or an exponential storage-discharge function
 for estimating the bucket discharge as a function of a conceptual depth
 of water in the bucket "exponential bucket". Note that, because this is
@@ -1353,7 +1364,7 @@ tracked in order to maintain mass conservation. Estimated baseflow
 discharged from the bucket model is then combined with lateral inflow
 from overland routing (if active) and input directly into the stream
 network as channel inflow, as referred to above in Section
-`3.5 <#surface-overland-flow-routing>`__. Presently, the total basin
+:ref:`3.5 <section-3.5>`. Presently, the total basin
 baseflow flux to the stream network is equally distributed among all
 channel pixels within a basin for gridded channel routing options or
 dumped into the top of the reach to be routed downstream for reach-based
@@ -1361,98 +1372,88 @@ methods. Lacking more specific information on regional groundwater
 basins, the groundwater/baseflow basins in WRF-Hydro are often assumed
 to match those of the surface topography. However, this is not a strict
 requirement. Buckets can be derived in a number of ways such as where
-true aquifers are defined or from a 3\ :sup:`rd` party hydrographic
+true aquifers are defined or from a third-party hydrographic
 dataset such as the USGS NHDPlus or Hydrosheds.
 
-|image36|\ |image37|\ |image38|
+.. _figure-3.11:
+.. figure:: media/groundwater.svg
+   :align: center
+   :width: 70%
 
-**Figure 3.11** Hypothetical map of groundwater/baseflow sub-basins
-within a watershed and conceptualization of baseflow “bucket”
-parameterization in WRF-Hydro.
+   **Figure 3.11** Hypothetical map of groundwater/baseflow sub-basins
+   within a watershed and conceptualization of baseflow “bucket”
+   parameterization in WRF-Hydro.
 
-   z = zprevious + (Qin*dt)/A (3.40)
+\
+      | `z = z_{previous} + \frac{Q_{in}*dt}{A}; \qquad (3.40)`
+      |
+      | **if** `z > z_{max}` :
+      |    `z_{spill} = z - z_{max}`
+      |    `z = z_{max}`
+      |    `Q_{spill} = \frac{A*z_{spill}}{dt}`
+      |
+      | **else** :
+      |    `Q_{spill} = 0`
+      |
+      | `Q_{exp} = C(e^{E\frac{z}{zmax}}-1)`
+      | `Q_{out} = Q_{spill} + Q_{exp}`
+      | `z = z - \frac{Q_{exp}*dt}{A}`
+      |
+      | **where** :
+      |    `Q_{in}` is the inflow to the bucket aggregated from the bottom of the LSM in `m^3/s`
+      |    `z` is the height of the water level in the bucket in `mm`
+      |    `z_{max}` is the total height of the bucket in `mm`
+      |    `A` is the area of the catchment or groundwater basin in `m^2`
+      |    `E` is a unitless parameter
+      |    `C` is a parameter with units of `m^3/s`
 
-   if z > zmax :
-
-   zspill = z - zmax
-
-   z = zmax
-
-   Qspill = (A*zspill)/dt
-
-   else :
-
-   Qspill = 0
-
-   Qexp = C(exp(E(z/zmax))-1)
-
-   Qout = Qspill + Qexp
-
-   z = z - (Qexp*dt)/A
-
-   where:
-
-   Qin is the inflow to the bucket aggregated from the bottom of the LSM
-   in m3/s
-
-   z is the height of the water level in the bucket in mm
-
-   zmax is the total height of the bucket in mm
-
-   A is the area of the catchment or groundwater basin in m2
-
-   E is a unitless parameter
-
-   C is a parameter with units of m3/s
-
-A groundwater/baseflow bucket model parameter file (GWBUCKPARM.nc)
+A groundwater/baseflow bucket model parameter file (:file:`GWBUCKPARM.nc`)
 specifies the empirical parameters governing the behavior of the bucket
 model parameterization for each groundwater/baseflow basin specified
 within the model domain. These files are created by the WRF-Hydro GIS
-Preprocessing System and documented in Appendix 10. The parameters
-include; the bucket model coefficient, the bucket model exponent, the
-initial depth of water in the bucket model, and the maximum storage in
-the bucket before "spilling" occurs.
+Preprocessing System and documented in :ref:`Appendix 10 <section-a10>`.
+The parameters include: the bucket model coefficient, the bucket model
+exponent, the initial depth of water in the bucket model, and the maximum
+storage in the bucket before "spilling" occurs.
 
 It is important to remember that a simple bucket model is a highly
 abstracted and conceptualized representation of groundwater processes
 and therefore the depth of water values in the bucket and the parameters
 themselves have no real physical basis. As mentioned above, initial
 values of the groundwater bucket model parameters are typically derived
-analytically or ‘offline’ from WRF-Hydro and then are fine-tuned through
+analytically or \'offline\' from WRF-Hydro and then are fine-tuned through
 model calibration.
 
-**Relevant code modules:**
+.. rubric:: Relevant code modules:
 
-Routing/ module_GW_baseflow.F90
+:file:`Routing/module_GW_baseflow.F90`
 
-**Relevant namelist options:**
+.. rubric:: Relevant namelist options:
 
-hydro.namelist:
+:file:`hydro.namelist`:
 
--  GWBASESWCRT - Switch to activate groundwater bucket module.
+-  ``GWBASESWCRT`` - Switch to activate groundwater bucket module.
 
--  GWBUCKPARM_file - Path to groundwater bucket parameter file.
+-  ``GWBUCKPARM_file`` - Path to groundwater bucket parameter file.
 
--  gwbasmskfil (optional) - Path to netcdf groundwater basin mask file
+-  ``gwbasmskfil`` (optional) - Path to netcdf groundwater basin mask file
    if using an explicit groundwater basin 2d grid.
 
--  UDMP_OPT (optional) - Switch to activate user-defined mapping between
+-  ``UDMP_OPT`` (optional) - Switch to activate user-defined mapping between
    land surface model grid and conceptual basins.
 
--  udmap_file (optional) - If user-defined mapping is active, path to
+-  ``udmap_file`` (optional) - If user-defined mapping is active, path to
    spatial-weights file.
 
-**Relevant domain and parameter files/variables:**
+.. rubric:: Relevant domain and parameter files/variables:
 
--  GWBUCKPARM.nc netCDF file - Specifies the parameters for each
+-  :file:`GWBUCKPARM.nc` netCDF file - Specifies the parameters for each
    groundwater bucket/basin. More information regarding the groundwater
-   bucket model parameters is provided in Section
-   `5.5 <#description-of-groundwater-input-and-parameter-files>`__ and
-   Appendix `A10 <#a10.-groundwater-input-and-parameter-files>`__.
+   bucket model parameters is provided in :ref:`Section 5.5 <section-5.5>` and
+   :ref:`Appendix 10 <section-a10>`.
 
--  GWBASINS.nc netCDF file - The 2d grid of groundwater basin IDs.
+-  :file:`GWBASINS.nc` netCDF file - The 2d grid of groundwater basin IDs.
 
--  spatialweights.nc - netCDF file specifying the weights to map between
-   the land surface grid and the pre-defined groundwater basin
+-  :file:`spatialweights.nc` - netCDF file specifying the weights to map
+   between the land surface grid and the pre-defined groundwater basin
    boundaries.
