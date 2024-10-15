@@ -1181,7 +1181,7 @@ within these files are described in the tables below.
    |                       | conductivity [:math:`m/s`]                   |
    +-----------------------+----------------------------------------------+
 
-.. _section-18:
+.. _section-A.9:
 
 A9. Channel routing parameter tables (`CHANPARM.TBL` and `Route\_Link.nc`)
 ---------------------------------------------------------------------------

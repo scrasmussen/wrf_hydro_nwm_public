@@ -627,11 +627,11 @@ boundary (``SLOPE_DATA = 0.0``) in the GENPARM.TBL parameter file (see
 Appendices :ref:`section-a6` and :ref:`section-a7` for a
 description of GENPARM.TBL).
 
-**Relevant code modules:**
+.. rubric:: Relevant code modules:
 
 :file:`Routing/Noah_distr_routing.F90`
 
-**Relevant namelist options:**
+.. rubric:: Relevant namelist options:
 
 `hydro.namelist`:
 
@@ -645,7 +645,7 @@ description of GENPARM.TBL).
 -  ``DTRT_TER`` - Terrain routing grid time step (used for overland and
    subsurface routing)
 
-**Relevant domain and parameter files/variables:**
+.. rubric:: Relevant domain and parameter files/variables:
 
 -  ``TOPOGRAPHY`` in :file:`Fulldom_hires.nc` - Terrain grid or Digital Elevation
    Model (DEM). Note: this grid may be provided at resolutions equal to
@@ -676,56 +676,82 @@ with the 1-dimensional method. While the physics of both methods are
 identical we have presented the formulation of the flow in equation form
 below using the 2-dimensional methodology.
 
-|figure3_1overlandflowrouting.jpg|
+.. figure:: media/overland-flow.png
+   :align: center
+   :scale: 50%
 
-**Figure 3.5:** Conceptual representation of terrain elements. Flow is
-routed across terrain elements until it intersects a “channel” grid cell
-indicated by the blue line where it becomes “in-flow” to the stream
-channel network.
+   **Figure 3.5:** Conceptual representation of terrain elements. Flow is
+   routed across terrain elements until it intersects a “channel” grid cell
+   indicated by the blue line where it becomes “in-flow” to the stream
+   channel network.
 
 The diffusive wave formulation is a simplification of the more general
 St. Venant equations of continuity and momentum for a shallow water
 wave. The two-dimensional continuity equation for a flood wave flowing
-over the land surface is
+over the land surface is:
 
-|image13| (3.8)
+.. _eqn3.8:
+.. rst-class:: center
+.. math::
 
-where, *h* is the surface flow depth; *q\ x* and *q\ y* are the unit
-discharges in the x- and y-directions, respectively; and *i\ e* is the
+   \frac{\partial h}{\partial t} + \frac{\partial q_x}{\partial x} + \frac{\partial q_y}{\partial x} = i_e
+
+   (3.8)
+
+where, `h` is the surface flow depth; `q_x` and `q_y` are the unit
+discharges in the `x`- and `y`-directions, respectively; and `i_e` is the
 infiltration excess. The momentum equation used in the diffusive wave
-formulation for the x-dimension is
+formulation for the `x`-dimension is:
 
-|image14| (3.9)
+.. _eqn3.9:
+.. rst-class:: center
+.. math::
 
-where, *S\ fx* is the friction slope (or slope of the energy grade line)
-in the x-direction, *S\ ox* is the terrain slope in the x-direction and
-*∂h/∂x* is the change in depth of the water surface above the land
-surface in the x-direction.
+   S_{fx} = S_{ox} - \frac{\partial h}{\partial x}
+
+   (3.9)
+
+where, `S_fx` is the friction slope (or slope of the energy grade line)
+in the x-direction, `S_ox` is the terrain slope in the `x`-direction and
+`\partial h/\partial x` is the change in depth of the water surface above the land
+surface in the `x`-direction.
 
 In the 2-dimensional option, flow across the terrain grid is calculated
-first in the x- then in the y-direction. In order to solve Eq. 3.8
-values for *q\ x* and *q\ y* are required. In most hydrological models
+first in the `x`- then in the `y`-direction. In order to solve :ref:`Eq. 3.8 <eqn3.8>`
+values for `q_x` and `q_y` are required. In most hydrological models
 they are typically calculated by the use of a resistance equation such
-as Manning’s equation or the Chezy equation, which incorporates the
-expression for momentum losses given in Eq. 3.9. In WRF-Hydro, a form of
-Manning’s equation is implemented:
+as Manning's equation or the Chezy equation, which incorporates the
+expression for momentum losses given in :ref:`Eq. 3.9 <eqn3.9>`.
+In WRF-Hydro, a form of Manning's equation is implemented:
 
-|image15| (3.10)
+.. _eqn3.10:
+.. rst-class:: center
+.. math::
+
+   q_x = \alpha_x h^\beta
+
+   (3.10)
 
 where,
 
-|image16| (3.11)
+.. _eqn3.11:
+.. rst-class:: center
+.. math::
 
-where, *n\ OV* is the roughness coefficient of the land surface and is a
-tunable parameter and *β* is a unit dependent coefficient expressed here
+   \alpha_x = \frac{S_{fx}^{1/2}}{n_{OV}}; \qquad \beta = \frac{5}{3}
+
+   (3.11)
+
+where, `n_{OV}` is the roughness coefficient of the land surface and is a
+tunable parameter and `\beta` is a unit-dependent coefficient expressed here
 for SI units.
 
 The overland flow formulation has been used effectively at fine terrain
-scales ranging from 30-300 m. There has not been rigorous testing to
-date, in WRF-Hydro, at larger length-scales (> 300 m). This is due to
+scales ranging from 30-300 `m`. There has not been rigorous testing to
+date, in WRF-Hydro, at larger length-scales (> 300 `m`). This is due to
 the fact that typical overland flood waves possess length scales much
-smaller than 1 km. Micro-topography can also influence the behavior of a
-flood wave. Correspondingly, at larger grid sizes (e.g. > 300 m) there
+smaller than 1 `km`. Micro-topography can also influence the behavior of a
+flood wave. Correspondingly, at larger grid sizes (e.g. > 300 `m`) there
 will be poor resolution of the flood wave and the small-scale features
 that affect it. Also, at coarser resolutions, terrain slopes between
 grid cells are lower due to an effective smoothing of topography as grid
@@ -739,59 +765,63 @@ order to prevent numerical diffusion of a simulated flood wave (where
 numerical diffusion is the artificial dissipation and dispersion of a
 flood wave) a proper time step must be selected to match the selected
 grid size. This match is dependent upon the assumed wave speed or
-celerity (*c*). The Courant Number, *C\ n*\ = *c(Δt/Δx)*, should be
+celerity (`c`). The Courant Number, `C_n = c(\Delta t/\Delta x)`, should be
 close to 1.0 in order to prevent numerical diffusion. The value of the
-C\ :sub:`n` also affects the stability of the routing routine such that
-values of C\ :sub:`n` should always be less than 1.0. Therefore the
+`C_n` also affects the stability of the routing routine such that
+values of `C_n` should always be less than 1.0. Therefore the
 following model time steps are suggested as a function of model grid
 size as shown in Table 3.2.
 
+.. table::
    **Table 3.2:** Suggested routing time steps for various grid spacings
+   :align: center
+   :width: 50%
 
-+------------------------------------+---------------------------------+
-| X (m)                              | T (s)                           |
-+====================================+=================================+
-| 30                                 | 2                               |
-+------------------------------------+---------------------------------+
-| 100                                | 6                               |
-+------------------------------------+---------------------------------+
-| 250                                | 15                              |
-+------------------------------------+---------------------------------+
-| 500                                | 30                              |
-+------------------------------------+---------------------------------+
+   +---------+---------+
+   | X (`m`) | T (`s`) |
+   +=========+=========+
+   | 30      | 2       |
+   +---------+---------+
+   | 100     | 6       |
+   +---------+---------+
+   | 250     | 15      |
+   +---------+---------+
+   | 500     | 30      |
+   +---------+---------+
 
-**Relevant code modules:**
+.. rubric:: Relevant code modules:
 
-Routing/Noah_distr_routing.F90
+:file:`Routing/Noah_distr_routing.F90`
 
-**Relevant namelist options:**
+.. rubric:: Relevant namelist options:
 
-hydro.namelist:
+`hydro.namelist`:
 
--  OVRTSWCRT - Switch to activate overland flow routing.
+-  ``OVRTSWCRT`` - Switch to activate overland flow routing.
 
--  DXRT - Specification of the routing grid cell spacing
+-  ``DXRT`` - Specification of the routing grid cell spacing
 
--  AGGFACTR - Subgrid aggregation factor, defined as the ratio of the
+-  ``AGGFACTR`` - Subgrid aggregation factor, defined as the ratio of the
    subgrid resolution to the native land model resolution
 
--  DTRT_TER - Terrain routing grid time step (used for overland and
+-  ``DTRT_TER`` - Terrain routing grid time step (used for overland and
    subsurface routing)
 
-**Relevant domain and parameter files/variables:**
+.. rubric:: Relevant domain and parameter files/variables:
 
--  TOPOGRAPHY in Fulldom_hires.nc - Terrain grid or Digital Elevation
+-  ``TOPOGRAPHY`` in :file:`Fulldom_hires.nc` - Terrain grid or Digital Elevation
    Model (DEM). Note: this grid may be provided at resolutions equal to
    or finer than the native land model resolution.
 
--  RETDEPRTFAC in Fulldom_hires.nc - Multiplier on maximum retention
+-  ``RETDEPRTFAC`` in :file:`Fulldom_hires.nc` - Multiplier on maximum retention
    depth before flow is routed as overland flow.
 
--  OVROUGHRTFAC in Fulldom_hires.nc - Multiplier on Manning's roughness
+-  ``OVROUGHRTFAC`` in :file:`Fulldom_hires.nc` - Multiplier on Manning's roughness
    for overland flow.
 
--  OV_ROUGH in HYDRO.TBL or OV_ROUGH2D hydro2dtbl.nc - Manning's
-   roughness for overland flow (by default a function of land use type).
+-  ``OV_ROUGH`` in :file:`HYDRO.TBL` or ``OV_ROUGH2D`` in
+   :file:`hydro2dtbl.nc` - Manning's roughness for overland flow (by
+   default a function of land use type).
 
 3.6 Channel and Lake Routing
 ----------------------------------
@@ -800,14 +830,14 @@ There are multiple channel routing algorithms available in version 5.0
 of WRF-Hydro. These algorithms operate either on the resolution of the
 fine grid (gridded routing) or on a vectorized network of channel
 reaches (linked routing, also referred to as reach-based routing), which
-maps the fine grid to the vector network (Figure 3.6). The following
-section describes the routing methods and their implementation in the
-WRF-Hydro model code.
+maps the fine grid to the vector network (:ref:`Figure 3.6 <figure3.6>`).
+The following section describes the routing methods and their
+implementation in the WRF-Hydro model code.
 
 In general, inflow to the channel is based on a mass balance
 calculation, where the channel routes water when the ponded water depth
-(or surface head, ‘SFCHEADRT’) of the channel grid cells exceeds a
-predefined retention depth (‘RETDEPRT’). As described in `Section
+(or surface head, `SFCHEADRT`) of the channel grid cells exceeds a
+predefined retention depth (`RETDEPRT`). As described in `Section
 3.5 <#surface-overland-flow-routing>`__, the depth of surface head on
 any grid cell is a combination of the local infiltration excess, the
 amount of water flowing onto the grid cell from overland flow, and
@@ -815,43 +845,53 @@ exfiltration from groundwater flow. The quantity of surface head in
 excess of the retention depth is accumulated as stream channel inflow
 and is effectively “discharged” to the channel routing routine
 (described below). For calibration purposes gridded values of a scaling
-factor for RETDEPRT can be specified in the main hydro2dtbl.nc netCDF
-input file. Increases in the RETDEPRT scaling factor on channel pixels
+factor for `RETDEPRT` can be specified in the main hydro2dtbl.nc netCDF
+input file. Increases in the `RETDEPRT` scaling factor on channel pixels
 can encourage more local infiltration near the river channel leading to
 wetter soils that better emulate riparian conditions. Values of “channel
 inflow” are accumulated on the channel grid and can be output for
-visualization and analysis (see `Section
-6 <#description-of-output-files-from-wrf-hydro>`__ for a description of
-model outputs).
+visualization and analysis (see :ref:`Section 6 <section-6.0>` for a
+description of model outputs).
 
-**Figure 3.6** Channel routing via the high resolution grid (left) or on
-a vector/link network (right).
+.. _figure3.6:
+.. figure:: media/channel-routing-grid-link.png
+   :align: center
 
-The channel routing module module_channel_routing.F90 allows for the
+   **Figure 3.6** Channel routing via the high resolution grid (left) or on
+   a vector/link network (right).
+
+The channel routing module :file:`module_channel_routing.F90` allows for the
 one-dimensional, distributed routing of streamflow across the domain. An
 optional, switch-activated, level-pool lake/reservoir algorithm is also
-available and is described below in Sections `3.7 <#_3v94x1dwjllp>`__
-and `3.8 <#conceptual-base-flow-model-description>`__. Within each
-channel grid cell there is an assumed channel reach of trapezoidal
-geometry as depicted in Figure 3.7. Channel parameters side slope (*z*),
-bottom width (*B\ w*) and roughness (*n*) are currently prescribed as
-functions of Strahler stream order for defaults. Details on how each
-routing method reads these parameters are specified in the subsections
-below.
+available and is described below in Sections :ref:`3.7 <section-3.7>`
+and :ref:`3.8 <section-3.8>`. Within each channel grid cell there is an
+assumed channel reach of trapezoidal geometry as depicted in Figure 3.7.
+Channel parameters side slope (`z`), bottom width (`B_w`) and roughness (`n`)
+are currently prescribed as functions of Strahler stream order for defaults.
+Details on how each routing method reads these parameters are specified
+in the subsections below.
 
-|image17|
+.. _figure3.7:
+.. figure:: media/image49.png
+   :align: center
+   :figwidth: image
 
--  Channel Slope, *S\ o*
+   **Figure 3.7** Schematic of Channel Routing Terms
 
--  Channel Length, |image18|\ (m)
+.. table::
+   :align: center
 
--  Channel side slope, z (m)
-
--  Constant bottom width, *B\ w* (m)
-
--  Manning’s roughness coefficient, (*n*)
-
-**Figure 3.7** Schematic of Channel Routing Terms
+   +---------------------------------+------------------+
+   | Channel Slope                   | `S_o`            |
+   +---------------------------------+------------------+
+   | Channel Length                  | `\Delta x` (`m`) |
+   +---------------------------------+------------------+
+   | Channel side slope              | `z` (`m`)        |
+   +---------------------------------+------------------+
+   | Constant bottom width           | `B_w` (`m`)      |
+   +---------------------------------+------------------+
+   | Manning's roughness coefficient | (`n`)            |
+   +---------------------------------+------------------+
 
 As discussed above, channel elements receive lateral inflow from
 overland flow. There is currently no overbank flow back to the
@@ -868,25 +908,24 @@ use observed stage-discharge relationships or “rating curves” when
 wishing to relate modeled/predicted streamflow values to actual river
 levels and potential inundation areas.
 
-**Relevant code modules:**
+.. rubric:: Relevant code modules:
 
-Routing/ module_channel_routing.F90
+:file:`Routing/module_channel_routing.F90`
 
-**Relevant namelist options for gridded and reach-based routing:**
+.. rubric::  Relevant namelist options for gridded and reach-based routing:
 
-hydro.namelist:
+`hydro.namelist`:
 
--  CHANRTSWCRT - Switch to activate channel routing.
+-  ``CHANRTSWCRT`` - Switch to activate channel routing.
 
--  channel_option - Specification of the type of channel routing to
+-  ``channel_option`` - Specification of the type of channel routing to
    activate
 
--  DTRT_CH - Channel routing time step, applies to both gridded and
+-  ``DTRT_CH`` - Channel routing time step, applies to both gridded and
    reach-based channel routing methods
 
--  route_link_f (optional) - a Route_Link.nc file is required for
-   reach-based routing methods. Example header in Appendix
-   `A9 <#a9.-channel-routing-parameter-tables-chanparm.tbl-and-route_link.nc>`__.
+-  ``route_link_f`` (optional) - a :file:`Route_Link.nc` file is required for
+   reach-based routing methods. Example header in :ref:`Appendix A9 <section-a.9>`.
 
 3.6.1. Gridded Routing using Diffusive Wave
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -898,52 +937,75 @@ simplification of the more general St. Venant equations for shallow
 water wave flow. Similarly, for channel routing, the mass and momentum
 continuity equations are given as:
 
-Continuity: |image19| (3.12)
+   Continuity:
 
-Momentum: |image20| (3.13)
+.. math::
+   \frac{\partial A}{\partial t} + \frac{\partial Q}{\partial x} = q_{lat}
+   \qquad (3.12)
 
-Where *t* is the time, |image21|\ is the streamwise coordinate, *A* is
-in the flow area of the cross section, and *q\ lat* is the lateral
-inflow rate into the channel. In the momentum equation, *Q* is the flow
-rate, β is a momentum correction coefficient, *Z* is the water surface
-elevation, g is gravity and *S\ f* is the friction slope which is
+\
+   Momentum:
+
+.. math::
+   \frac{\partial Q}{\partial t} + \frac{\partial(\beta Q^2 / A)}{\partial x} +
+   gA\frac{\partial Z}{\partial x} = -gAS_f
+   \qquad (3.13)
+
+Where `t` is the time, `x` is the streamwise coordinate, `A` is
+in the flow area of the cross section, and `q_{lat}` is the lateral
+inflow rate into the channel. In the momentum equation, `Q` is the flow
+rate, `\beta` is a momentum correction coefficient, `Z` is the water surface
+elevation, `g` is gravity and `S_f` is the friction slope which is
 computed as:
 
-|image22| (3.14)
+.. math::
+   S_f = \left( \frac{Q}{K} \right)^2
+   \qquad (3.14)
 
-where K is the conveyance, computed from the Manning’s equation:
+where `K` is the conveyance, computed from the Manning's equation:
 
-|image23| (3.15)
+.. math::
+   K = \frac{C_m}{n} AR^{2/3}
+   \qquad (3.15)
 
-where *n* is the Manning’s roughness coefficient, *A* is the
-cross-sectional area, *R* is the hydraulic radius (*A/P*), *P* is the
-wetted perimeter, and *C\ m* is dimensional constant (1.486 for English
+where `n` is the Manning's roughness coefficient, `A` is the
+cross-sectional area, `R` is the hydraulic radius (`A/P`), `P` is the
+wetted perimeter, and `C_m` is dimensional constant (1.486 for English
 units or 1.0 for SI units).
 
 Ignoring the convective term, the second term in the momentum equation
 gives the diffusive wave approximation of open channel flow. The
 momentum equation then simplifies to:
 
-|image24| (3.16)
+.. math::
+   Q = -SIGN \left( \frac{\partial Z}{\partial x} \right) K \sqrt{\left| \frac{\partial z}{\partial x}\right |}
+   \qquad (3.16)
 
-where the substitution for friction slope has been made and the SIGN
-function is 1 for |image25| and -1 for |image26|.
+where the substitution for friction slope has been made and the `SIGN`
+function is `1` for `\partial Z / \partial x > 0` and `-1` for `\partial Z / \partial x < 0`.
 
 The numerical solution is obtained by discretizing the continuity
 equation over a raster cell as:
 
-|image27| (3.17)
+.. math::
+   A^{n+1} - A^n = \frac{\Delta t}{\Delta x} \left( Q^n_{i+\frac{1}{2}} - Q^n_{i-\frac{1}{2}} \right)
+   + \Delta tq^n_{lat}
+   \qquad (3.17)
 
-where |image28| is the flux across the cell face between point i and
-i+1, and is computed as:
+where `Q^n_{i+\frac{1}{2}}` is the flux across the cell face between point `i` and
+`i+1`, and is computed as:
 
-|image29|\ (3.18)
+.. math::
+   Q^n_{i+\frac{1}{2}} = -SIGN\left(\Delta Z^n_{i+1}\right) K_{i+\frac{1}{2}}
+   \sqrt{\frac{\left|\Delta Z^n_{i+1}\right|}{\Delta x}}
+   \qquad (3.18)
 
 where:
 
-   |image30| (3.19)
-
-   |image31| (3.20)
+.. math::
+   \Delta Z^n_{i+1} = Z^n_{i+1} - Z^i &\qquad (3.19) \\
+   K^n_{i+\frac{1}{2}} = \frac{1}{2} \left( 1 + SIGN\left(\Delta Z^n_{i+1}\right)\right) K_i
+   + \left( 1- SIGN\left( \Delta Z^n_{i+1} \right)\right) K_{i+1} &\qquad (3.20)
 
 A first-order, Newton-Raphson (N-R) solver is used to integrate the
 diffusive wave flow equations. Under certain streamflow conditions (e.g.
@@ -980,9 +1042,8 @@ Uncertainty in channel routing parameters can also impact the accuracy
 of the model solution which implies that model calibration is often
 required upon implementation in a new domain. Presently, all of the
 channel routing parameters are prescribed as functions of stream order
-in a channel routing parameter table CHANPARM.TBL. The structure of this
-file is described in detail in Appendix
-`A9 <#a9.-channel-routing-parameter-tables-chanparm.tbl-and-route_link.nc>`__.
+in a channel routing parameter table :file:`CHANPARM.TBL`. The structure of this
+file is described in detail in Appendix :ref:`A9 <section-a.9>`.
 It should be noted that prescription of channel flow parameters as
 functions of stream order is likely to be a valid assumption over
 relatively small catchments and not over large regions.
@@ -997,13 +1058,13 @@ each reach. The flow out of each channel reach is determined based on
 flow hydraulics, channel storage and the lateral inflow contribution
 from each grid cell that is mapped to the individual link element. Since
 reach lengths are not constant, the number of contributing grid cells to
-the link depend on the link length (Figure 3.6). Flow is assumed always
-upstream-to-downstream, and channel junctions accommodate the merging of
-flows through the linked network. The simultaneous transformation of the
-often complex drainage network, source areas, and channel flow
-hydrographs in these large, complex networks necessitates a practical
-and efficient solution to the routing problem (Brunner and Gorbrecht,
-1991).
+the link depend on the link length (:ref:`Figure 3.6 <figure3.6>`).
+Flow is assumed always upstream-to-downstream, and channel junctions
+accommodate the merging of flows through the linked network. The simultaneous
+transformation of the often complex drainage network, source areas, and
+channel flow hydrographs in these large, complex networks necessitates
+a practical and efficient solution to the routing problem (*Brunner and
+Gorbrecht, 1991*).
 
 On the linked network, WRF-Hydro makes use of a fairly standard
 implementation of the Muskingum-Cunge (MC) method of hydrograph routing
@@ -1012,48 +1073,59 @@ practical approach to characterize watershed runoff characteristics over
 large network, large watershed flow integration. But as a
 one-dimensional explicit scheme, it does not allow for backwater or
 localized effects. Channel flows are routed upstream to downstream in a
-cascade routing manner (Gunner and Gorbetch, 1991) with the assumption
+cascade routing manner (*Gunner and Gorbetch, 1991*) with the assumption
 that there are negligible backwater effects. The MC routing scheme
-relates inflow and outflow using a storage relationship, where S = K[XI
-+ (1-X) Q], (3.21) where X is a weighting factor with a range of 0 ≤ X ≤
-0.5, where X range from 0 for reservoir-type storage, while an advancing
-floodwave produces a wedge of storage and thus a value of X greater than
-0 (Chow et al., 1982). The finite difference formulation of the storage
+relates inflow and outflow using a storage relationship, where:
+
+.. math::
+   S = K[XI + (1-X) Q] \qquad (3.21)
+
+where X is a weighting factor with a range of` 0 ≤ X ≤ 0.5`, where `X`
+range from `0` for reservoir-type storage, while an advancing floodwave
+produces a wedge of storage and thus a value of `X` greater than `0` (*Chow
+et al., 1982*). The finite difference formulation of the storage
 relationship results in the Muskingum Equation,
 
-   :math:`Q_{d}^{c} = \ C1{\ Q}_{u}^{p}\  + \ C2\ Q_{u}^{c}\  + \ {C3Q}_{d}^{p}\  + \left( \frac{\ q_{l}\ dt}{D} \right)`
-   (3.22)
+.. math::
+   Q_{d}^{c} = \ C1{\ Q}_{u}^{p}\  + \ C2\ Q_{u}^{c}\  + \ {C3Q}_{d}^{p}\  + \left( \frac{\ q_{l}\ dt}{D} \right)
+   \qquad (3.22)
 
-where D = K(1-X)+ dt/2 and is the wedge storage contribution from
-lateral inflow in the reach. The subscript are *u* and *d* are the
-upstream and downstream nodes of each reach, respectively; and the *p*
-and *c* superscript are the previous and current time step,
+where `D = K(1-X)+ dt/2` and is the wedge storage contribution from
+lateral inflow in the reach. The subscript are `u` and `d` are the
+upstream and downstream nodes of each reach, respectively; and the `p`
+and `c` superscript are the previous and current time step,
 respectively.
 
-**Figure 3.8** Channel Properties
+.. _figure3.8:
+.. figure:: media/channel-props.svg
+   :align: center
+   :scale: 150%
+
+   **Figure 3.8** Channel Properties
 
 Static hydraulic properties are used to describe the properties of each
 channel reach, with each being assumed trapezoidal and include bottom
-width (*B\ w*), channel length (*dx*), channel top width before bankfull
-(*Tw*), Manning’s roughness coefficient (*n*), channel side slope (*z*,
-in meters), and the longitudinal slope of the channel (*So*). If a user
-is running the model with reach-based routing (channel_option = 1 or 2),
-the *B\ w* , *n,* and *z* parameters can be modified through the
-Route_Link.nc file. Note: the CHANPARM.TBL file will not be used in this
-configuration.
+width (`B_w``), channel length (`dx`), channel top width before bankfull
+(`Tw`), Manning's roughness coefficient (`n`), channel side slope (`z`,
+in meters), and the longitudinal slope of the channel (`So`). If a user
+is running the model with reach-based routing (``channel_option`` =
+``1`` or ``2``), the `B_w` , `n`, and `z` parameters can be modified
+through the :file:`Route_Link.nc` file. Note: the :file:`CHANPARM.TBL`
+file will not be used in this configuration.
 
 Simulated state variables include estimate of mean water depth in the
-channel (*h*), steady-state velocity (*v*) and flow rate (*q*) in the
+channel (`h`), steady-state velocity (`v`) and flow rate (`q`) in the
 reach at the current timestep. An initial depth estimate is made based
 on the depth from the previous time step. Time varying properties
-include the hydraulic area,
+include the hydraulic area, `Area = (B_w*h*z)*h; (3.23)`, the wetted
+perimeter `W_p= (B_w + 2 * \sqrt{1+z^2}); (3.24)`, and the hydraulic radius,
+`R=Area/W_p; (3.25)`. With an initial estimate of water depth in the channel,
+the wave celerity for the trapezoidal channel is estimated as:
 
-*Area = (Bw*h*z)*h;* (3.23) the wetted perimeter *Wp= (B\ w + 2 \*
-sqrt(1+z\ 2));*\ (3.24) and the hydraulic radius\ *, R=Area/Wp.* (3.25)
-With an initial estimate of water depth in the channel, the wave
-celerity for the trapezoidal channel is estimated as,
-
-   :math:`Ck\  = \ \ 5/3\ R^{2/3} - 2/3R^{5/3}*(2*)`. (3.26)
+.. math::
+   Ck = \sqrt{\frac{So}{n}} \frac{5}{3}R^{\frac{2}{3}} -
+   \frac{2}{3}R^{\frac{5}{3}}*\left(2*\sqrt{\frac{1+z^2}{B_w + 2hz}}\right)
+   \qquad (3.26)
 
 Wave celerity is used to estimate the MC routing parameters, where *K=*
 *dx/c\ k* (3.27) is the time required for an incremental flood wave to
@@ -1127,9 +1199,13 @@ Sensitivity experiments presented in Read et al. (forthcoming) found
 that T\ :sub:`w_cc` =3*T\ :sub:`w` yielded the best streamflow
 performance, all else equal.
 
-:mark:`Figure 3.9. Cross-sectional schematic of trapezoidal channel and compound channel in National Water Model, where the dashed lines represent roughness of the channel n, and of the compound channel, n\ :sub:`cc``\ |image32|
+Figure 3.9. Cross-sectional schematic of trapezoidal channel and compound
+channel in National Water Model, where the dashed lines represent roughness
+of the channel n, and of the compound channel, n\ :sub:`cc` |image32|
 
-3.7 Lake and Reservoir routing description
+.. _section-3.7:
+
+3.7 Lake and Reservoir Routing Description
 ------------------------------------------
 
 A simple mass balance, level-pool lake/reservoir routing module allows
@@ -1232,7 +1308,7 @@ hydro.namelist:
 -  LAKEPARM.nc netCDF file - Specifies lake parameters for each lake
    object specified.
 
-.. _section-6:
+.. _section-3.8:
 
 3.8 Conceptual base flow model description
 ---------------------------------------------

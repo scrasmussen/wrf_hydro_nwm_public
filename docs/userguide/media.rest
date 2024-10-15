@@ -1,21 +1,6 @@
 .. |image7| image:: media/image14.png
    :width: 7in
    :height: 3.13889in
-.. |figure3_1overlandflowrouting.jpg| image:: media/image13.jpg
-   :width: 2.98438in
-   :height: 2.7482in
-.. |image13| image:: media/image56.png
-   :width: 1.65808in
-   :height: 0.6195in
-.. |image14| image:: media/image63.png
-   :width: 1.22973in
-   :height: 0.47396in
-.. |image15| image:: media/image61.png
-   :width: 0.92654in
-   :height: 0.40104in
-.. |image16| image:: media/image67.png
-   :width: 1.88787in
-   :height: 0.60938in
 .. |image17| image:: media/image49.png
    :width: 4.67708in
    :height: 1.90625in
@@ -37,30 +22,9 @@
 .. |image23| image:: media/image36.png
    :width: 1in
    :height: 0.40556in
-.. |image24| image:: media/image42.png
-   :width: 1.64167in
-   :height: 0.44306in
-.. |image25| image:: media/image41.png
-   :width: 0.70764in
-   :height: 0.23611in
-.. |image26| image:: media/image43.png
-   :width: 0.70764in
-   :height: 0.23611in
-.. |image27| image:: media/image44.png
-   :width: 2.46696in
-   :height: 0.46723in
 .. |image28| image:: media/image45.png
    :width: 0.32813in
    :height: 0.32813in
-.. |image29| image:: media/image21.png
-   :width: 2.26389in
-   :height: 0.52847in
-.. |image30| image:: media/image4.png
-   :width: 1.14167in
-   :height: 0.26389in
-.. |image31| image:: media/image3.png
-   :width: 3.61319in
-   :height: 0.30208in
 .. |image32| image:: media/image54.png
    :width: 5.48438in
    :height: 1.67871in
