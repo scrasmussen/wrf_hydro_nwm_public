@@ -245,7 +245,7 @@ https://github.com/NCAR/hrldas-release/blob/release/HRLDAS/run/README.namelist
    FORC_TYP = 1
    /
 
-.. _section-15:
+.. _section-a5:
 
 A5. WRF-Hydro `hydro.namelist` File with Description of Options
 ---------------------------------------------------------------
@@ -1726,6 +1726,8 @@ header information.
          tau:long_name = "Time tapering parameter half window size in minutes" ;
    }
 
+.. _section-a15:
+
 A15. National Water Model (NWM) Configuration
 ---------------------------------------------
 
@@ -1788,6 +1790,7 @@ current National Water Model configuration as of March 2018, the
 NWM ecosystem and suite of tools and sample NWM configuration
 namelists.
 
+.. _figure-A15.1:
 .. figure:: media/image17.png
    :align: center
    :scale: 90%
@@ -1795,6 +1798,7 @@ namelists.
    **Figure A15.1** Illustration of WRF-Hydro physics permutations and those used in the
    current configuration of the National Water Model (NWM).
 
+.. _figure-A15.2:
 .. figure:: media/image39.png
    :align: center
    :scale: 75%
@@ -1802,6 +1806,7 @@ namelists.
    **Figure A15.2.** Illustration of Noah-MP physics permutations and those
    used in the configuration of the National Water Model (NWM)
 
+.. _figure-A15.3:
 .. figure:: media/image25.png
    :align: center
    :scale: 135%

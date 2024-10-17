@@ -67,7 +67,7 @@ column used in WRF-Hydro but this is not a strict requirement.
 Additional discretization permits improved resolution of a time-varying
 water table height and users may vary the number and thickness of soil
 layers in the model namelist described in the Appendices :ref:`section-13`,
-:ref:`section-14`, and :ref:`section-15`.
+:ref:`section-14`, and :ref:`section-a5`.
 
 Then, overland flow is defined. The fully unsteady, spatially explicit,
 diffusive wave formulation of *Julien et al. (1995-CASC2D)* with later
@@ -238,7 +238,7 @@ overland flow or subsurface flow is active and the specified routing
 grid increment is different from that of the land surface model grid.
 Routing in WRF-Hydro is “switch-activated” through the declaration of
 parameter options in the primary model namelist file hydro.namelist
-which are described in Appendix :ref:`section-15`
+which are described in Appendix :ref:`section-a5`
 
 In WRF-Hydro subgrid aggregation/disaggregation is used to represent
 overland and subsurface flow processes on grid scales much finer than
@@ -623,9 +623,9 @@ include 1) the specified depth of soil and number and thickness of the
 soil vertical layers and 2) the prescription of the model bottom
 boundary condition. Typically, for simulations with deep soil profiles
 (e.g. > 10 `m`) the bottom boundary condition is set to a ‘no-flow’
-boundary (``SLOPE_DATA = 0.0``) in the GENPARM.TBL parameter file (see
+boundary (``SLOPE_DATA = 0.0``) in the :file:`GENPARM.TBL` parameter file (see
 Appendices :ref:`section-a6` and :ref:`section-a7` for a
-description of GENPARM.TBL).
+description of :file:`GENPARM.TBL`).
 
 .. rubric:: Relevant code modules:
 
@@ -633,7 +633,7 @@ description of GENPARM.TBL).
 
 .. rubric:: Relevant namelist options:
 
-`hydro.namelist`:
+:file:`hydro.namelist`:
 
 -  ``SUBRTSWCRT`` - Switch to activate subsurface flow routing.
 
@@ -665,7 +665,7 @@ description of GENPARM.TBL).
 
 Overland flow in WRF-Hydro is calculated using a fully-unsteady,
 explicit, finite-difference, diffusive wave formulation similar to that
-of Julien et al. (1995) and Ogden et al. (1997). The diffusive wave
+of *Julien et al. (1995)* and *Ogden et al. (1997)*. The diffusive wave
 equation, while slightly more complicated, is, under some conditions,
 superior to the simpler and more traditionally used kinematic wave
 equation, because it accounts for backwater effects and allows for flow
@@ -825,8 +825,10 @@ size as shown in Table 3.2.
    :file:`hydro2dtbl.nc` - Manning's roughness for overland flow (by
    default a function of land use type).
 
+.. _section-3.6:
+
 3.6 Channel and Lake Routing
-----------------------------------
+----------------------------
 
 There are multiple channel routing algorithms available in version 5.0
 of WRF-Hydro. These algorithms operate either on the resolution of the

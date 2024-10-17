@@ -6,3 +6,10 @@
 
 .. role:: underline
     :class: underline
+
+.. role:: file
+    :class: filename
+
+.. role:: program
+    :class: program
+

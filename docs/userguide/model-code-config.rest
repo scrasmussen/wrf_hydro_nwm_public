@@ -432,7 +432,7 @@ file and in it are the various settings for operating all of the routing
 components of the WRF-Hydro system. The hydro.namelist file is
 internally commented so that it should be clear as to what is needed for
 each setting. A full annotated example of the hydro.namelist file is
-provided in :ref:`section-15`.
+provided in :ref:`section-a5`.
 
 The second namelist is the namelist which specifies the land surface
 model options to be used. This namelist can change depending on which

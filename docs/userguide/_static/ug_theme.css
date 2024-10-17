@@ -9,3 +9,17 @@
 .underline {
     text-decoration: underline;
 }
+
+.filename {
+    font-family: Courier, "Courier New", monospace;
+    white-space: pre-wrap;
+}
+
+.program {
+    font-family: Courier, "Courier New", monospace;
+    white-space: pre-wrap;
+    color: greenyellow;
+    background-color: black;
+    padding-left: 5px;
+    padding-right: 5px;
+}
