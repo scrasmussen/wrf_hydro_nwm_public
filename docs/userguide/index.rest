@@ -4,13 +4,15 @@
 =========================================================
 The NCAR WRF-Hydro® Modeling System Technical Description
 =========================================================
-.. centered:: Version |version_long|
+.. rst-class:: center
 
-.. centered:: Originally Created:
-.. centered:: April 14, 2013
-
-.. centered:: Updated:
-.. centered:: September 24, 2024
+    | Version |version_long|
+    |
+    | Originally Created:
+    | April 14, 2013
+    |
+    | Updated:
+    | October 17, 2024
 
 Until further notice, please cite the WRF-Hydro® modeling system as
 follows:
@@ -21,8 +23,7 @@ Sampson, D. Yates, Y. Zhang (2020). *The WRF-Hydro® modeling system
 technical description,* (Version 5.4)\ *.* NCAR Technical Note. 107
 pages. Available online at: https://wrf-hydro.readthedocs.io/en/latest/
 
-
-**FORWARD**
+.. rubric:: FORWARD
 
 This Technical Description describes the WRF-Hydro® model coupling
 architecture and physics options, released in Version 5.4 in Oct. 2024.
@@ -30,13 +31,13 @@ As the WRF-Hydro® modeling system is developed further, this document
 will be continuously enhanced and updated. Please send feedback to
 wrfhydro@ucar.edu .
 
-**Prepared by:**
+.. rubric:: Prepared by:
 
 David Gochis, Aubrey Dugger, Michael Barlage, Ryan Cabell, Katelyn
 FitzGerald, Molly McAllister, James McCreight, Arezoo RafieeiNasab,
 Laura Read, Kevin Sampson, David Yates, Yongxin Zhang
 
-**Special Acknowledgments:**
+.. rubric:: Special Acknowledgments:
 
 Development of the NCAR WRF-Hydro system has been significantly enhanced
 through numerous collaborations. The following persons are graciously
@@ -95,7 +96,7 @@ Prediction (OWP)
 
 .. toctree::
 
-    Front Matter <self>
+    Preface / Acknowledgments <self>
     introduction
     model-code-config
     model-physics
