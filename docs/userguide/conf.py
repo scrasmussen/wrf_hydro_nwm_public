@@ -5,8 +5,14 @@ version = 'v5.4.0'
 release = '5.4.0'
 try:
     import sphinx_rtd_theme
-    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+    extensions = [
+        'sphinx_rtd_theme',
+    ]
+    # html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
     html_theme = 'sphinx_rtd_theme'
+    html_theme_options = {
+        'navigation_depth': -1
+    }
 except:
     pass
 html_static_path = ['_static']

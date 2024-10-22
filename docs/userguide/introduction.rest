@@ -95,6 +95,7 @@ models and land data assimilation systems. WRF-Hydro can also operate in
 a standalone mode as a traditional land surface hydrologic modeling
 system.
 
+.. _figure-1.1:
 .. figure:: media/conceptual_diagram_wrfhydro.png
    :align: center
    :scale: 80%

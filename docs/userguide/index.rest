@@ -95,6 +95,7 @@ Prediction (OWP)
 
 
 .. toctree::
+    :hidden:
 
     Preface / Acknowledgments <self>
     introduction

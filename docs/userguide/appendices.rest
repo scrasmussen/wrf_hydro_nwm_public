@@ -1181,7 +1181,7 @@ within these files are described in the tables below.
    |                       | conductivity [:math:`m/s`]                   |
    +-----------------------+----------------------------------------------+
 
-.. _section-A.9:
+.. _section-a9:
 
 A9. Channel routing parameter tables (`CHANPARM.TBL` and `Route\_Link.nc`)
 ---------------------------------------------------------------------------
@@ -1350,7 +1350,7 @@ below.
    |              | grid *(starting with 1,1 in the LL corner)* |               |
    +--------------+---------------------------------------------+---------------+
 
-.. _section-21:
+.. _section-a12:
 
 A12. Lake and reservoir parameter tables (`LAKEPARM.nc`)
 --------------------------------------------------------

@@ -332,19 +332,19 @@ documented at this time.
 +-----------------------------------+---------------------------------------+
 | **Documented/Supported Options**  | **Undocumented/Unsupported Options**  |
 +===================================+=======================================+
-| timeSlicePath                     | nLastObs                              |
+| ``timeSlicePath``                 | ``nLastObs``                          |
 |                                   |                                       |
-| nudgingParamFile                  | persistBias                           |
+| ``nudgingParamFile``              | ``persistBias``                       |
 |                                   |                                       |
-| nudgingLastObsFile                | biasWindowBeforeT0                    |
+| ``nudgingLastObsFile``            | ``biasWindowBeforeT0``                |
 |                                   |                                       |
-| readTimesliceParallel             | maxAgePairsBiasPersist                |
+| ``readTimesliceParallel``         | ``maxAgePairsBiasPersist``            |
 |                                   |                                       |
-| temporalPersistence               | minNumPairsBiasPersist                |
+| ``temporalPersistence``           | ``minNumPairsBiasPersist``            |
 |                                   |                                       |
-|                                   | invDistTimeWeightBias                 |
+|                                   | ``invDistTimeWeightBias``             |
 |                                   |                                       |
-|                                   | noConstInterfBias                     |
+|                                   | ``noConstInterfBias``                 |
 +-----------------------------------+---------------------------------------+
 
 Details on the meaning and usage of the options are given in

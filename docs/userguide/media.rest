@@ -31,9 +31,6 @@
 .. |image38| image:: media/image62.png
    :width: 1.77083in
    :height: 1.58333in
-.. |image39| image:: media/image38.png
-   :width: 7.71908in
-   :height: 4.78646in
 .. |image40| image:: media/image35.png
    :width: 7in
    :height: 3.70833in
