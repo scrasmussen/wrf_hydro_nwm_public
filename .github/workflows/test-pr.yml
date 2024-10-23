@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [nwm_ana, nwm_long_range, gridded, reach]
+        configuration: [nwm_ana, nwm_long_range, gridded, reach, reach_lakes]
     runs-on: ubuntu-latest
 
     env:
