@@ -741,7 +741,6 @@ contains
         call HYDRO_time_adv(did)
         call HYDRO_out(did, 1)
 
-
 !           write(90 + my_id,*) "finish calling hydro_exe"
 !           call flush(90+my_id)
 !          call mpp_land_sync()
@@ -751,8 +750,6 @@ contains
 !! Under channel-only, these variables are not allocated
         if(allocated(RT_DOMAIN(did)%SOLDRAIN)) RT_DOMAIN(did)%SOLDRAIN = 0
         if(allocated(rt_domain(did)%subsurface%state%qsubrt))   RT_DOMAIN(did)%subsurface%state%qsubrt   = 0
-
-
 
     end subroutine HYDRO_exe
 
@@ -1089,6 +1086,7 @@ contains
 #endif
 
 #ifdef HYDRO_D
+if (.FALSE.) then
 ! ADCHANGE: START Initial water balance variables
 ! ALL VARS in MM
         suminfxsrt1 = 0.
@@ -1111,6 +1109,7 @@ contains
         smcrttot1 = smcrttot1/float(numprocs)
 #endif
 ! END Initial water balance variables
+endif
 #endif
 
         do J=1,RT_DOMAIN(did)%JX
@@ -1264,13 +1263,12 @@ contains
             end do
         end do
 
-
 #ifdef MPP_LAND
         call MPP_LAND_COM_REAL(RT_DOMAIN(did)%INFXSWGT, &
             RT_DOMAIN(did)%IXRT,    &
             RT_DOMAIN(did)%JXRT, 99)
 
-        do i = 1, rt_domain(did)%bedrocklyr(I,J)
+        do i = 1, nlst(did)%NSOIL
             call MPP_LAND_COM_REAL(RT_DOMAIN(did)%SH2OWGT(:,:,i), &
                 RT_DOMAIN(did)%IXRT, &
                 RT_DOMAIN(did)%JXRT, 99)
@@ -1281,6 +1279,7 @@ contains
         RT_DOMAIN(did)%SMC = RT_DOMAIN(did)%SH2OX + RT_DOMAIN(did)%SICE
 
 #ifdef HYDRO_D
+if (.FALSE.) then
 ! ADCHANGE: START Final water balance variables
 ! ALL VARS in MM
         suminfxs2 = 0.
@@ -1326,6 +1325,7 @@ contains
         endif
 #endif
 ! END Final water balance variables
+endif
 #endif
 
 #ifdef HYDRO_D
