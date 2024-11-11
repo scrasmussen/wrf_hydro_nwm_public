@@ -29,14 +29,14 @@ Requirements
 
 
 Install dependencies for Debain/Ubuntu
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. code-block:: bash
 
     $ apt install -y git cmake libnetcdff-dev mpi-default-dev
 
 
 Install/activate dependencies for Red Hat/Fedora
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. code-block:: bash
 
     $ dnf install -y git cmake netcdf-fortran-mpich-devel
@@ -91,6 +91,12 @@ available options are described in the following table.
 CMake Testcase
 ~~~~~~~~~~~~~~
 
+.. code-block:: bash
+
+    $ cd build/Run
+    $ make croton
+    $ make run
+
 To download and setup the Croton testcase in ``build/Run`` use one of the
 following commands.
 The first time the ``croton.tar.gz`` file will be downloaded, extracted, and configured.
@@ -115,3 +121,12 @@ Future commands will reconfigure the ``Run`` directory.
 +---------------------------------+
 | make croton-reach-lakes         |
 +---------------------------------+
+
+CTests
+~~~~~~
+Run WRF-Hydro unit tests
+
+.. code-block:: bash
+
+    $ cd build
+    $ ctest
