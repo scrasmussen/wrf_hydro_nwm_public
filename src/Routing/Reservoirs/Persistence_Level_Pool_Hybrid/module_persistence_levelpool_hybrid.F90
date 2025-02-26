@@ -297,7 +297,8 @@ contains
                     this%state%persistence_current_weight = 0.0
 
                 else
-                    this%state%persistence_current_weight = this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
+                    this%state%persistence_current_weight = &
+                         this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
                 end if
 
             else
@@ -312,11 +313,13 @@ contains
                 this%state%persistence_weight_index = 1
 
                 ! Grab first persistence weight at index 1 from array
-                this%state%persistence_current_weight = this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
+                this%state%persistence_current_weight = &
+                     this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
 
                 ! Set weight update time offset by how long back a timeslice discharge was read. For instance, if the weight update interval is
                 ! 24 hours, and the gage discharge was read 2 hours back, then the weight update time will be set to 22 hours after the current time.
-                this%state%weight_update_time = this%state%current_time + this%properties%weight_update_time_interval - gage_lookback_seconds
+                this%state%weight_update_time = this%state%current_time + &
+                     this%properties%weight_update_time_interval - gage_lookback_seconds
 
             end if
 
@@ -324,7 +327,8 @@ contains
             this%state%levelpool_current_weight = 1.0 - this%state%persistence_current_weight
 
             ! Set timeslice update time
-            this%state%timeslice_update_time = this%state%timeslice_update_time + this%properties%observation_update_time_interval_seconds
+            this%state%timeslice_update_time = this%state%timeslice_update_time + &
+                 this%properties%observation_update_time_interval_seconds
 
         ! If update time to change persistence weights
         else if (this%state%current_time >= this%state%weight_update_time) then
@@ -336,7 +340,8 @@ contains
             if (this%state%persistence_weight_index <= SIZE(this%properties%persistence_weighted_coefficients)) then
 
                 ! Grab indexed persistence weight from array
-                this%state%persistence_current_weight = this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
+                this%state%persistence_current_weight = &
+                     this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
 
             else
                 ! If boundary of persistence weights array has been exceeded, then set all persistence weights to 0.0

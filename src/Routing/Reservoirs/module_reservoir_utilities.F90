@@ -233,8 +233,8 @@ contains
 
         ! Check to ensure that the reservoir_type array size matches the lake_id array size.
         if (number_of_reservoir_types .ne. number_of_lake_parameter_lakes) then
-            call hydro_stop("ERROR: Reservoir Type array size in the reservoir parameter file does not match the Lake ID array size &
-            in the lake parameter file.")
+           call hydro_stop("ERROR: Reservoir Type array size in the reservoir parameter file does not match the &
+                &Lake ID array size in the lake parameter file.")
         end if
 
         status = nf90_get_var(ncid, var_id, reservoir_types)

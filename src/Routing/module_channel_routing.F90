@@ -836,7 +836,8 @@ END SUBROUTINE SUBMUSKINGCUNGE
                     if (l_idx >= 0) then     !-- -999 if not a reservoir in the lookup table (belt-and-suspenders check)
                         call rt_domain(did)%reservoirs(l_idx)%ptr%run(Qup, Quc, 0.0, &
                               RESHT(l_idx), QLINK(k,2), DTRT_CH, rt_domain(did)%final_reservoir_type(l_idx), &
-                              rt_domain(did)%reservoir_assimilated_value(l_idx), rt_domain(did)%reservoir_assimilated_source_file(l_idx))
+                              rt_domain(did)%reservoir_assimilated_value(l_idx), &
+                              rt_domain(did)%reservoir_assimilated_source_file(l_idx))
 
                         QLAKEO(l_idx)  = QLINK(k,2)     !save outflow to lake
                         QLAKEI(l_idx)  = Quc            !save inflow to lake

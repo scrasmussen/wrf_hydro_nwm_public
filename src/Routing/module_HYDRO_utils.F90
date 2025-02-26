@@ -297,7 +297,8 @@ contains
               nlst(did)%dxrt0,nlst(did)%dxrt0)
 #ifdef MPP_LAND
         do k = 1, 9
-           call MPP_LAND_COM_REAL(rt_domain(did)%overland%properties%distance_to_neighbor(:,:,k),rt_domain(did)%IXRT,rt_domain(did)%JXRT,99)
+           call MPP_LAND_COM_REAL(rt_domain(did)%overland%properties%distance_to_neighbor(:,:,k), &
+                rt_domain(did)%IXRT,rt_domain(did)%JXRT,99)
         end do
 #endif
      endif
@@ -342,7 +343,7 @@ contains
       jx = global_ny
       call write_IO_int(rt_domain(did)%GWSUBBASMSK,mask)
       do k = 1,  9
-         call write_IO_real(rt_domain(did)%dist_lsm(:,:,k),dist_lsm(:,:,k)) 
+         call write_IO_real(rt_domain(did)%dist_lsm(:,:,k),dist_lsm(:,:,k))
       end do
 #else
       ix = rt_domain(did)%ix

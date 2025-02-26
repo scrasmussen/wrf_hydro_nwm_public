@@ -857,7 +857,8 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
       iret = nf90_open(trim(nlst(1)%land_spatial_meta_flnm),NF90_NOWRITE,ncid=ftnMeta)
       if(iret .ne. 0) then
          ! Spatial metadata file not found for land grid.
-         call postDiagMsg(diagFlag,'WARNING: Unable to open LAND spatial metadata file. No crs variable or attributes will be created.')
+         call postDiagMsg(diagFlag,'WARNING: Unable to open LAND spatial metadata file. &
+              &No crs variable or attributes will be created.')
          ldasOutDict%nCrsCharAtts = 0
          ldasOutDict%nCrsRealAtts = 0
          ldasOutDict%nxCharAtts = 0
@@ -2314,7 +2315,8 @@ subroutine initLsmOutDict(lsmOutDict,procId,diagFlag)
       iret = nf90_open(trim(nlst(1)%land_spatial_meta_flnm),NF90_NOWRITE,ncid=ftnMeta)
       if(iret .ne. 0) then
          ! Spatial metadata file not found for land grid.
-         call postDiagMsg(diagFlag,'WARNING: Unable to open LAND spatial metadata file. No crs variable or attributes will be created.')
+         call postDiagMsg(diagFlag,'WARNING: Unable to open LAND spatial metadata file. &
+              &No crs variable or attributes will be created.')
          lsmOutDict%nCrsCharAtts = 0
          lsmOutDict%nCrsRealAtts = 0
          lsmOutDict%nxCharAtts = 0

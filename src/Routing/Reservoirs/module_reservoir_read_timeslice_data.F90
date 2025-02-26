@@ -344,7 +344,8 @@ contains
 
     ! Close timeslice NetCDF file
     status = nf90_close(ncid)
-    if (status /= nf90_noerr) call handle_err(status, "Could not close timeslice file " // trim(ADJUSTL(timeslice_file_full)) // ".")
+    if (status /= nf90_noerr) call handle_err(status, "Could not close timeslice file &
+         &" // trim(ADJUSTL(timeslice_file_full)) // ".")
 
     ! Deallocate gage arrays
     if(allocated(this%gage_id)) deallocate(this%gage_id)

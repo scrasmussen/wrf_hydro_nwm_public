@@ -400,14 +400,16 @@ subroutine output_chrt_NWM(domainId)
       else
          ! Gridded routing collection
          call write_chanel_real(strFlowLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,1))
-         call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,2))
+         call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks, &
+              g_qlink(:,2))
          call write_chanel_real(RT_DOMAIN(domainId)%CHLAT,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlat)
          call write_chanel_real(RT_DOMAIN(domainId)%CHLON,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlon)
          call write_chanel_real(RT_DOMAIN(domainId)%HLINK,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_hlink)
          call write_chanel_int(RT_DOMAIN(domainId)%ORDER,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_order)
          call write_chanel_int8(RT_DOMAIN(domainId)%linkid,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_linkid)
          call write_chanel_real(RT_DOMAIN(domainId)%ZELEV,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_zelev)
-         call write_chanel_real(RT_DOMAIN(domainId)%QLateral,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_QLateral)
+         call write_chanel_real(RT_DOMAIN(domainId)%QLateral,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks, &
+              g_QLateral)
          call write_chanel_real(velocityLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_velocity)
          if(nlst(domainId)%output_channelBucket_influx .ne. 0) then
             call postDiagMsg(diagFlag,'WARNING: This channelBucket_influx only available for reach-based routing.')
@@ -892,36 +894,49 @@ subroutine output_chrt_NWM(domainId)
             ! output. Only compress if io_form_outputs is set to 1.
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 3)) then
                iret = nf90_def_var_deflate(ftn,varId,0,1,2)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression for: '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression for: &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
 
             ! Create variable attributes
             iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'coordinates',trim(fileMeta%coordNames(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place coordinates attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place coordinates attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'grid_mapping','crs')
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'add_offset',fileMeta%addOffset(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRange)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             else
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRangeReal)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
          endif
       end do
@@ -1513,27 +1528,37 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
             if(fileMeta%outFlag(iTmp) .eq. 1) then
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                   if(fileMeta%numLev(iTmp) .eq. fileMeta%numSoilLayers) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(4),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int, &
+                          (/dimId(2),dimId(4),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSnowLayers) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(5),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int, &
+                          (/dimId(2),dimId(5),dimId(3),dimId(1)/),varId)
                   else if(noah_lsm%crocus_opt == 1 .and. fileMeta%numLev(iTmp) .eq. fileMeta%act_lev) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int, &
+                          (/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int, &
+                          (/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int, &
+                          (/dimId(2),dimId(3),dimId(1)/),varId)
                   endif
                else
                   if(fileMeta%numLev(iTmp) .eq. fileMeta%numSoilLayers) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(4),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,&
+                          (/dimId(2),dimId(4),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSnowLayers) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(5),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float, &
+                          (/dimId(2),dimId(5),dimId(3),dimId(1)/),varId)
                   else if(noah_lsm%crocus_opt == 1 .and. fileMeta%numLev(iTmp) .eq. fileMeta%act_lev) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float, &
+                          (/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float, &
+                          (/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
-                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(3),dimId(1)/),varId)
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float, &
+                          (/dimId(2),dimId(3),dimId(1)/),varId)
                   endif
                endif
                call nwmCheck(diagFlag,iret,"ERROR: Unable to create variable: "//trim(fileMeta%varNames(iTmp)))
@@ -1556,35 +1581,48 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 
                ! Create variable attributes
                iret = nf90_put_att(ftnNoahMP,varId,'long_name',trim(fileMeta%longName(iTmp)))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftnNoahMP,varId,'units',trim(fileMeta%units(iTmp)))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftnNoahMP,varId,'grid_mapping','crs')
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: &
+                    &'//trim(fileMeta%varNames(iTmp)))
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                   iret = nf90_put_att(ftnNoahMP,varId,'_FillValue',fileMeta%fillComp(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftnNoahMP,varId,'missing_value',fileMeta%missingComp(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftnNoahMP,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftnNoahMP,varId,'add_offset',fileMeta%addOffset(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftnNoahMP,varId,'valid_range',varRange)
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                else
                   iret = nf90_put_att(ftnNoahMP,varId,'_FillValue',fileMeta%fillReal(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftnNoahMP,varId,'missing_value',fileMeta%missingReal(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftnNoahMP,varId,'valid_range',varRangeReal)
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                endif
                ! Place necessary geospatial attributes into the variable.
                do iTmp2=1,fileMeta%nCrsCharAtts
                   if(trim(fileMeta%crsCharAttNames(iTmp2)) .eq. 'esri_pe_string') then
-                     iret = nf90_put_att(ftnNoahMP,varId,trim(fileMeta%crsCharAttNames(iTmp2)),trim(fileMeta%crsCharAttVals(iTmp2)))
-                     call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into '//trim(fileMeta%varNames(iTmp)))
+                     iret = nf90_put_att(ftnNoahMP,varId,trim(fileMeta%crsCharAttNames(iTmp2)), &
+                          trim(fileMeta%crsCharAttVals(iTmp2)))
+                     call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into &
+                          &'//trim(fileMeta%varNames(iTmp)))
                   endif
                end do
             endif ! End if output flag is on
@@ -2114,35 +2152,48 @@ subroutine output_rt_NWM(domainId,iGrid)
 
             ! Create variable attributes
             iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'grid_mapping','crs')
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: &
+                 &'//trim(fileMeta%varNames(iTmp)))
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'add_offset',fileMeta%addOffset(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRange)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             else
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRangeReal)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
             ! Place necessary geospatial attributes into the variable.
             do iTmp2=1,fileMeta%nCrsCharAtts
                if(trim(fileMeta%crsCharAttNames(iTmp2)) .eq. 'esri_pe_string') then
-                  iret = nf90_put_att(ftn,varId,trim(fileMeta%crsCharAttNames(iTmp2)),trim(fileMeta%crsCharAttVals(iTmp2)))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into '//trim(fileMeta%varNames(iTmp)))
+                  iret = nf90_put_att(ftn,varId,trim(fileMeta%crsCharAttNames(iTmp2)), &
+                       trim(fileMeta%crsCharAttVals(iTmp2)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into &
+                       &'//trim(fileMeta%varNames(iTmp)))
                endif
             end do
          endif
@@ -2298,15 +2349,19 @@ subroutine output_rt_NWM(domainId,iGrid)
             call nwmCheck(diagFlag,iret,'ERROR: Unable to find variable ID for var: '//trim(fileMeta%varNames(iTmp2)))
             if(numLev .eq. 1) then
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
-                  iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+                  iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1/), &
+                       (/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
                else
-                  iret = nf90_put_var(ftn,varId,globalOutReal,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+                  iret = nf90_put_var(ftn,varId,globalOutReal,(/1,1,1/), &
+                       (/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
                endif
             else
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
-                  iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt,1/))
+                  iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1,1/), &
+                       (/RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt,1/))
                else
-                  iret = nf90_put_var(ftn,varId,globalOutReal,(/1,1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt,1/))
+                  iret = nf90_put_var(ftn,varId,globalOutReal,(/1,1,1,1/), &
+                       (/RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt,1/))
                endif
             endif
             call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into output variable: '//trim(fileMeta%varNames(iTmp2)))
@@ -2872,36 +2927,49 @@ subroutine output_lakes_NWM(domainId,iGrid)
             ! Only compress if io_form_outputs is set to 1.
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 3)) then
                iret = nf90_def_var_deflate(ftn,varId,0,1,2)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression for: '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression for: &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
 
             ! Create variable attributes
             iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'coordinates',trim(fileMeta%coordNames(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place coordinates attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place coordinates attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'grid_mapping','crs')
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'add_offset',fileMeta%addOffset(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRange)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             else
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRangeReal)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
          endif
       end do
@@ -3401,40 +3469,53 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
             ! Only compress if io_form_outputs is set to 1.
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 3)) then
                iret = nf90_def_var_deflate(ftn,varId,0,1,2)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression for: '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression for: &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
 
             ! Create variable attributes
             iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'grid_mapping','crs')
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: &
+                 &'//trim(fileMeta%varNames(iTmp)))
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'add_offset',fileMeta%addOffset(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRange)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             else
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRangeReal)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
             ! Place necessary geospatial attributes into the variable.
             do iTmp2=1,fileMeta%nCrsCharAtts
                if(trim(fileMeta%crsCharAttNames(iTmp2)) .eq. 'esri_pe_string') then
                   iret = nf90_put_att(ftn,varId,trim(fileMeta%crsCharAttNames(iTmp2)),trim(fileMeta%crsCharAttVals(iTmp2)))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into &
+                       &'//trim(fileMeta%varNames(iTmp)))
                endif
             end do
          endif
@@ -3826,20 +3907,26 @@ subroutine output_lsmOut_NWM(domainId)
 
             ! Create variable attributes
             iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'grid_mapping','crs')
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable: &
+                 &'//trim(fileMeta%varNames(iTmp)))
             ! Place necessary geospatial attributes into the variable.
             do iTmp2=1,fileMeta%nCrsCharAtts
                if(trim(fileMeta%crsCharAttNames(iTmp2)) .eq. 'esri_pe_string') then
                   iret = nf90_put_att(ftn,varId,trim(fileMeta%crsCharAttNames(iTmp2)),trim(fileMeta%crsCharAttVals(iTmp2)))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place esri_pe_string attribute into &
+                       &'//trim(fileMeta%varNames(iTmp)))
                endif
             end do
          endif ! End if output flag is on
@@ -4134,7 +4221,8 @@ implicit none
       if(nlst(domainId)%channel_option .eq. 3) then
          call write_chanel_int(frxstPtsLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_STRMFRXSTPTS)
          call write_chanel_real(strFlowLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,1))
-         call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,2))
+         call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,&
+              g_qlink(:,2))
          call write_chanel_real(RT_DOMAIN(domainId)%CHLAT,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlat)
          call write_chanel_real(RT_DOMAIN(domainId)%CHLON,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlon)
          call write_chanel_real(RT_DOMAIN(domainId)%HLINK,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_hlink)
@@ -4504,7 +4592,8 @@ subroutine output_chanObs_NWM(domainId)
       if(nlst(domainId)%channel_option .eq. 3) then
          call write_chanel_int(frxstPtsLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_STRMFRXSTPTS)
          call write_chanel_real(strFlowLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,1))
-         call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,2))
+         call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,&
+              g_qlink(:,2))
          call write_chanel_real(RT_DOMAIN(domainId)%CHLAT,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlat)
          call write_chanel_real(RT_DOMAIN(domainId)%CHLON,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_chlon)
          call write_chanel_real(RT_DOMAIN(domainId)%HLINK,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_hlink)
@@ -4839,31 +4928,43 @@ subroutine output_chanObs_NWM(domainId)
 
                ! Create variable attributes
                iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'coordinates',trim(fileMeta%coordNames(iTmp)))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place coordinates attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place coordinates attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'grid_mapping','crs')
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place grid_mapping attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                   iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillComp(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingComp(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftn,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftn,varId,'add_offset',fileMeta%addOffset(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftn,varId,'valid_range',varRange)
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                else
                   iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                   iret = nf90_put_att(ftn,varId,'valid_range',varRangeReal)
-                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+                  call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                       &'//trim(fileMeta%varNames(iTmp)))
                endif
             endif
          end do
@@ -5390,27 +5491,37 @@ subroutine output_gw_NWM(domainId,iGrid)
 
             ! Create variable attributes
             iret = nf90_put_att(ftn,varId,'long_name',trim(fileMeta%longName(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             iret = nf90_put_att(ftn,varId,'units',trim(fileMeta%units(iTmp)))
-            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable '//trim(fileMeta%varNames(iTmp)))
+            call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into variable &
+                 &'//trim(fileMeta%varNames(iTmp)))
             if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingComp(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'scale_factor',fileMeta%scaleFactor(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place scale_factor attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'add_offset',fileMeta%addOffset(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place add_offset attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRange)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             else
                iret = nf90_put_att(ftn,varId,'_FillValue',fileMeta%fillReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place Fill value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'missing_value',fileMeta%missingReal(iTmp))
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place missing value attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
                iret = nf90_put_att(ftn,varId,'valid_range',varRangeReal)
-               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable '//trim(fileMeta%varNames(iTmp)))
+               call nwmCheck(diagFlag,iret,'ERROR: Unable to place valid_range attribute into variable &
+                    &'//trim(fileMeta%varNames(iTmp)))
             endif
          endif
       end do

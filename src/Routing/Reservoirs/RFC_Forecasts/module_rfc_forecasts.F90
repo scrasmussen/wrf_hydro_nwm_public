@@ -130,7 +130,8 @@ contains
                 // trim(ADJUSTL(lake_number_string)) // ".")
             else
                 ! initialize rfc forecasts properties
-                call this%properties%init(lake_area, lake_max_water_elevation, lake_number, reservoir_type, reservoir_parameter_file)
+               call this%properties%init(lake_area, lake_max_water_elevation, lake_number, reservoir_type, &
+                    reservoir_parameter_file)
             end if
             this%pointer_allocation_guard = .true.
 
@@ -280,8 +281,9 @@ contains
 
         ! Run levelpool reservoir
         call this%state%levelpool_ptr%run(previous_timestep_inflow, inflow, &
-        lateral_inflow, this%state%levelpool_water_elevation, levelpool_outflow, routing_period, this%state%levelpool_reservoir_type, &
-        this%state%levelpool_assimilated_value, this%state%levelpool_assimilated_source_file)
+             lateral_inflow, this%state%levelpool_water_elevation, &
+             levelpool_outflow, routing_period, this%state%levelpool_reservoir_type, &
+             this%state%levelpool_assimilated_value, this%state%levelpool_assimilated_source_file)
 
         ! Check if Routing Period is greater than 1 hour, and if true, set forecast_found to false.
         if (routing_period .gt. 3600) then

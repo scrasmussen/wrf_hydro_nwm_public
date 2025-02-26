@@ -469,7 +469,8 @@ contains
 
    if (len(trim(self%route_lake_f)) .ne. 0) then
       inquire(file=trim(self%route_lake_f),exist=fileExists)
-      if (.not. fileExists) call hydro_stop('hydro.namelist ERROR: specified route_lake_f ('//trim(self%route_lake_f)//') not found.')
+      if (.not. fileExists) call hydro_stop('hydro.namelist ERROR: specified route_lake_f &
+                                             &('//trim(self%route_lake_f)//') not found.')
    endif
 
    if ((self%channel_option .eq. 3) .and. (self%compound_channel)) then
@@ -484,7 +485,7 @@ contains
    if (self%reservoir_type_specified) then
       if (len(trim(self%reservoir_parameter_file)) .eq. 0) then
          call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_parameter_file for &
-         inputs to reservoirs that are not level pool type.')
+         &inputs to reservoirs that are not level pool type.')
       endif
       if (len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -495,7 +496,7 @@ contains
    if (self%reservoir_persistence_usgs) then
       if (len(trim(self%reservoir_usgs_timeslice_path)) .eq. 0) then
          call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usgs_timeslice_path for &
-         reservoir USGS persistence capability.')
+         &reservoir USGS persistence capability.')
       endif
       if (len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -506,7 +507,7 @@ contains
    if (self%reservoir_persistence_usace) then
       if (len(trim(self%reservoir_usace_timeslice_path)) .eq. 0) then
          call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usace_timeslice_path for &
-         reservoir USACE persistence capability.')
+         &reservoir USACE persistence capability.')
       endif
       if (len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -516,10 +517,12 @@ contains
 
    if (self%reservoir_rfc_forecasts) then
       if (len(trim(self%reservoir_parameter_file)) .eq. 0) then
-         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_parameter_file for inputs to rfc forecast type reservoirs.')
+         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_parameter_file for inputs to rfc &
+                          &forecast type reservoirs.')
       endif
       if (len(trim(self%reservoir_rfc_forecasts_time_series_path)) .eq. 0) then
-         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_rfc_forecasts_time_series_path for reservoir rfc forecast capability.')
+         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_rfc_forecasts_time_series_path for &
+                          &reservoir rfc forecast capability.')
       endif
       if (len(trim(self%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(self%reservoir_parameter_file),exist=fileExists)
@@ -630,7 +633,8 @@ contains
          SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, dtrt_ter,dtrt_ch,dxrt,&
          GwSpinCycles, GwPreCycles, GwSpinUp, GwPreDiag, GwPreDiagInterval, gwIhShift, &
          GWBASESWCRT, gwChanCondSw, gwChanCondConstIn, gwChanCondConstOut , &
-         route_topo_f,route_chan_f,route_link_f, compound_channel, channel_loss_option, lake_option, route_lake_f,  diversions_file, &
+         route_topo_f,route_chan_f,route_link_f, compound_channel, channel_loss_option, &
+         lake_option, route_lake_f,  diversions_file, &
          route_direction_f,route_order_f,gwbasmskfil, &
          geo_finegrid_flnm, gwstrmfil,GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, sys_cpl, &
          order_to_write , rst_typ, rst_bi_in, rst_bi_out, gwsoilcpl, &
