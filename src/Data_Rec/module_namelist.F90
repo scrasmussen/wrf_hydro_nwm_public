@@ -107,17 +107,23 @@ contains
                     SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, dtrt_ter,dtrt_ch,dxrt,&
                     GwSpinCycles, GwPreCycles, GwSpinUp, GwPreDiag, GwPreDiagInterval, gwIhShift, &
                     GWBASESWCRT, gwChanCondSw, gwChanCondConstIn, gwChanCondConstOut, &
-                    route_topo_f,route_chan_f,route_link_f, compound_channel, route_lake_f, diversions_file, &
-                    reservoir_persistence_usgs, reservoir_persistence_usace, reservoir_parameter_file, reservoir_usgs_timeslice_path, &
-                    reservoir_usace_timeslice_path, reservoir_observation_lookback_hours, reservoir_observation_update_time_interval_seconds, &
-                    reservoir_rfc_forecasts,  reservoir_rfc_forecasts_time_series_path, reservoir_rfc_forecasts_lookback_hours, &
-                    reservoir_type_specified, route_direction_f,route_order_f, gwbasmskfil, geo_finegrid_flnm, gwstrmfil, &
+                    route_topo_f,route_chan_f,route_link_f, compound_channel, &
+                    route_lake_f, diversions_file, &
+                    reservoir_persistence_usgs, reservoir_persistence_usace, &
+                    reservoir_parameter_file, reservoir_usgs_timeslice_path, &
+                    reservoir_usace_timeslice_path, reservoir_observation_lookback_hours, &
+                    reservoir_observation_update_time_interval_seconds, &
+                    reservoir_rfc_forecasts,  reservoir_rfc_forecasts_time_series_path, &
+                    reservoir_rfc_forecasts_lookback_hours, &
+                    reservoir_type_specified, route_direction_f,route_order_f, &
+                    gwbasmskfil, geo_finegrid_flnm, gwstrmfil, &
                     GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, sys_cpl, &
                     order_to_write , rst_typ, rst_bi_in, rst_bi_out, gwsoilcpl, &
                     CHRTOUT_DOMAIN,CHANOBS_DOMAIN,CHRTOUT_GRID,LSMOUT_DOMAIN,&
                     RTOUT_DOMAIN, output_gw, outlake, &
                     frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
-                    io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj
+                    io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, &
+                    output_channelBucket_influx, imperv_adj
 
 #ifdef WRF_HYDRO_NUDGING
    namelist /NUDGING_nlist/ nudgingParamFile,       netwkReExFile,          &
@@ -774,7 +780,8 @@ subroutine rt_nlst_check(nlst)
    if(len(trim(nlst%route_lake_f)) .ne. 0) then
       if(nlst%channel_option .ne. 3) then
          if(nlst%UDMP_OPT .ne. 1) then
-            call hydro_stop('hydro.namelist ERROR: Currently lakes only work with gridded channel routing or UDMP=1. Please change your namelist settings.')
+            call hydro_stop('hydro.namelist ERROR: Currently lakes only work with gridded channel routing &
+                 &or UDMP=1. Please change your namelist settings.')
          endif
       endif
    endif
@@ -796,7 +803,8 @@ subroutine rt_nlst_check(nlst)
 
    if(nlst%reservoir_persistence_usgs) then
       if(len(trim(nlst%reservoir_usgs_timeslice_path)) .eq. 0) then
-         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usgs timeslice_path for reservoir USGS persistence capability.')
+         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usgs timeslice_path &
+              &for reservoir USGS persistence capability.')
       endif
       if(len(trim(nlst%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(nlst%reservoir_parameter_file),exist=fileExists)
@@ -806,7 +814,8 @@ subroutine rt_nlst_check(nlst)
 
    if(nlst%reservoir_persistence_usace) then
       if(len(trim(nlst%reservoir_usace_timeslice_path)) .eq. 0) then
-         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usace_timeslice_path for reservoir USACE persistence capability.')
+         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_usace_timeslice_path for &
+              &reservoir USACE persistence capability.')
       endif
       if(len(trim(nlst%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(nlst%reservoir_parameter_file),exist=fileExists)
@@ -816,10 +825,12 @@ subroutine rt_nlst_check(nlst)
 
    if(nlst%reservoir_rfc_forecasts) then
       if(len(trim(nlst%reservoir_parameter_file)) .eq. 0) then
-         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_parameter_file for inputs to rfc forecast type reservoirs.')
+         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_parameter_file for inputs to &
+              &rfc forecast type reservoirs.')
       endif
       if(len(trim(nlst%reservoir_rfc_forecasts_time_series_path)) .eq. 0) then
-         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_rfc_forecasts_time_series_path for reservoir rfc forecast capability.')
+         call hydro_stop('hydro.namelist ERROR: You MUST specify a reservoir_rfc_forecasts_time_series_path &
+              &for reservoir rfc forecast capability.')
       endif
       if(len(trim(nlst%reservoir_parameter_file)) .ne. 0) then
         inquire(file=trim(nlst%reservoir_parameter_file),exist=fileExists)

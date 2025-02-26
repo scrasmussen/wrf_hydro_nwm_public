@@ -165,10 +165,12 @@ contains
         if (ieee_is_nan(div_gage_flow)) then
             fraction = diversion%fraction
             if (fraction == -1) then
-                print free, "WARNING: No fractional diversion value specified for diversion at gage '" // trim(adjustl(diversion%da_dest)) // "', skipping"
+                print free, "WARNING: No fractional diversion value specified for diversion at gage &
+                     &'" // trim(adjustl(diversion%da_dest)) // "', skipping"
                 fraction = 0
             else
-                print free, "INFO: No gage discharge available for diversion '" // trim(adjustl(diversion%da_dest)) // "', using fixed fractional diversion of", fraction
+                print free, "INFO: No gage discharge available for diversion &
+                     &'" // trim(adjustl(diversion%da_dest)) // "', using fixed fractional diversion of", fraction
             end if
             div_gage_flow = qlink_src * fraction
         end if

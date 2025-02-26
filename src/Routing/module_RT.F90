@@ -1040,7 +1040,8 @@ subroutine LandRT_ini(did)
 
         call getLocalIndx(rt_domain(did)%gnlinksl,rt_domain(did)%LINKID, rt_domain(did)%LLINKID)
 
-        call getToInd(rt_domain(did)%LINKID,rt_domain(did)%to_node,rt_domain(did)%toNodeInd,rt_domain(did)%nToInd,rt_domain(did)%gtoNode)
+        call getToInd(rt_domain(did)%LINKID,rt_domain(did)%to_node,rt_domain(did)%toNodeInd, &
+             rt_domain(did)%nToInd,rt_domain(did)%gtoNode)
 #else
         do k = 1, rt_domain(did)%NLINKSL
            do j = 1, rt_domain(did)%jxrt
@@ -1093,11 +1094,16 @@ subroutine LandRT_ini(did)
      Vmax = 0.0
      do j=2,rt_domain(did)%JXRT-1
         do i=2,rt_domain(did)%IXRT-1
-           rt_domain(did)%overland%properties%surface_slope_x(i,j)=(rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,3)
-           rt_domain(did)%overland%properties%surface_slope_y(i,j)=(rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j+1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,1)
+           rt_domain(did)%overland%properties%surface_slope_x(i,j) = &
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,3)
+           rt_domain(did)%overland%properties%surface_slope_y(i,j) = &
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j+1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,1)
            !DJG Introduce reduction in retention depth as a linear function of terrain slope
            if (nlst(did)%RT_OPTION.eq.2) then
-              if (rt_domain(did)%overland%properties%surface_slope_x(i,j).gt.rt_domain(did)%overland%properties%surface_slope_y(i,j)) then
+              if (rt_domain(did)%overland%properties%surface_slope_x(i,j) .gt. &
+                   rt_domain(did)%overland%properties%surface_slope_y(i,j)) then
                  Vmax=rt_domain(did)%overland%properties%surface_slope_x(i,j)
               else
                  Vmax=rt_domain(did)%overland%properties%surface_slope_y(i,j)
@@ -1107,20 +1113,25 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%overland%properties%retention_depth(i,j)=0.
               else
                  rt_domain(did)%RETDEPFRAC=Vmax/0.1
-                 rt_domain(did)%overland%properties%retention_depth(i,j)=rt_domain(did)%overland%properties%retention_depth(i,j)*(1.-rt_domain(did)%RETDEPFRAC)
-                 if (rt_domain(did)%overland%properties%retention_depth(i,j).lt.0.) rt_domain(did)%overland%properties%retention_depth(i,j)=0.
+                 rt_domain(did)%overland%properties%retention_depth(i,j) = &
+                      rt_domain(did)%overland%properties%retention_depth(i,j)*(1.-rt_domain(did)%RETDEPFRAC)
+
+                 if (rt_domain(did)%overland%properties%retention_depth(i,j).lt.0.) &
+                      rt_domain(did)%overland%properties%retention_depth(i,j)=0.
               end if
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,1) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j+1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,1)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j+1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,1)
            rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i
            rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j + 1
            rt_domain(did)%overland%properties%max_surface_slope_index(i,j,3) = 1
            Vmax = rt_domain(did)%overland%properties%surface_slope(i,j,1)
 
            rt_domain(did)%overland%properties%surface_slope(i,j,2) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j+1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,2)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j+1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,2)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,2) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i + 1
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j + 1
@@ -1129,7 +1140,8 @@ subroutine LandRT_ini(did)
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,3) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,3)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,3)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,3) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i + 1
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j
@@ -1138,7 +1150,8 @@ subroutine LandRT_ini(did)
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,4) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j-1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,4)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j-1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,4)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,4) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i + 1
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j - 1
@@ -1147,7 +1160,8 @@ subroutine LandRT_ini(did)
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,5) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j-1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,5)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j-1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,5)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,5) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j - 1
@@ -1156,7 +1170,8 @@ subroutine LandRT_ini(did)
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,6) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i-1,j-1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,6)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i-1,j-1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,6)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,6) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i - 1
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j - 1
@@ -1165,7 +1180,8 @@ subroutine LandRT_ini(did)
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,7) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i-1,j))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,7)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i-1,j)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,7)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,7) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i - 1
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j
@@ -1174,7 +1190,8 @@ subroutine LandRT_ini(did)
            end if
 
            rt_domain(did)%overland%properties%surface_slope(i,j,8) = &
-                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i-1,j+1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,8)
+                (rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i-1,j+1)) / &
+                rt_domain(did)%overland%properties%distance_to_neighbor(i,j,8)
            if(rt_domain(did)%overland%properties%surface_slope(i,j,8) .gt. Vmax ) then
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,1) = i - 1
               rt_domain(did)%overland%properties%max_surface_slope_index(i,j,2) = j + 1
@@ -1188,8 +1205,11 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%overland%properties%retention_depth(i,j)=0.
               else
                  rt_domain(did)%RETDEPFRAC=Vmax/0.75
-                 rt_domain(did)%overland%properties%retention_depth(i,j)=rt_domain(did)%overland%properties%retention_depth(i,j)*(1.-rt_domain(did)%RETDEPFRAC)
-                 if (rt_domain(did)%overland%properties%retention_depth(i,j).lt.0.) rt_domain(did)%overland%properties%retention_depth(i,j)=0.
+                 rt_domain(did)%overland%properties%retention_depth(i,j) = &
+                      rt_domain(did)%overland%properties%retention_depth(i,j)*(1.-rt_domain(did)%RETDEPFRAC)
+
+                 if (rt_domain(did)%overland%properties%retention_depth(i,j).lt.0.) &
+                      rt_domain(did)%overland%properties%retention_depth(i,j)=0.
               end if
            end if
         end do
@@ -1197,12 +1217,15 @@ subroutine LandRT_ini(did)
 
      !Apply impervious adjustment to retdeprt (AD)
      if (nlst(did)%imperv_adj .ne. 0) then
-       rt_domain(did)%overland%properties%retention_depth = rt_domain(did)%overland%properties%retention_depth*(1.-rt_domain(did)%impervfrac)
+        rt_domain(did)%overland%properties%retention_depth = &
+             rt_domain(did)%overland%properties%retention_depth*(1.-rt_domain(did)%impervfrac)
      end if
 
      !Apply calibration scaling factors to sfc roughness and retention depth here...
-     rt_domain(did)%overland%properties%retention_depth = rt_domain(did)%overland%properties%retention_depth * rt_domain(did)%RETDEPRTFAC
-     rt_domain(did)%overland%properties%roughness = rt_domain(did)%overland%properties%roughness * rt_domain(did)%OVROUGHRTFAC
+     rt_domain(did)%overland%properties%retention_depth = &
+          rt_domain(did)%overland%properties%retention_depth * rt_domain(did)%RETDEPRTFAC
+     rt_domain(did)%overland%properties%roughness = &
+          rt_domain(did)%overland%properties%roughness * rt_domain(did)%OVROUGHRTFAC
 
    !ADCHANGE: Moved this channel cell setting from OV_RTNG so it is outside
    !of overland routine (frequently called) and time loop.
@@ -1217,10 +1240,12 @@ subroutine LandRT_ini(did)
 #ifdef MPP_LAND
      if(right_id .lt. 0) rt_domain(did)%overland%properties%surface_slope_x(rt_domain(did)%IXRT,:)= &
         rt_domain(did)%overland%properties%surface_slope_x(rt_domain(did)%IXRT-1,:)
-     if(left_id  .lt. 0) rt_domain(did)%overland%properties%surface_slope_x(1,:)=rt_domain(did)%overland%properties%surface_slope_x(2,:)
+     if(left_id  .lt. 0) rt_domain(did)%overland%properties%surface_slope_x(1,:)= &
+          rt_domain(did)%overland%properties%surface_slope_x(2,:)
      if(up_id    .lt. 0) rt_domain(did)%overland%properties%surface_slope_y(:,rt_domain(did)%JXRT)= &
           rt_domain(did)%overland%properties%surface_slope_y(:,rt_domain(did)%JXRT-1)
-     if(down_id  .lt. 0) rt_domain(did)%overland%properties%surface_slope_y(:,1)=rt_domain(did)%overland%properties%surface_slope_y(:,2)
+     if(down_id  .lt. 0) rt_domain(did)%overland%properties%surface_slope_y(:,1)= &
+          rt_domain(did)%overland%properties%surface_slope_y(:,2)
 #else
      rt_domain(did)%overland%properties%surface_slope_x(rt_domain(did)%IXRT,:)=rt_domain(did)%overland%properties%surface_slope_x(rt_domain(did)%IXRT-1,:)
      rt_domain(did)%overland%properties%surface_slope_x(1,:)=rt_domain(did)%overland%properties%surface_slope_x(2,:)
@@ -1238,7 +1263,8 @@ subroutine LandRT_ini(did)
         call MPP_LAND_COM_REAL(rt_domain(did)%overland%properties%surface_slope(:,:,i),rt_domain(did)%IXRT,rt_domain(did)%JXRT,99)
      end do
      do i = 1, 3
-        call MPP_LAND_COM_INTEGER(rt_domain(did)%overland%properties%max_surface_slope_index(:,:,i),rt_domain(did)%IXRT,rt_domain(did)%JXRT,99)
+        call MPP_LAND_COM_INTEGER(rt_domain(did)%overland%properties%max_surface_slope_index(:,:,i), &
+             rt_domain(did)%IXRT,rt_domain(did)%JXRT,99)
      end do
 #endif
 
@@ -1318,7 +1344,8 @@ subroutine LandRT_ini(did)
 #endif
                 rt_domain(did)%IX,rt_domain(did)%JX,rt_domain(did)%IXRT,&
                 rt_domain(did)%JXRT,rt_domain(did)%GWSUBBASMSK,nlst(did)%gwbasmskfil,&
-                rt_domain(did)%gw_strm_msk,rt_domain(did)%numbasns,rt_domain(did)%overland%streams_and_lakes%ch_netrt,nlst(did)%AGGFACTRT)
+                rt_domain(did)%gw_strm_msk,rt_domain(did)%numbasns, &
+                rt_domain(did)%overland%streams_and_lakes%ch_netrt,nlst(did)%AGGFACTRT)
 
 
            call SIMP_GW_IND(rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%GWSUBBASMSK,  &
@@ -1363,7 +1390,8 @@ subroutine LandRT_ini(did)
 
 !!! Determine number of stream pixels per GW basin for distribution...
 #ifdef MPP_LAND
-           call pix_ct_1(rt_domain(did)%gw_strm_msk,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%gwbas_pix_ct,rt_domain(did)%numbasns, &
+           call pix_ct_1(rt_domain(did)%gw_strm_msk,rt_domain(did)%ixrt,rt_domain(did)%jxrt, &
+                rt_domain(did)%gwbas_pix_ct,rt_domain(did)%numbasns, &
                 rt_domain(did)%gnumbasns,rt_domain(did)%basnsInd)
 #else
            rt_domain(did)%gwbas_pix_ct = 0.
@@ -1616,7 +1644,8 @@ subroutine LandRT_ini(did)
               rt_domain(did)%HLINK(j) = HLINK_INIT(5)
            endif
 
-           rt_domain(did)%CVOL(j) = (rt_domain(did)%Bw(j)+ 1/rt_domain(did)%ChSSLP(j)*rt_domain(did)%HLINK(j))*rt_domain(did)%HLINK(j)*rt_domain(did)%CHANLEN(j) !-- initalize channel volume
+           rt_domain(did)%CVOL(j) = (rt_domain(did)%Bw(j)+ 1/rt_domain(did)%ChSSLP(j)*rt_domain(did)%HLINK(j)) * &
+                rt_domain(did)%HLINK(j)*rt_domain(did)%CHANLEN(j) !-- initalize channel volume
         end do
 
      endif  !End if channel option eq 3; else;
