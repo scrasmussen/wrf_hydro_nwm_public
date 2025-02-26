@@ -8,6 +8,17 @@ if(${PROJECT_NAME} STREQUAL "WRF")
                 add_definitions(-DWRF_HYDRO_NUDGING=1)
         endif()
 endif()
+if(${PROJECT_NAME} STREQUAL "MPAS")
+        # additions that WRF-Hydro's top CMakeLists.txt handles
+        add_compile_options( "${PROJECT_COMPILE_OPTIONS}" )
+        add_compile_definitions( "${PROJECT_COMPILE_DEFINITIONS}" )
+        # TODO: this works but is it "correct" for MPAS?
+        set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/hydro/mods)
+        add_definitions(-DMPP_LAND)
+        if (WRF_HYDRO_NUDGING STREQUAL "1")
+                add_definitions(-DWRF_HYDRO_NUDGING=1)
+        endif()
+endif()
 
 
 # build the various sup-projects
@@ -26,6 +37,11 @@ add_subdirectory("HYDRO_drv")
 if(${PROJECT_NAME} STREQUAL "WRF")
         add_subdirectory("CPL/WRF_cpl")
 endif()
+if(${PROJECT_NAME} STREQUAL "MPAS")
+        target_compile_options(hydro_mpp PRIVATE -fallow-argument-mismatch)
+        # add_subdirectory("CPL/MPAS_cpl")
+endif()
+
 
 if (WRF_HYDRO_NUDGING STREQUAL "1")
         add_subdirectory("nudging")
