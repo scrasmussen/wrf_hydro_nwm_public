@@ -42,7 +42,9 @@ module module_rfc_forecasts_state
 contains
 
     ! RFC Forecasts State Constructor
-    subroutine rfc_forecasts_state_init(this, water_elevation, lake_area, lake_max_water_elevation, orifice_elevation, initial_fractional_depth)
+    subroutine rfc_forecasts_state_init(this, &
+         water_elevation, lake_area, lake_max_water_elevation, &
+         orifice_elevation, initial_fractional_depth)
         implicit none
         class(rfc_forecasts_state_interface), intent(inout) :: this ! the type object being initialized
         real, intent(in) :: water_elevation           ! meters AMSL

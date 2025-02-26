@@ -47,7 +47,9 @@ module module_rfc_forecasts_properties
 contains
 
     ! RFC Forecasts Properties Constructor
-    subroutine rfc_forecasts_properties_init(this, lake_area, lake_max_water_elevation, lake_number, reservoir_type, reservoir_parameter_file)
+    subroutine rfc_forecasts_properties_init(this, &
+         lake_area, lake_max_water_elevation, lake_number, &
+         reservoir_type, reservoir_parameter_file)
         implicit none
         class(rfc_forecasts_properties_interface), intent(inout) :: this ! the type object being initialized
         real,    intent(in)          :: lake_area                    ! area of lake (km^2)

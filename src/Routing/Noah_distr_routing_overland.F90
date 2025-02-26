@@ -147,7 +147,9 @@ subroutine OverlandRouting( &
     do i=1,IXRT
         do j=1,JXRT
             ovrt_data%mass_balance%post_infiltration_excess = &
-                ovrt_data%mass_balance%post_infiltration_excess + (ovrt_data%control%surface_water_head_routing(I,J)/float(IXRT*JXRT))
+                 ovrt_data%mass_balance%post_infiltration_excess + &
+                 (ovrt_data%control%surface_water_head_routing(I,J)/float(IXRT*JXRT))
+
             chan_in2=chan_in2 + (ovrt_data%streams_and_lakes%surface_water_to_channel(I,J)/float(IXRT*JXRT))
             lake_in2=lake_in2 + (ovrt_data%streams_and_lakes%surface_water_to_lake(I,J)/float(IXRT*JXRT))
             qbdry2=qbdry2 + (ovrt_data%control%boundary_flux(I,J)/float(IXRT*JXRT))
@@ -333,9 +335,12 @@ subroutine ov_rtng( &
 
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
                         !!               QINFLO(CH_NET(I,J)=QINFLO(CH_NET(I,J)+SFCHEAD(I,J) - RETDEPRT(I,J)
-                        ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel = ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel + &
+                        ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel = &
+                             ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
-                        ovrt_data%streams_and_lakes%surface_water_to_channel(I,J) = ovrt_data%streams_and_lakes%surface_water_to_channel(I,J) + &
+
+                        ovrt_data%streams_and_lakes%surface_water_to_channel(I,J) = &
+                             ovrt_data%streams_and_lakes%surface_water_to_channel(I,J) + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
 
                         ! if(QSTRMVOLRT(I,J) .gt. 0) then
@@ -351,10 +356,14 @@ subroutine ov_rtng( &
 
                 IF (ovrt_data%streams_and_lakes%lake_mask(I,J) .gt. 0) THEN
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
-                        ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake = ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake + &
+                        ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake = &
+                             ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
-                        ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) = ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) + &
+
+                        ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) = &
+                             ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) + &
                             (ovrt_data%control%surface_water_head_routing(I,J)- ovrt_data%properties%retention_depth(I,J))
+
                         ovrt_data%control%surface_water_head_routing(I,J) = ovrt_data%properties%retention_depth(I,J)
                     END IF
                 END IF

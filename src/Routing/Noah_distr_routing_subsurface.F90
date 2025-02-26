@@ -302,9 +302,11 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                         ELSE
                         END IF
                     ELSE
-                        WATAVAIL = (subrt_data%grid_transform%smcmaxrt(I,J,KK)-subrt_data%grid_transform%smcrt(I,J,KK))*subrt_data%properties%sldpth(KK)
+                        WATAVAIL = (subrt_data%grid_transform%smcmaxrt(I,J,KK) - &
+                             subrt_data%grid_transform%smcrt(I,J,KK))*subrt_data%properties%sldpth(KK)
                         IF (WATAVAIL.GE.SUBFLO) THEN
-                            subrt_data%grid_transform%smcrt(I,J,KK) = subrt_data%grid_transform%smcrt(I,J,KK) + SUBFLO/subrt_data%properties%sldpth(KK)
+                            subrt_data%grid_transform%smcrt(I,J,KK) = &
+                                 subrt_data%grid_transform%smcrt(I,J,KK) + SUBFLO/subrt_data%properties%sldpth(KK)
                             SUBFLO = 0.
                         ELSE
                             SUBFLO = SUBFLO - WATAVAIL
@@ -345,10 +347,12 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                 !DJG and then using unsat cond as opposed to Ksat...
 
                 DO KK=SATLYRCHK(I,J),subrt_static%nsoil
-                    WATAVAIL = (subrt_data%grid_transform%smcrt(I,J,KK) - subrt_data%grid_transform%smcrefrt(I,J,KK)) * subrt_data%properties%sldpth(KK)
+                    WATAVAIL = (subrt_data%grid_transform%smcrt(I,J,KK) - &
+                         subrt_data%grid_transform%smcrefrt(I,J,KK)) * subrt_data%properties%sldpth(KK)
                     IF (WATAVAIL.GE.ABS(SUBFLO)) THEN
                         !?yw mod                 IF (WATAVAIL.GE.(ABS(SUBFLO)+0.000001) ) THEN
-                        subrt_data%grid_transform%smcrt(I,J,KK) = subrt_data%grid_transform%smcrt(I,J,KK) + SUBFLO/subrt_data%properties%sldpth(KK)
+                        subrt_data%grid_transform%smcrt(I,J,KK) = &
+                             subrt_data%grid_transform%smcrt(I,J,KK) + SUBFLO/subrt_data%properties%sldpth(KK)
                         SUBFLO=0.
                     ELSE     ! Since subflo is small on a time-step following is unlikely...
                         subrt_data%grid_transform%smcrt(I,J,KK) = subrt_data%grid_transform%smcrefrt(I,J,KK)

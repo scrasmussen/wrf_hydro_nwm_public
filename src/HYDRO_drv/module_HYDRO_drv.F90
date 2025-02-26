@@ -674,7 +674,8 @@ contains
                 RT_DOMAIN(did)%QSTRMVOLRT_TS = rt_domain(did)%overland%streams_and_lakes%surface_water_to_channel
                 RT_DOMAIN(did)%QSTRMVOLRT_ACC = RT_DOMAIN(did)%QSTRMVOLRT_ACC + RT_DOMAIN(did)%QSTRMVOLRT_TS
 
-                RT_DOMAIN(did)%LAKE_INFLORT_TS = rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake-RT_DOMAIN(did)%LAKE_INFLORT_DUM
+                RT_DOMAIN(did)%LAKE_INFLORT_TS = &
+                     rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake-RT_DOMAIN(did)%LAKE_INFLORT_DUM
 
 #ifdef HYDRO_D
                 call system_clock(count=clock_count_1, count_rate=clock_rate)
@@ -866,7 +867,8 @@ contains
                 gw2d(did)%ho = gw2d(did)%h
 
 ! put surface exceeding groundwater to surface routing inflow
-                rt_domain(did)%overland%control%surface_water_head_routing = rt_domain(did)%overland%control%surface_water_head_routing &
+                rt_domain(did)%overland%control%surface_water_head_routing = &
+                     rt_domain(did)%overland%control%surface_water_head_routing &
                     + gw2d(did)%excess*1000. ! convert to mm
 
 ! aggregate  qsgw from routing to lsm grid
@@ -909,8 +911,10 @@ contains
             if(nlst(did)%UDMP_OPT .eq. 1) then
 !!! for user defined Reach based Routing method.
 
-                call drive_CHANNEL_RSL(did, nlst(did)%UDMP_OPT,RT_DOMAIN(did)%timestep_flag, RT_DOMAIN(did)%IXRT,RT_DOMAIN(did)%JXRT,  &
-                    RT_DOMAIN(did)%LAKE_INFLORT_TS, RT_DOMAIN(did)%QSTRMVOLRT_TS, RT_DOMAIN(did)%TO_NODE, RT_DOMAIN(did)%FROM_NODE, &
+                call drive_CHANNEL_RSL(did, nlst(did)%UDMP_OPT,RT_DOMAIN(did)%timestep_flag, &
+                    RT_DOMAIN(did)%IXRT,RT_DOMAIN(did)%JXRT,  &
+                    RT_DOMAIN(did)%LAKE_INFLORT_TS, RT_DOMAIN(did)%QSTRMVOLRT_TS, &
+                    RT_DOMAIN(did)%TO_NODE, RT_DOMAIN(did)%FROM_NODE, &
                     RT_DOMAIN(did)%TYPEL, RT_DOMAIN(did)%ORDER, RT_DOMAIN(did)%MAXORDER,   RT_DOMAIN(did)%CH_LNKRT, &
                     rt_domain(did)%overland%streams_and_lakes%lake_mask, nlst(did)%DT, nlst(did)%DTCT, nlst(did)%DTRT_CH, &
                     RT_DOMAIN(did)%MUSK, RT_DOMAIN(did)%MUSX, RT_DOMAIN(did)%QLINK, &
@@ -1146,16 +1150,20 @@ contains
 !!!yw added for debug
                             if(rt_domain(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT) .lt. 0) then
 #ifndef NCEP_WCOSS
-                                print*, "Error negative SMCRT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
+                                print*, "Error negative SMCRT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), &
+                                     RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
 #else
-                                write(78,*) "WARNING: negative SMCRT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
+                                write(78,*) "WARNING: negative SMCRT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), &
+                                     RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
 #endif
                             endif
                             if(RT_DOMAIN(did)%SH2OWGT(IXXRT,JYYRT,KRT) .lt. 0) then
 #ifndef NCEP_WCOSS
-                                print *, "Error negative SH2OWGT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
+                                print *, "Error negative SH2OWGT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), &
+                                     RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
 #else
-                                write(78,*) "WARNING: negative SH2OWGT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
+                                write(78,*) "WARNING: negative SH2OWGT", rt_domain(did)%SH2OWGT(IXXRT,JYYRT,KRT), &
+                                     RT_DOMAIN(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT),RT_DOMAIN(did)%SH2OX(I,J,KRT)
 #endif
                             endif
 
@@ -1622,7 +1630,9 @@ contains
         if(nlst(did)%rstrt_swc.eq.1) then  !Switch for reset of restart accum vars...
             print *, "Resetting RESTART Accumulation Variables to 0...",nlst(did)%rstrt_swc
 ! Under channel-only , these first three variables are not allocated.
-            if(allocated(rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake))    rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake = zeroFlt
+            if(allocated(rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake)) &
+                 rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake = zeroFlt
+
             if(allocated(rt_domain(did)%QSTRMVOLRT_ACC))  rt_domain(did)%QSTRMVOLRT_ACC   = zeroFlt
 ! These variables are optionally allocated, if their output is requested.
             if(allocated(rt_domain(did)%accSfcLatRunoff)) rt_domain(did)%accSfcLatRunoff = zeroDbl
@@ -1674,7 +1684,8 @@ contains
             endif
         endif
 
-        where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater .or. RT_DOMAIN(did)%VEGTYP == rt_domain(did)%islake) soltyp = rt_domain(did)%isoilwater
+        where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater .or. &
+             RT_DOMAIN(did)%VEGTYP == rt_domain(did)%islake) soltyp = rt_domain(did)%isoilwater
         where(soltyp == rt_domain(did)%isoilwater) RT_DOMAIN(did)%VEGTYP = rt_domain(did)%iswater
 
 ! LKSAT,
@@ -1689,7 +1700,8 @@ contains
 
         rt_domain(did)%subsurface%properties%sldpth(1) = abs( RT_DOMAIN(did)%subsurface%properties%zsoil(1) )
         do i = 2, nlst(did)%nsoil
-            rt_domain(did)%subsurface%properties%sldpth(i) = RT_DOMAIN(did)%subsurface%properties%zsoil(i-1)-RT_DOMAIN(did)%subsurface%properties%zsoil(i)
+            rt_domain(did)%subsurface%properties%sldpth(i) = &
+                 RT_DOMAIN(did)%subsurface%properties%zsoil(i-1)-RT_DOMAIN(did)%subsurface%properties%zsoil(i)
         enddo
         rt_domain(did)%subsurface%properties%soldeprt = -1.0*RT_DOMAIN(did)%subsurface%properties%zsoil(nlst(did)%NSOIL)
 
