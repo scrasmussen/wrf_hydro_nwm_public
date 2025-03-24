@@ -1,8 +1,12 @@
 !#### This is a module for parallel Land model.
 MODULE MODULE_MPP_LAND
-
    use MODULE_CPL_LAND
-   use mpi
+   use mpi, only: MPI_Comm_rank, MPI_Comm_size, MPI_Cart_create, MPI_Comm_dup, &
+        MPI_Send, MPI_Recv, MPI_Scatterv, MPI_Gatherv, &
+        MPI_Cart_get, MPI_Initialized, MPI_Init_thread, MPI_Bcast
+   use mpi, only: MPI_STATUS_SIZE, MPI_COMM_WORLD, MPI_THREAD_FUNNELED, MPI_REAL, &
+        MPI_DOUBLE_PRECISION, MPI_INTEGER, MPI_INTEGER8, MPI_REAL8, &
+        MPI_CHARACTER
    use iso_fortran_env, only: int64
 
    IMPLICIT NONE
