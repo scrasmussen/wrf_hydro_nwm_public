@@ -200,7 +200,9 @@ message("WRF_HYDRO_CREATE_EXE_SYMLINK = " ${WRF_HYDRO_CREATE_EXE_SYMLINK} )
 message("=============================================================")
 
 #set compile flags based on compiler id
-if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
+if (MPAS-Hydro)
+  message("MPAS-Hydro CMAKE_Fortran_FLAGS = ${CMAKE_Fortran_FLAGS}")
+elseif (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
         # set compile flags for gfortran
         message( "-- Using gfortran")
         set(CMAKE_Fortran_FLAGS "-cpp -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4")
