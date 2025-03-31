@@ -1,6 +1,7 @@
 # Standalone WRF-Hydro Build Instructions
 Details regarding the model as well as documentation and user guides can be
-found on the project website:
+found in the documentation or project website:
+https://wrf-hydro.readthedocs.io/en/latest/
 https://ral.ucar.edu/projects/wrf_hydro
 
 ## Requirements
@@ -26,9 +27,9 @@ Download and unpack the source code and navigate to the directory where you
 will compile the code:
 
 ```
-$ wget https://github.com/NCAR/wrf_hydro_nwm_public/archive/refs/tags/v5.3.0.tar.gz
-$ tar zxf v5.3.0.tar.gz
-$ cd wrf_hydro_nwm_public-5.3.0/src
+$ wget https://github.com/NCAR/wrf_hydro_nwm_public/archive/refs/tags/v5.4.0.tar.gz
+$ tar zxf v5.4.0.tar.gz
+$ cd wrf_hydro_nwm_public-5.4.0/src
 ```
 
 2. Compile using CMake
