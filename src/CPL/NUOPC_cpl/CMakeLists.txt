@@ -28,6 +28,7 @@ list(APPEND wrfhydro_nuopc_linklibs
   hydro_routing_subsurface
   hydro_data_rec
   hydro_routing
+  hydro_routing_diversions
   hydro_routing_reservoirs_levelpool
   hydro_routing_reservoirs_hybrid
   hydro_routing_reservoirs_rfc
@@ -35,6 +36,7 @@ list(APPEND wrfhydro_nuopc_linklibs
   hydro_driver
   hydro_orchestrator
   hydro_netcdf_layer
+  fortglob
 )
 if (WRF_HYDRO_NUDGING STREQUAL "1")
   list(APPEND wrfhydro_nuopc_linklibs
@@ -61,4 +63,3 @@ install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
 install(EXPORT wrfhydro-config
   DESTINATION lib/cmake
 )
-
