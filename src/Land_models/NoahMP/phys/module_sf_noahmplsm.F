@@ -1492,7 +1492,8 @@ ENDIF   ! CROPTYPE == 0
         DO IZ = 1,NSOIL
           END_WB = END_WB + SMC(IZ) * DZSNSO(IZ) * 1000.
         END DO
-        ERRWAT = END_WB-BEG_WB-(PRCP+MODEXCESS*1000./3600-ECAN-ETRAN-EDIR-RUNSRF-RUNSUB)*DT
+        ERRWAT = END_WB-BEG_WB-(PRCP+MODEXCESS*1000./3600.0-ECAN-ETRAN-EDIR-RUNSRF-RUNSUB)*DT
+        ! ERRWAT = END_WB-BEG_WB-(PRCP+MODEXCESS*1000./DT-ECAN-ETRAN-EDIR-RUNSRF-RUNSUB)*DT
 
 #ifndef WRF_HYDRO
         IF(ABS(ERRWAT) > 0.1) THEN
@@ -7048,6 +7049,8 @@ ENDIF   ! CROPTYPE == 0
           NITER = NITER*2
        END IF
 !    END IF
+    ! Farshid increased NITER 
+    ! NITER = NITER*2
 
     DTFINE  = DT / NITER
 
@@ -7069,9 +7072,9 @@ ENDIF   ! CROPTYPE == 0
 
        CALL SRT   (parameters,NSOIL  ,ZSOIL  ,DTFINE ,PDDUM  ,ETRANI , & !in
                    QSEVA  ,SH2O   ,SMC    ,ZWT    ,FCR    , & !in
-                   SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD ,         & !in
+                   SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD , MODEXCESS,        & !in
                    RHSTT  ,AI     ,BI     ,CI     ,QDRAIN , & !out
-                   WCND   )                                   !out
+                   WCND)!, MODEXCESS)                                   !out
 
        CALL SSTEP (parameters,NSOIL  ,NSNOW  ,DTFINE ,ZSOIL  ,DZSNSO , & !in
                    SICE   ,ILOC   ,JLOC   ,ZWT            ,                 & !in
@@ -7317,9 +7320,9 @@ ENDIF   ! CROPTYPE == 0
 
   SUBROUTINE SRT (parameters,NSOIL  ,ZSOIL  ,DT     ,PDDUM  ,ETRANI , & !in
                   QSEVA  ,SH2O   ,SMC    ,ZWT    ,FCR    , & !in
-                  SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD ,         & !in
+                  SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD , MODEXCESS,        & !in
                   RHSTT  ,AI     ,BI     ,CI     ,QDRAIN , & !out
-                  WCND   )                                   !out
+                  WCND)!, MODEXCESS)                                   !out
 ! ----------------------------------------------------------------------
 ! calculate the right hand side of the time tendency term of the soil
 ! water diffusion equation.  also to compute ( prepare ) the matrix
@@ -7345,7 +7348,7 @@ ENDIF   ! CROPTYPE == 0
     REAL, INTENT(IN)                      :: FCRMAX !maximum of FCR (-)
     REAL,                     INTENT(IN)  :: SICEMAX!maximum soil ice content (m3/m3)
     REAL,                     INTENT(IN)  :: SMCWTD !soil moisture between bottom of the soil and the water table
-
+    REAL                    , INTENT(INOUT) :: MODEXCESS !unit is [m/hr]
 ! output
 
     REAL, DIMENSION(1:NSOIL), INTENT(OUT) :: RHSTT
@@ -7406,7 +7409,13 @@ ENDIF   ! CROPTYPE == 0
              QDRAIN   = 0.
           END IF
           IF(OPT_RUN == 3 .OR. OPT_RUN == 7) THEN
+		     ! MODEXCESS unit change [m/hr --> m/sec]
+			 ! QDRAIN can be negative here,
+             ! QDRAIN   = parameters%SLOPE*WCND(K) - MODEXCESS/3600.0
+
              QDRAIN   = parameters%SLOPE*WCND(K)
+			 IF(MODEXCESS > 0.0) QDRAIN = 0.0
+
           END IF
           IF(OPT_RUN == 4) THEN
              QDRAIN   = (1.0-FCRMAX)*WCND(K)
@@ -7422,7 +7431,12 @@ ENDIF   ! CROPTYPE == 0
              DSMDZ(K) = 2.0 * (SMX(K) - SMXBOT) / TEMP1
              QDRAIN   = WDF(K  ) * DSMDZ(K  ) + WCND(K  )
           END IF
-          WFLUX(K) = -(WDF(K-1)*DSMDZ(K-1))-WCND(K-1)+ETRANI(K) + QDRAIN
+          ! WFLUX(K) = -(WDF(K-1)*DSMDZ(K-1))-WCND(K-1)+ETRANI(K) + QDRAIN
+
+          WFLUX(K) = -(WDF(K-1)*DSMDZ(K-1))-WCND(K-1)+ETRANI(K) + QDRAIN !- MODEXCESS/3600.0
+          ! WFLUX(K) = -(WDF(K-1)*DSMDZ(K-1))-WCND(K-1)+ETRANI(K) + QDRAIN - MODEXCESS/DT ! this DT is subset of land DT=3600
+		                                                                                  ! the rate should be MODEXCESS/3600.0
+
        END IF
     END DO
 
@@ -7485,6 +7499,7 @@ ENDIF   ! CROPTYPE == 0
 
 !output
     REAL, INTENT(OUT)                       :: WPLUS     !saturation excess water (m)
+    REAL                                    :: WPLUStmp  !temporary saturation excess water (m)
     REAL, INTENT(OUT)                       :: WMINUS    !deficit from negative smc correction (m)
 
 !local
@@ -7498,6 +7513,7 @@ ENDIF   ! CROPTYPE == 0
 ! ----------------------------------------------------------------------
     WPLUS = 0.0
     WMINUS = 0.0
+	WPLUStmp = 0.0
 
     DO K = 1,NSOIL
        RHSTT (K) =   RHSTT(K) * DT
@@ -7521,10 +7537,15 @@ ENDIF   ! CROPTYPE == 0
         SH2O(K) = SH2O(K) + CI(K)
     ENDDO
 
-	! addeding excess water from MODFLOW to last layer  [m/m]
-	! better to be added to SRT difussion solver above, 
-	! that does take care of soil miosture changes internally
-	SH2O(NSOIL) = SH2O(NSOIL) + MODEXCESS/DZSNSO(NSOIL)
+	!!! addeding excess water from MODFLOW to last layer  [m/m]
+	!!! better to be added to SRT difussion solver above,
+	!!! that does take care of soil miosture changes internally
+	SH2O(NSOIL) = SH2O(NSOIL) + DT * (MODEXCESS/3600.0)/DZSNSO(NSOIL)
+	! WPLUStmp    = MAX((SH2O(NSOIL)-parameters%SMCMAX(NSOIL)), 0.0) * DZSNSO(NSOIL)
+	! SH2O(NSOIL - 1)    = SH2O(NSOIL - 1) + WPLUStmp/DZSNSO(NSOIL - 1)
+    !!! reduce fluxes at the bottom boundaries accordingly
+    ! QDRAIN = QDRAIN - WPLUStmp/DT
+	! QDRAIN = MAX(QDRAIN, 0.0)
 
 !  excessive water above saturation in a layer is moved to
 !  its unsaturated layer like in a bucket
