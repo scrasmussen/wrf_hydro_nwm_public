@@ -337,8 +337,8 @@ contains
 	iterm = 1
     do ip = 1, ngwfpack
 	   packobj => GetBndFromList(gwfmodel%bndlist, ip)
-	   print *, "gwfmodel%bndlist%Count(), ngwfpack", ngwfpack
-	   
+	   ! print *, "gwfmodel%bndlist%Count(), ngwfpack", ngwfpack
+	   ! print *, "trim(packobj%packName) ======", trim(packobj%packName)
 	   if (trim(packobj%packName) == bndName) then
 			
          print *, "iterm, ip: ", iterm, ip
@@ -356,8 +356,8 @@ contains
             idx2 = packobj%dis%get_nodeuser(idx1)
 			idx3 = packobj%dis%get_nodenumber(idx1, 0)
 
-			if (idx2 .ne. idx3) print *, "ATTENTION! get_nodeuser AND get_nodenumber ARE DIFFERENT!", &
-			                                idx2, idx3
+			! if (idx2 .ne. idx3) print *, "ATTENTION! get_nodeuser AND get_nodenumber ARE DIFFERENT!", &
+			                                ! idx2, idx3
             src_(idx2) = src(ii)
 	     end do
          src = src_
