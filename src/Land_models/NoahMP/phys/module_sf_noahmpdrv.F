@@ -77,7 +77,7 @@ CONTAINS
                  SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D,         &
 #endif
 #ifdef WRF_HYDRO
-               sfcheadrt,INFXSRT,soldrain,moddrain,ACMODDRAIN,                &
+               sfcheadrt,INFXSRT,soldrain,moddrain,ACMODDRAIN,MODDRAINout,    &
 #endif
                ids,ide,  jds,jde,  kds,kde,                    &
                ims,ime,  jms,jme,  kms,kme,                    &
@@ -202,6 +202,7 @@ CONTAINS
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  SFCRUNOFF ! accumulated surface runoff [m]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  UDRUNOFF  ! accumulated sub-surface runoff [m]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  ACMODDRAIN ! accumulated modflow MODDRAIN [m]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  MODDRAINout ! modflow MODDRAIN [m]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  ALBEDO    ! total grid albedo []
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  SNOWC     ! snow cover fraction []
     REAL,    DIMENSION( ims:ime, 1:nsoil, jms:jme ), INTENT(INOUT) ::  SMOIS     ! volumetric soil moisture [m3/m3]
@@ -1370,6 +1371,7 @@ CONTAINS
              SFCRUNOFF(I,J)                = SFCRUNOFF(I,J) + RUNSF * DT
              UDRUNOFF (I,J)                = UDRUNOFF(I,J)  + RUNSB * DT
              ACMODDRAIN(I,J)               = ACMODDRAIN(I,J) + MODEXCSS
+             MODDRAINout(I,J)              = MODEXCSS
 #ifdef WRF_HYDRO
              if(present(ACCPRCP)) ACCPRCP  (I,J)                = ACCPRCP(I,J) + PRCP * DT
              if(present(ACCECAN)) ACCECAN  (I,J)                = ACCECAN(I,J) + ECAN * DT
