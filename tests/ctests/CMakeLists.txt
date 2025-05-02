@@ -1,3 +1,8 @@
+# add Makefile target to setup test runs
+if (BMI STREQUAL "1" OR MODFLOW STREQUAL "1")
+  add_subdirectory("bmi")
+endif()
+
 # add Makefile targets to setup test runs
 # Croton Test Options: {Gridded, Gridded_no_lakes, NWM, Reach, ReachLakes}
 set(croton_testcases "gridded" "gridded_no_lakes" "nwm" "nwm_ana"
@@ -31,7 +36,7 @@ foreach(croton_testcase ${croton_testcases})
     ${CMAKE_CURRENT_SOURCE_DIR}/run_cmake_testcase.sh ${croton_testcase} ${CMAKE_BINARY_DIR} 2)
 endforeach()
 
-# generic ctests
+# --- generic ctests ---
 add_executable(fortran_ctest_should_fail
   should_fail.f90)
 add_test(NAME fortran_ctest_should_fail
