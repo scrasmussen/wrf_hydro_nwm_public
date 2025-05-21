@@ -139,6 +139,8 @@ if (HYDRO_D STREQUAL "1" )
         add_definitions(-DHYDRO_D)
 endif()
 
+message("MPAS_HYDRO = " ${MPAS_HYDRO} )
+
 # set -DWRF_HYDRO_RAPID from env
 message("WRF_HYDRO_RAPID = " ${WRF_HYDRO_RAPID} )
 if (WRF_HYDRO_RAPID STREQUAL "1" )
@@ -242,6 +244,9 @@ set(CMAKE_BINARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/mods)
+if (MPAS_HYDRO)
+  set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_INSTALL_PREFIX})
+endif()
 
 #add common include directores need in the build
 include_directories(AFTER ${PROJECT_BINARY_DIR}/mods)
