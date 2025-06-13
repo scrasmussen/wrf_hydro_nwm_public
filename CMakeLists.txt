@@ -200,6 +200,10 @@ option(BUILD_CROCUS "Build Crocus" ON)
 option(WRF_HYDRO_CREATE_EXE_SYMLINK "Create symlink wrfhydro.exe -> wrfhydro" ON)
 message("WRF_HYDRO_CREATE_EXE_SYMLINK = " ${WRF_HYDRO_CREATE_EXE_SYMLINK} )
 
+if (MODFLOW STREQUAL "1" )
+  message("MODFLOW = " ${MODFLOW} )
+endif()
+
 message("=============================================================")
 
 #set compile flags based on compiler id
