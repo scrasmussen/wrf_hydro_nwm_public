@@ -102,7 +102,6 @@ program wrf_hydro_nwm_bmi_driver
 
   call stat_check(modflow%get_var_grid("RECHARGE", rch_grid))
   call stat_check(modflow%get_grid_rank(rch_grid, rch_rank))
-
   call stat_check(modflow%get_grid_x(rch_grid, grid_x))
   call stat_check(modflow%get_grid_y(rch_grid, grid_y))
 
@@ -151,7 +150,6 @@ program wrf_hydro_nwm_bmi_driver
     soldrain_flat_daysum(:) = 0.
     soldrain_flat_daysum_flip(:) = 0.
 
-
     ! get current values
     call stat_check(modflow%get_value("X", x_flat))
     call stat_check(modflow%get_value("RECHARGE", rch_flat))
@@ -186,7 +184,6 @@ program wrf_hydro_nwm_bmi_driver
     print *, "soldrain sum of ave:      ", soldrainavesum
     print *, "soldrain_flat_daysum ave: ", &
          SUM(soldrain_flat_daysum)/size(soldrain_flat_daysum)
-
     print *, "****************************************"
     print *, " "
 
