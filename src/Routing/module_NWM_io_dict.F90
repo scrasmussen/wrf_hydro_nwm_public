@@ -1326,7 +1326,6 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             40,40,40, &             !111-113
                             40,1,1]                 !114-116
    ldasOutDict%numLev(107:116) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
->>>>>>> new-feature/bmi-domain-decomp-2025
 
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10

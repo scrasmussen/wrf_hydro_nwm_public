@@ -99,9 +99,6 @@ add_dependencies(hydro_data_rec
 )
 add_library(wrfhydro_lib INTERFACE)
 
-
-add_library(wrfhydro_lib INTERFACE)
-
 if (HYDRO_LSM MATCHES "NoahMP")
         message("-- Building NoahMP LSM")
         add_subdirectory("Land_models/NoahMP")
