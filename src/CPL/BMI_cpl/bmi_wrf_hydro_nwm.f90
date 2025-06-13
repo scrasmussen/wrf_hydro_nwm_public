@@ -455,7 +455,7 @@ contains
 
   ! Perform teardown tasks for the model.
   module procedure wrf_hydro_finalize
-    ! use module_hydro_drv!, only : hydro_finish
+    use module_hydro_drv, only : hydro_finish
     call hydro_finish()
     bmi_status = BMI_SUCCESS
   end procedure ! wrf_hydro_finalize

@@ -30,10 +30,10 @@ target_link_libraries(bmi_wrf_hydro_nwm_bind_c
   module_NoahMP_hrldas)
 
 # setup WRF-Hydro BMI Fortran driver
-add_executable(wrf_hydro_bmi.exe
+add_executable(wrf_hydro_bmi
   wrf_hydro_nwm_bmi_driver.f90)
 
-target_link_libraries(wrf_hydro_bmi.exe
+target_link_libraries(wrf_hydro_bmi
   bmi_wrf_hydro_nwm)
 
 # setup WRF-Hydro BMI Python driver
@@ -42,14 +42,6 @@ file(CREATE_LINK
   "${CMAKE_BINARY_DIR}/Run/wrf_hydro_bmi.py"
   SYMBOLIC)
 
-# <<<<<<< Updated upstream
-# # setup WRF-Hydro BMI C++ driver
-# add_executable(wrf_hydro_bmi_cpp.exe
-#   wrf_hydro_nwm_bmi_driver.cpp)
-
-# target_link_libraries(wrf_hydro_bmi_cpp.exe
-#   bmi_wrf_hydro_nwm_bind_c)
-# =======
 # setup WRF-Hydro BMI Python driver
 file(CREATE_LINK
   "${CMAKE_CURRENT_SOURCE_DIR}/wrf_hydro_nwm_modflow6_bmi_driver.py"
@@ -59,16 +51,15 @@ file(CREATE_LINK
 #
 # link_directories(bmi_wrf_hydro_nwm_bind_c ${CMAKE_BINARY_DIR}/lib )
 # setup WRF-Hydro BMI C driver
-# add_executable(wrf_hydro_bmi_c.exe
+# add_executable(wrf_hydro_bmi_c
 #   wrf_hydro_nwm_bmi_driver.c)
 
-# target_link_libraries(wrf_hydro_bmi_c.exe
+# target_link_libraries(wrf_hydro_bmi_c
 #   bmi_wrf_hydro_nwm_bind_c)
 
 # setup WRF-Hydro BMI C++ driver
-# add_executable(wrf_hydro_bmi_cpp.exe
+# add_executable(wrf_hydro_bmi_cpp
 #   wrf_hydro_nwm_bmi_driver.cpp)
 
-# target_link_libraries(wrf_hydro_bmi_cpp.exe
+# target_link_libraries(wrf_hydro_bmi_cpp
 #   bmi_wrf_hydro_nwm_bind_c)
-# >>>>>>> Stashed changes

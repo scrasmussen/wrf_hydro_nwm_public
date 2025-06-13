@@ -1528,8 +1528,8 @@ module module_NoahMP_hrldas_driver
    etpnd     = 0.0
    soldrain  = 0.0
    ! moddrain  = 0.0
-   moddrain  = MODDRAINout   
-   
+   moddrain  = MODDRAINout
+
    allocate(zsoil (NSOIL))
    zsoil = 0
 

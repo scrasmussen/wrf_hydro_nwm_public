@@ -15,17 +15,17 @@ target_link_libraries(bmi_modflow
   modflow)
 
 # setup WRF-Hydro BMI Fortran drivers
-add_executable(modflow_hello_world.exe
+add_executable(modflow_hello_world
   wrf_hydro_nwm_modflow6_hello_world.f90)
-target_link_libraries(modflow_hello_world.exe
+target_link_libraries(modflow_hello_world
   bmi_wrf_hydro_nwm
   bmi_modflow
   modflow
   ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(wrf_hydro-modflow-driver.exe
+add_executable(wrf_hydro-modflow-driver
   wrf_hydro_nwm_modflow6_driver.f90)
-target_link_libraries(wrf_hydro-modflow-driver.exe
+target_link_libraries(wrf_hydro-modflow-driver
   bmi_wrf_hydro_nwm
   bmi_modflow
   modflow
@@ -35,14 +35,14 @@ target_include_directories(bmi_modflow
   PUBLIC ${modflow_lib_dir}/libmf6.so.p/
   ${modflow_lib_dir}/../src/libmf6core.a.p/
   )
-# target_include_directories(wrf_hydro_modflow.exe
+# target_include_directories(wrf_hydro_modflow
 #   PUBLIC ${modflow_lib_dir}/libmf6.so.p/)
 
 
 
-# add_executable(wrf_hydro_modflow.exe
+# add_executable(wrf_hydro_modflow
 #   wrf_hydro_nwm_modflow6.f90)
-# target_link_libraries(wrf_hydro_modflow.exe
+# target_link_libraries(wrf_hydro_modflow
 #   bmi_wrf_hydro_nwm
 #   bmi_modflow
 #   modflow
@@ -50,7 +50,7 @@ target_include_directories(bmi_modflow
 
 
 
-# target_link_libraries(wrf_hydro_modflow.exe
+# target_link_libraries(wrf_hydro_modflow
 #   Threads::Threads)
-# target_link_libraries(wrf_hydro_modflow.exe
+# target_link_libraries(wrf_hydro_modflow
 #   /lib64/libpthread.so.0)

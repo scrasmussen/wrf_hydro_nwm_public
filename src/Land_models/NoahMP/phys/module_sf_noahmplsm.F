@@ -499,7 +499,7 @@ contains
   REAL,                            INTENT(INOUT) :: DEEPRECH !recharge to or from the water table when deep [m]
   REAL,                            INTENT(INOUT) :: RECH !recharge to or from the water table when shallow [m] (diagnostic)
   REAL,                            INTENT(INOUT) :: MODEXCESS ! MODFLOW Excess saturation [mm?] input is in m/hour
-  
+
 ! output
   REAL                           , INTENT(OUT)   :: Z0WRF  !combined z0 sent to coupled model
   REAL                           , INTENT(OUT)   :: FSA    !total absorbed solar radiation (w/m2)
@@ -7029,7 +7029,7 @@ ENDIF   ! CROPTYPE == 0
           NITER = NITER*2
        END IF
 !    END IF
-    ! Farshid increased NITER 
+    ! Farshid increased NITER
     ! NITER = NITER*2
 
     DTFINE  = DT / NITER
@@ -7517,15 +7517,10 @@ ENDIF   ! CROPTYPE == 0
         SH2O(K) = SH2O(K) + CI(K)
     ENDDO
 
-	!!! addeding excess water from MODFLOW to last layer  [m/m]
-	!!! better to be added to SRT difussion solver above,
-	!!! that does take care of soil miosture changes internally
-	SH2O(NSOIL) = SH2O(NSOIL) + DT * (MODEXCESS/3600.0)/DZSNSO(NSOIL)
-	! WPLUStmp    = MAX((SH2O(NSOIL)-parameters%SMCMAX(NSOIL)), 0.0) * DZSNSO(NSOIL)
-	! SH2O(NSOIL - 1)    = SH2O(NSOIL - 1) + WPLUStmp/DZSNSO(NSOIL - 1)
-    !!! reduce fluxes at the bottom boundaries accordingly
-    ! QDRAIN = QDRAIN - WPLUStmp/DT
-	! QDRAIN = MAX(QDRAIN, 0.0)
+    ! addeding excess water from MODFLOW to last layer  [m/m]
+    ! better to be added to SRT difussion solver above,
+    ! that does take care of soil miosture changes internally
+    SH2O(NSOIL) = SH2O(NSOIL) + DT * (MODEXCESS/3600.0)/DZSNSO(NSOIL)
 
 !  excessive water above saturation in a layer is moved to
 !  its unsaturated layer like in a bucket
@@ -7579,7 +7574,6 @@ ENDIF   ! CROPTYPE == 0
    END IF
 
    ! I added (NO NEED: WPLUS WOULD BE ADDED TO SURF RUNOFF AFTER SSTEP)
-   
    ! IF(WPLUS > 0.0) QDRAIN = QDRAIN + WPLUS/DT
 
    ! Negative soil moisture check

@@ -20,5 +20,7 @@ add_library(hydro_utils STATIC
 )
 
 target_link_libraries(hydro_utils PRIVATE MPI::MPI_Fortran)
+# target_link_libraries(hydro_utils
+#   hydro_mpp)
 
 add_subdirectory(fortglob)
