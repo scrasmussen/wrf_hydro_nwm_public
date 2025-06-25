@@ -25,6 +25,7 @@ module module_lsm_forcing
 #endif
     use module_HYDRO_io, only: get_2d_netcdf, get_soilcat_netcdf, get2d_int
     use module_hydro_stop, only:HYDRO_stop
+	use config_base, only: wrf_hydro, noah_lsm
     use netcdf
 
 implicit none
@@ -923,7 +924,7 @@ Contains
 
 
 
- subroutine read_hydro_forcing_seq( &
+ subroutine read_hydro_forcing_seq(noah_lsm, &
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  &
        forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -931,7 +932,9 @@ Contains
        T2,q2x,u,v,pres,xlong,short,prcp1,&
        lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
+   use NoahmpIOVarType, only: NoahmpIO_type
    implicit none
+   type(NoahmpIO_type), intent(inout)    :: noah_lsm
    ! in variable
    character(len=*) :: olddate,hgrid,indir
    character(len=256) :: filename
@@ -970,7 +973,7 @@ Contains
 
         inquire (file=trim(inflnm), exist=fexist)
         if ( .not. fexist ) then
-           print*, "no forcing data found", inflnm
+           print*, "no forcing data found1", inflnm
            call hydro_stop("In read_hydro_forcing_seq")
         endif
 
@@ -993,8 +996,8 @@ Contains
              out_date(15:16)//".LDASIN_DOMAIN"//hgrid
         inquire (file=trim(inflnm), exist=fexist)
         if ( .not. fexist ) then
-           print*, "no forcing data found", inflnm
-           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
+           print*, "no forcing data found2", inflnm
+           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found3")
         endif
         CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE, &
              forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -1017,8 +1020,8 @@ Contains
 
         inquire (file=trim(inflnm), exist=fexist)
         if ( .not. fexist ) then
-           print*, "no forcing data found", inflnm
-           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
+           print*, "no forcing data found4", inflnm
+           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found5")
         endif
 
         do i_forcing = 1, int(24*3600/dt)
@@ -1259,7 +1262,7 @@ Contains
 
         if ( .not. fexist ) then
 #ifdef HYDRO_D
-           print*, "no forcing data found", inflnm
+           print*, "no forcing data found6", inflnm
 #endif
         else
            do i_forcing = 1, int(24*3600/dt)
@@ -1771,8 +1774,10 @@ Contains
        lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 
-
+   ! use NoahmpIOVarType, only: NoahmpIO_type
    implicit none
+   ! type(NoahmpIO_type), intent(inout)    :: noah_lsm
+
    ! in variable
    character(len=*) :: olddate,hgrid,indir
    character(len=256) :: filename
@@ -1817,7 +1822,7 @@ Contains
 
 
    if(my_id .eq. IO_id) then
-      call read_hydro_forcing_seq( &
+      call read_hydro_forcing_seq(noah_lsm, &
         indir,olddate,hgrid,&
         global_nx,global_ny,forc_typ,snow_assim,  &
         forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -2310,7 +2315,7 @@ Contains
   end subroutine geth_newdate
 
 
-subroutine read_hydro_forcing_mpp1( &
+subroutine read_hydro_forcing_mpp1(noah_lsm, &
      indir,olddate,hgrid, &
      ix,jx,forc_typ,snow_assim,  &
      forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -2318,7 +2323,12 @@ subroutine read_hydro_forcing_mpp1( &
      T2,q2x,u,v,pres,xlong,short,prcp1,&
      lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
+use NoahmpIOVarType, only: NoahmpIO_type
+
 implicit none
+
+type(NoahmpIO_type), intent(inout)    :: noah_lsm
+
 ! in variable
 character(len=*) :: olddate,hgrid,indir
 character(len=256) :: filename
@@ -2333,9 +2343,12 @@ character(len=256), intent(in)  :: forcing_name_SW
 character(len=256), intent(in)  :: forcing_name_PR
 character(len=256), intent(in)  :: forcing_name_SN
 character(len=256), intent(in)  :: forcing_name_LF
+! real, intent(in) ::  dt 
+integer, intent(in) ::  dt
+integer ::  dt1
 real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
      prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
-real ::  dt, wrf_dt
+real ::  wrf_dt
 ! tmp variable
 character(len=256) :: inflnm, inflnm2, product
 integer  :: i,j,mmflag,ierr_flg
@@ -2353,20 +2366,39 @@ inflnm = trim(indir)//"/"//&
 
 !!! FORC_TYPE 1 ============================================================================
 if(FORC_TYP.eq.1) then
+   ! print*, "FF out_date (before): ", out_date
+   ! print*, "FF olddate  (before):  ", olddate
+   ! print*, "FF nint(dt) (before): ", nint(dt)
+   ! print*, "FF noah_lsm%FORCING_TIMESTEP: ", noah_lsm%FORCING_TIMESTEP
+   ! print*, "k           (before): ", k
    !!Create forcing data filename...
-   call geth_newdate(out_date,olddate,nint(dt))
-   inflnm = trim(indir)//"/"//&
+   ! call geth_newdate(out_date,olddate,nint(dt))
+   dt1 = noah_lsm%FORCING_TIMESTEP
+   ! dt = noah_lsm%FORCING_TIMESTEP
+   call geth_newdate(out_date,olddate,dt1)
+   ! print*, "FF out_date: ", out_date
+   ! print*, "FF olddate:  ", olddate
+   print*, "FF dt  : ", dt
+   print*, "FF dt1 : ", dt1
+   print*, "k      : ", k
+   ! print*, "trim(indir)", trim(indir)
+   ! print*, "trim(noah_lsm%indir)", trim(noah_lsm%indir)
+   ! inflnm = trim(indir)//"/"//&
+        ! out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
+        ! ".LDASIN_DOMAIN"//hgrid
+   inflnm = trim(noah_lsm%indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         ".LDASIN_DOMAIN"//hgrid
 
    inquire (file=trim(inflnm), exist=fexist)
-
+   ! print*, "FF fexist before", fexist, trim(inflnm)
 #ifdef MPP_LAND
    call mpp_land_bcast_logical(fexist)
 #endif
+   ! print*, "FF fexist after", fexist, inflnm
    if ( .not. fexist ) then
-      print*, "no forcing data found", inflnm
-      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
+      print*, "no forcing data found7", inflnm
+      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found8")
    endif
 
 #ifdef HYDRO_D
@@ -2389,7 +2421,7 @@ end if
 if(FORC_TYP.eq.2) then
 
 !!Create forcing data filename...
-   call geth_newdate(out_date,olddate,nint(dt))
+   call geth_newdate(out_date,olddate,dt1)!nint(dt))
    inflnm = trim(indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         out_date(15:16)//".LDASIN_DOMAIN"//hgrid
@@ -2398,8 +2430,8 @@ if(FORC_TYP.eq.2) then
    call mpp_land_bcast_logical(fexist)
 #endif
    if ( .not. fexist ) then
-      print*, "no forcing data found", inflnm
-      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
+      print*, "no forcing data found9", inflnm
+      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found10")
    endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,&
         forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -2427,12 +2459,12 @@ if(FORC_TYP.eq.3) then
    call mpp_land_bcast_logical(fexist)
 #endif
    if ( .not. fexist ) then
-      print*, "no forcing data found", inflnm
+      print*, "no forcing data found11", inflnm
       call hydro_stop("read_hydro_forcing_seq")
    endif
 
-   do i_forcing = 1, int(24*3600/dt)
-      wrf_dt = i_forcing*dt
+   do i_forcing = 1, int(24*3600/dt1)
+      wrf_dt = i_forcing*dt1
       call geth_newdate(out_date,olddate,nint(wrf_dt))
       inflnm2 = trim(indir)//"/"//&
            "wrfout_d0"//hgrid//"_"//&
@@ -2534,7 +2566,7 @@ if(FORC_TYP.eq.5) then
    if (ierr_flg.eq.0) then   ! use spec. precip
       !Convert units if necessary
       if (mmflag.eq.0) then    !Convert pcp grid to units of mm/s...
-         PRCP1=PRCP2/DT     !convert from mm to mm/s
+         PRCP1=PRCP2/dt1     !convert from mm to mm/s
 #ifdef HYDRO_D
          print*, "Supplemental pcp is accumulated pcp/dt. "
 #endif
@@ -2574,8 +2606,8 @@ if(FORC_TYP.eq.6) then
 #ifdef MPP_LAND
    if(my_id .eq. io_id) then
 #endif
-      do i_forcing = 1, nint(3600*12/dt)
-         call geth_newdate(out_date,olddate,nint(dt*i_forcing))
+      do i_forcing = 1, 3600*12/dt1 !nint(3600*12/dt)
+         call geth_newdate(out_date,olddate,dt1*i_forcing) !nint(dt*i_forcing))
          inflnm = trim(indir)//"/"//&
               out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
               ".LDASIN_DOMAIN"//hgrid
@@ -2593,8 +2625,8 @@ if(FORC_TYP.eq.6) then
 #ifdef MPP_LAND
       if(my_id .eq. io_id) then
 #endif
-         do i_forcing = 1, nint(3600*12/dt)
-            call geth_newdate(out_date,olddate,nint(dt*i_forcing))
+         do i_forcing = 1, 3600*12/dt1 ! nint(3600*12/dt)
+            call geth_newdate(out_date,olddate,dt1*i_forcing) !nint(dt*i_forcing))
             inflnm = trim(indir)//"/"//&
                  out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
                  out_date(15:16)//".LDASIN_DOMAIN"//hgrid
@@ -2630,7 +2662,7 @@ if(FORC_TYP.eq.6) then
    !Get specified precip....
    !VIP, dimensions of grid are currently hardwired in input subroutine!!!
    !!Create forcing data filename...
-   call geth_newdate(out_date,olddate,nint(dt))
+   call geth_newdate(out_date,olddate,dt1) !nint(dt))
    inflnm = trim(indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         out_date(15:16)//".PRECIP_FORCING.nc"
@@ -2661,7 +2693,7 @@ if(FORC_TYP.eq.6) then
       else
          PRCP1=PRCP2   !assumes PRCP2 is in mm/s
          if (mmflag.eq.0) then    !Convert pcp grid to units of mm/s...
-            PRCP1=PRCP2/DT     !convert from mm to mm/s
+            PRCP1=PRCP2/dt1     !convert from mm to mm/s
          end if  ! Endif mmflag
 #ifdef HYDRO_D
          if(my_id .eq. io_id) then
@@ -2705,7 +2737,7 @@ if(FORC_TYP.eq.7) then
 
    if ( .not. fexist ) then
 #ifdef HYDRO_D
-      print*, "no forcing data found", inflnm
+      print*, "no forcing data found12", inflnm
 #endif
    else
       do i_forcing = 1, int(24*3600/dt)
