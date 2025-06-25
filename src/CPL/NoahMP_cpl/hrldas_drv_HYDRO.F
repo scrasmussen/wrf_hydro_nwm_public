@@ -72,7 +72,7 @@
              call open_print_mpp(6)
        end subroutine hrldas_drv_HYDRO_ini
 
-       subroutine HYDRO_frocing_drv (indir,forc_typ, snow_assim,olddate,     &
+       subroutine HYDRO_frocing_drv (noah_lsm, indir,forc_typ, snow_assim,olddate,     &
           ixs, ixe,jxs,jxe,                       &
           forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
           forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
@@ -80,7 +80,12 @@
 
          use module_lsm_forcing, only: read_hydro_forcing
          use config_base, only: nlst
+		 use config_base, only: wrf_hydro!, noah_lsm
+		 use NoahmpIOVarType, only: NoahmpIO_type
          implicit none
+		 
+		 type(NoahmpIO_type), intent(inout)    :: noah_lsm
+		 
          integer did, ixs,ixe,jxs,jxe
          integer ix,jx, kt
          character(len=19) :: olddate
@@ -95,22 +100,25 @@
          character(len=256), intent(in)  :: forcing_name_PR
          character(len=256), intent(in)  :: forcing_name_SN
          character(len=256), intent(in)  :: forcing_name_LF
+		 ! real, intent(in)                :: FORCING_TIMESTEP
+		 integer                :: FORCING_TIMESTEP
          real, dimension(ixs:ixe,jxs:jxe):: T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1, &
                  lai, snowbl, fpar, snodep, pcp_old
-         integer :: forc_typ, snow_assim, FORCING_TIMESTEP
+         integer :: forc_typ, snow_assim
+
 
          ix = ixe-ixs+1
          jx = jxe-jxs+1
          did = 1
-
-         call read_hydro_forcing( &
+         write(*,*) "kt, FORCING_TIMESTEP", kt, FORCING_TIMESTEP
+         call read_hydro_forcing(noah_lsm, &
             indir, olddate, &
             nlst(did)%hgrid,&
             ix,jx,forc_typ,snow_assim,  &
             forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
             forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
             T2,q2x,u,v,pres,xlong,short,prcp1,&
-            lai,snowbl,fpar,snodep,FORCING_TIMESTEP*1.0,kt, pcp_old)
+            lai,snowbl,fpar,snodep,FORCING_TIMESTEP,kt, pcp_old)
        end subroutine HYDRO_frocing_drv
 
        subroutine get_greenfrac(inFile,greenfrac, idim, jdim, olddate,SHDMAX)
