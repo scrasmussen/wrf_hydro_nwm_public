@@ -288,13 +288,14 @@ project directory.
 .. code-block:: console
 
   git clone https://github.com/NCAR/wrf_hydro_nwm_public.git
-  git clone --recurse-submodule --branch v4.6.1 https://github.com/wrf-model/WRF.git
+  git clone --recurse-submodule --branch v4.7.1 https://github.com/wrf-model/WRF.git
   git clone --branch v4.6.0 https://github.com/wrf-model/WPS.git
-  wget https://github.com/NCAR/wrf_hydro_nwm_public/releases/download/v5.4.0/croton_NY_training_example_v5.4.tar.gz
+  wget https://github.com/NCAR/wrf_hydro_nwm_public/releases/download/v5.4.0/front_range_CO_example_testcase_coupled.tar.gz
 
 4. Copy the uncompressed WPS geographic data into the WPS directory.
 5. Copy the uncompressed coupled example case into the project directory.
-6. Your project directory structure will look like the following:
+6. Create a `run` directory with `WPS` and `WRF` directories in it.
+7. Your project directory structure will look like the following:
 
 .. code-block:: console
 
@@ -341,7 +342,7 @@ with the updated version you just downloaded
 
 .. code-block:: console
 
-  module load ncarenv gcc ncarcompilers cray-mpich craype
+  module load ncarenv gcc openmpi netcdf cmake
 
 
 
