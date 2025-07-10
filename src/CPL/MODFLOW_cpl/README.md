@@ -92,3 +92,33 @@ $ cd build
 $ cmake .. -DMODFLOW=1
 $ make -j 4
 ```
+
+### Prepare parallel case
+Do domain decomposition on a serial MODFLOW domain to prepare for parallel
+runs.
+The dependencies of the `create_modflow_domain_decomposition.py` tool are
+listed in `environment.yml`.
+
+The tool will take the MODFLOW domain from the current directory and write
+the new domain in the `split_domain_${np}np` directory.
+The variable `np` is the number of processors the case will be run on and
+is provided as a command line argument.
+
+```
+$ ./create_modflow_domain_decomposition.py -np 4
+```
+
+### Run
+```
+$ mpiexec -np 4 ./wrf_hydro-modflow-driver
+```
+
+#### NetCDF Output
+In the `*.nam` files there is [an option](https://modflow6.readthedocs.io/en/latest/_mf6io/gwf-nam.html)
+to enable NetCF output.
+
+```
+BEGIN options
+  NETCDF_STRUCTURE FILEOUT modflow_subset_4.nc
+END options
+```

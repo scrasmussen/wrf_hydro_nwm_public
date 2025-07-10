@@ -1,16 +1,26 @@
 #!/usr/bin/python3
 import ctypes as ct
 import numpy as np
+import os
 import sys
 if sys.version_info.major == 2:
     raise RuntimeError("wrf-hydro-tools requires Python 3 or higher.")
 
-bind_c_lib_path_1='../../../../build/lib/libwrf_hydro_tools_bind_c.so'
-bind_c_lib_path_2='../lib/libwrf_hydro_tools_bind_c.so'
-try:
+# Get the absolute directory of this script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Resolve paths to shared libraries relative to this script
+bind_c_lib_path_1 = os.path.abspath(os.path.join(script_dir, '../../../build/lib/libwrf_hydro_tools_bind_c.so'))
+bind_c_lib_path_2 = os.path.abspath(os.path.join(script_dir, '../lib/libwrf_hydro_tools_bind_c.so'))
+
+# Optionally: Try loading one of them
+if os.path.exists(bind_c_lib_path_1):
     wrf_h_tools = ct.CDLL(bind_c_lib_path_1)
-except:
+elif os.path.exists(bind_c_lib_path_2):
     wrf_h_tools = ct.CDLL(bind_c_lib_path_2)
+else:
+    raise FileNotFoundError("Could not find the C library. Library needs to be in CMake 'build' directory")
+
 
 # ---------------------------------
 # --- Calling Fortran Functions ---

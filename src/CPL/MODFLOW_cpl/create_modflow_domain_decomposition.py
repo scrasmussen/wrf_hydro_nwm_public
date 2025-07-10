@@ -1,7 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+import os
 import sys
-sys.path.append("../../tools")
-sys.path.append("../../src/tools")
+current_dir = os.path.dirname(os.path.abspath(__file__))
+tools_dir = os.path.abspath(os.path.join(current_dir, '../../tools'))
+sys.path.insert(0, tools_dir)
 
 import wrf_hydro_tools
 import ctypes as ct
@@ -19,9 +21,8 @@ from flopy.plot import styles
 from flopy.utils.geometry import LineString, Polygon
 
 
-
 def main():
-    print('--- Starting Python Decomposition Tool---')
+    print('- Starting Python Decomposition Tool -')
     np_s, verbose = parseCLA()
     np_int = int(np_s)
     python_index = True
@@ -54,25 +55,19 @@ def main():
         print("end_x =", end_x)
         print("end_y =", end_y)
 
-
-
-
-
-
     print("Creating new domain for", np_int, "processes")
     print("-- load case --")
-    simulation_ws = Path("/glade/derecho/scratch/soren/src/modflow/testcases/farshid_parallel_testcase/parallal_data")
+    cwd = os.getcwd() # directory from where the script was called
+    simulation_ws = Path(cwd)
+
     sim = flopy.mf6.MFSimulation.load(sim_ws=simulation_ws)
-    # temp_dir = TemporaryDirectory()
-    # workspace = Path("/glade/derecho/scratch/soren/src/modflow/testcases/farshid_parallel_testcase/parallal_data/split_domain"+"_"+np_s+"np")
     workspace = Path("./split_domain"+"_"+np_s+"np")
 
     sim.set_sim_path(workspace)
     sim.write_simulation()
-    success, buff = sim.run_simulation(silent=True)
-    assert success
 
-
+    # success, buff = sim.run_simulation(silent=True)
+    # assert success
 
     gwf = sim.get_model()
     modelgrid = gwf.modelgrid
@@ -80,7 +75,6 @@ def main():
     print("-- split MODFLOW domain --")
     n = modelgrid.ncol
     m = modelgrid.nrow
-    nump = 4
     # array = np.ones((modelgrid.nrow, modelgrid.ncol), dtype=int)
 
     print("np =", np_int)
@@ -106,9 +100,7 @@ def main():
         print(array)
         sys.exit()
 
-    print('debugging con')
-
-    # # split the simulation
+    # split the simulation
     mfsplit = Mf6Splitter(sim)
     new_sim = mfsplit.split_model(array)
     print("-- Writing split domain to:", workspace)
@@ -116,9 +108,11 @@ def main():
     new_sim.write_simulation()
 
     # write image of decomposition
+    decomp_img = str(workspace)+'/decomposition_'+np_s+'np.png'
     plt.imshow(array[:,:], cmap='viridis')
     plt.colorbar()
-    plt.savefig(str(workspace)+'/decomposition_'+np_s+'np.png')
+    plt.savefig(decomp_img)
+    print("-- image of decompisition save to ", decomp_img)
 
     print("- Decomposition Finished")
 
