@@ -89,6 +89,7 @@ include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (NetCDF DEFAULT_MSG NETCDF_LIBRARIES NETCDF_INCLUDES NetCDF_has_interfaces)
 
 if (NETCDF_FOUND AND NOT TARGET netCDF::netcdf)
+  message("FindNetCDF.cmake: first NOT TARGET netCDF::netcdf")
   add_library(netCDF::netcdf UNKNOWN IMPORTED)
   set_target_properties(
     netCDF::netcdf
@@ -99,6 +100,7 @@ if (NETCDF_FOUND AND NOT TARGET netCDF::netcdf)
     )
 endif()
 if (NETCDF_FOUND AND NOT TARGET netCDF::netcdff)
+  message("FindNetCDF.cmake: second NOT TARGET netCDF::netcdf")
   add_library(netCDF::netcdff UNKNOWN IMPORTED)
   set_target_properties(
     netCDF::netcdff

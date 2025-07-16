@@ -54,6 +54,14 @@ if (NOT TARGET netCDF::netcdff)
    message("-- NetCDF Include Dir(s): ${NETCDF_INCLUDES_F77} ${NETCDF_INCLUDES_F90}")
 endif()
 
+message("NETCDF_LIBRARIES_C = ${NETCDF_LIBRARIES_C}")
+message("NETCDF_LIBRARIES_CXX = ${NETCDF_LIBRARIES_CXX}")
+message("NETCDF_LIBRARIES_F77 = ${NETCDF_LIBRARIES_F77}")
+message("NETCDF_LIBRARIES_F90 = ${NETCDF_LIBRARIES_F90}")
+message("NETCDF_INCLUDES = ${NETCDF_INCLUDES}")
+message("INTERFACE_INCLUDE_DIRECTORIES = ${INTERFACE_INCLUDE_DIRECTORIES}")
+# message(FATAL_ERROR "-- DEBUGGING CMAKE --")
+
 # set user controled enviorment variables
 set(HYDRO_LSM $ENV{HYDRO_LSM} CACHE STRING "Name of the Land Surface Model to Use")
 
