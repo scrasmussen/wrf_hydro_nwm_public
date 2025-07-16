@@ -456,7 +456,7 @@ Edit the paths within this namelist as appropriate for your system
 
 .. code-block:: console
 
-  ./geogrid.exe >& geogrid.log
+  ./geogrid.exe &> geogrid.log
 
 
 **Running the ungrib utility**
@@ -500,7 +500,7 @@ steps.
 
 .. code-block:: console
 
-  ./ungrib.exe >& ungrib.log
+  ./ungrib.exe &> ungrib.log
 
 
 **Running the metgrid utility**
@@ -521,7 +521,7 @@ utility.
 
 .. code-block:: console
 
-  ./metgrid.exe >& metgrid.log
+  ./metgrid.exe &> metgrid.log
 
 
 Running a coupled WRF | WRF-Hydro simulation
@@ -591,7 +591,7 @@ condition files to be used as input for the coupled simulation.
 
 .. code-block:: console
 
-  mpirun -np 2 ./real >& real.log
+  mpirun -np 2 ./real &> real.log
 
 2. Next review the rsl.out.* and rsl.error.* files for possible errors and
    check to make sure the wrfinput* and wrfbdy* files have been created.
@@ -608,7 +608,7 @@ hydro.namelist files.
 
 .. code-block:: console
 
-  mpirun -np 2 ./wrf >& wrf.log
+  mpirun -np 2 ./wrf &> wrf.log
 
 2. If your simulation ran successfully, there should now be a large number of
    output files. Descriptions of the output files can be found in the
