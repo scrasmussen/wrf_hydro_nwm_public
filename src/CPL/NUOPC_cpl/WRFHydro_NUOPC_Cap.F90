@@ -238,7 +238,11 @@ module WRFHydro_NUOPC
     model_label_CheckImport => label_CheckImport, &
     model_label_Advance     => label_Advance, &
     model_label_Finalize    => label_Finalize
-  use WRFHYDRO_NUOPC_Gluecode
+  use WRFHYDRO_NUOPC_Gluecode, only: wrfhydro_nuopc_ini, wrfhydro_nuopc_run, &
+       wrfhydro_nuopc_fin, wrfhydro_regrid_mesh, wrfhydro_open_mesh, &
+       wrfhydro_GridCreate, &
+       wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
+       wrfhydro_get_restart, wrfhydro_GridCreate_tmp
   use WRFHYDRO_NUOPC_Fields
   use WRFHYDRO_NUOPC_Flags
   use WRFHydro_ESMF_Extensions
@@ -301,6 +305,9 @@ module WRFHydro_NUOPC
     type(type_InternalState)   :: is
 
     rc = ESMF_SUCCESS
+
+    call ESMF_LogWrite("Entering WRF-Hydro SetServices", &
+         ESMF_LOGMSG_INFO, rc=rc)
 
     ! allocate memory for this internal state and set it in the component
     allocate(is%wrap, stat=stat)
@@ -367,6 +374,12 @@ module WRFHydro_NUOPC
 
     rc = ESMF_SUCCESS
 
+    call ESMF_LogWrite("WRFH: entering Initializep0", ESMF_LOGMSG_INFO, rc=rc)
+    ! crank up verbosity + flush every write
+    call ESMF_LogSet(logmsgList=ESMF_LOGMSG_ALL, trace=.false., &
+         maxElements=1, flush=.true., &
+         highResTimestampFlag=.true., rc=rc)
+
 
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
@@ -381,7 +394,7 @@ module WRFHydro_NUOPC
       specialValueList=(/0,65535,65536,131071/), rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
-      defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
+         defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
@@ -417,7 +430,7 @@ module WRFHydro_NUOPC
         relaxedFlag=.true., rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     endif
-
+    call ESMF_LogWrite("WRFH: exiting Initializep0", ESMF_LOGMSG_INFO, rc=rc)
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     subroutine WRFHydro_AttributeGet(rc)
@@ -779,6 +792,9 @@ module WRFHydro_NUOPC
 
     rc = ESMF_SUCCESS
 
+
+    call ESMF_LogWrite("WRFH: entering Initializep1", ESMF_LOGMSG_INFO, rc=rc)
+
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
@@ -808,12 +824,15 @@ module WRFHydro_NUOPC
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
-    call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    print *, "WRFH: Init Off, turn on after testcase created"
+    call ESMF_LogWrite("WRFH: Initializep1: Init Off, turn on after testcase created", &
+         ESMF_LOGMSG_INFO, rc=rc)
+    ! call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
+    ! if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
-    ! get hgrid for domain id
-    call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    ! ! get hgrid for domain id
+    ! call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
+    ! if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
     ! add namespace
     if(.NOT.is%wrap%nestToNest) then
@@ -846,8 +865,8 @@ module WRFHydro_NUOPC
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
     if (btest(verbosity,16)) call field_advertise_log(cap_fld_list,cname,rc=rc)
-
-  end subroutine
+    call ESMF_LogWrite("WRFH: exiting Initializep1: advertise", ESMF_LOGMSG_INFO, rc=rc)
+  end subroutine InitializeP1
 
   !-----------------------------------------------------------------------------
 
@@ -863,14 +882,19 @@ module WRFHydro_NUOPC
     integer                    :: verbosity, diagnostic
     character(len=64)          :: value
     type(type_InternalState)   :: is
-    type(ESMF_Grid)            :: WRFHYDRO_Grid
+    type(ESMF_Grid)            :: wrfhydro_grid, regridded_grid
+    type(ESMF_Mesh)            :: wrfhydro_mesh
     type(ESMF_Field)           :: field
     logical                    :: importConnected, exportConnected
     integer                    :: fIndex
     character(len=9)           :: nStr
 
+    type(ESMF_Mesh) :: mesh
+
     rc = ESMF_SUCCESS
 
+    print *, "WRFH: entering Initializep3: realize"
+    call ESMF_LogWrite("WRFH: entering Initializep3: realize", ESMF_LOGMSG_INFO, rc=rc)
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
@@ -899,27 +923,56 @@ module WRFHydro_NUOPC
     write (nStr,"(I0)") is%wrap%did
 
     ! call gluecode to create grid
-    WRFHYDRO_Grid = WRFHYDRO_GridCreate(is%wrap%did,rc=rc)
+    ! wrfhydro_grid = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+    wrfhydro_grid = wrfhydro_GridCreate_tmp(is%wrap%did, &
+         nx=204, ny=120, &
+         lon0=-105.1205, lat0=39.83927, &
+         dlon=0.003, dlat=.00001, &
+         rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
-    if (btest(verbosity,16)) then
-      call WRFHYDRO_ESMF_LogGrid(WRFHYDRO_Grid, &
-        trim(cname)//"_"//rname//"_D"//trim(nStr),rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    endif
+    wrfhydro_mesh = wrfhydro_open_mesh(rc)
+    if(ESMF_STDERRORCHECK(rc)) return
 
-    ! Write grid to NetCDF file.
-    if (btest(diagnostic,16)) then
-      call WRFHYDRO_ESMF_GridWrite(WRFHYDRO_Grid, &
-        trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-        rname//'_grid_D'//trim(nStr)//".nc", rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    endif
+    regridded_grid = wrfhydro_regrid_mesh( &
+         wrfhydro_grid, &
+         wrfhydro_mesh, &
+         is%wrap%did, &
+         is%wrap%NStateImp(1), &
+         rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    stop "RIGHT HERE in WRFH Cap"
 
+    ! if (btest(verbosity,16)) then
+    !   call WRFHYDRO_ESMF_LogGrid(WRFHYDRO_Grid, &
+    !     trim(cname)//"_"//rname//"_D"//trim(nStr),rc=rc)
+    !   if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! endif
+
+    ! ! Write grid to NetCDF file.
+    ! if (btest(diagnostic,16)) then
+    !   call WRFHYDRO_ESMF_GridWrite(WRFHYDRO_Grid, &
+    !     trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+    !     rname//'_grid_D'//trim(nStr)//".nc", rc=rc)
+    !   if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! endif
+
+
+    mesh = ESMF_MeshCreate(filename="frontrange.scrip.nc", &
+         fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
+    ! call field_realize(fieldList=cap_fld_list, &
+    !   importState=is%wrap%NStateImp(1), &
+    !   exportState=is%wrap%NStateExp(1), &
+    !   grid=WRFHYDRO_grid, did=is%wrap%did, &
+    !   realizeAllImport=is%wrap%realizeAllImport, &
+    !   realizeAllExport=is%wrap%realizeAllExport, &
+    !   memr_import=is%wrap%memr_import, &
+    !   memr_export=is%wrap%memr_export, &
+    !   rc=rc)
     call field_realize(fieldList=cap_fld_list, &
       importState=is%wrap%NStateImp(1), &
       exportState=is%wrap%NStateExp(1), &
-      grid=WRFHYDRO_grid, did=is%wrap%did, &
+      mesh=mesh, did=is%wrap%did, &
       realizeAllImport=is%wrap%realizeAllImport, &
       realizeAllExport=is%wrap%realizeAllExport, &
       memr_import=is%wrap%memr_import, &
@@ -932,7 +985,9 @@ module WRFHydro_NUOPC
 
     if (btest(verbosity,16)) call field_realize_log(cap_fld_list,cname,rc=rc)
     if (btest(verbosity,16)) call LogMode()
-
+    call ESMF_LogWrite("WRFH: exiting Initializep3: realize", &
+         ESMF_LOGMSG_INFO, rc=rc)
+    print *, "WRFH: exiting Initializep3: realize"
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     !---------------------------------------------------------------------------
@@ -1180,8 +1235,11 @@ module WRFHydro_NUOPC
     type(ESMF_Clock)           :: modelClock
     type(ESMF_TimeInterval)    :: timeStep
 
-    rc = ESMF_SUCCESS
 
+   character(len=64) :: s
+
+    rc = ESMF_SUCCESS
+    call ESMF_LogWrite("WRFH: entering SetClock", ESMF_LOGMSG_INFO, rc=rc)
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
@@ -1218,7 +1276,15 @@ module WRFHydro_NUOPC
     ! query the timestep for seconds
     call ESMF_TimeIntervalGet(timestep,s=dt,rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    print *, "WRFH: dt = ", dt
 
+    call ESMF_TimeIntervalGet(timeStep, timeString=s, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    print *, "WRFH: timestep = ", trim(s)
+
+    is%wrap%timeStepInt = 60
+    print *, "is%wrap%timeStepInt = ", is%wrap%timeStepInt
+    ! s = "P0Y0M0DT0H1M0S"
     ! override timestep
     if (is%wrap%timeStepInt /= 0) then
       call ESMF_TimeIntervalSet(timestep, &
@@ -1244,6 +1310,9 @@ module WRFHydro_NUOPC
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
     if (btest(verbosity,16)) call LogClock()
+
+    call LogClock()
+    call ESMF_LogWrite("WRFH: exiting SetClock", ESMF_LOGMSG_INFO, rc=rc)
 
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1368,6 +1437,9 @@ subroutine CheckImport(gcomp, rc)
     character(len=16)           :: misgValTypeStr
 
     rc = ESMF_SUCCESS
+
+
+    call ESMF_LogWrite("WRFH: entering Advance", ESMF_LOGMSG_INFO, rc=rc)
 
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
@@ -1499,6 +1571,7 @@ subroutine CheckImport(gcomp, rc)
         overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     endif
+    call ESMF_LogWrite("WRFH: exiting Advance", ESMF_LOGMSG_INFO, rc=rc)
 
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
