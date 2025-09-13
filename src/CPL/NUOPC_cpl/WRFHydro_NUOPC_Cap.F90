@@ -242,7 +242,8 @@ module WRFHydro_NUOPC
        wrfhydro_nuopc_fin, wrfhydro_regrid_mesh, wrfhydro_open_mesh, &
        wrfhydro_GridCreate, &
        wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
-       wrfhydro_get_restart, wrfhydro_GridCreate_tmp
+       wrfhydro_get_restart, wrfhydro_GridCreate_tmp, &
+       wrfhydro_write_geo_file
   use WRFHYDRO_NUOPC_Fields
   use WRFHYDRO_NUOPC_Flags
   use WRFHydro_ESMF_Extensions
@@ -789,6 +790,9 @@ module WRFHydro_NUOPC
     type(ESMF_VM)               :: vm
     integer                     :: fIndex
     character(len=9)            :: nStr
+    type(ESMF_Grid)            :: wrfhydro_grid
+    type(ESMF_Mesh)            :: wrfhydro_mesh
+    type(ESMF_RouteHandle)     :: regrid_handle
 
     rc = ESMF_SUCCESS
 
@@ -820,19 +824,33 @@ module WRFHydro_NUOPC
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
+
+    wrfhydro_grid = wrfhydro_GridCreate_tmp(1, rc=rc)
+    wrfhydro_mesh = wrfhydro_open_mesh(rc)
+    regrid_handle = wrfhydro_regrid_mesh( &
+         wrfhydro_grid, &
+         wrfhydro_mesh, &
+         is%wrap%did, &
+         is%wrap%NStateImp(1), &
+         rc)
+
+    call wrfhydro_write_geo_file(wrfhydro_grid, wrfhydro_mesh, regrid_handle)
+
+    ! stop "CREATING LOW-RES GRID"
+    print*, "CREATED LOW-RES GRID"
+
+
     ! initialize wrfhydro
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
-    print *, "WRFH: Init Off, turn on after testcase created"
-    call ESMF_LogWrite("WRFH: Initializep1: Init Off, turn on after testcase created", &
-         ESMF_LOGMSG_INFO, rc=rc)
-    ! call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
-    ! if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
-    ! ! get hgrid for domain id
-    ! call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
-    ! if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    ! stop "editing nuopc_ini"
+    ! get hgrid for domain id
+    call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
     ! add namespace
     if(.NOT.is%wrap%nestToNest) then
@@ -882,8 +900,9 @@ module WRFHydro_NUOPC
     integer                    :: verbosity, diagnostic
     character(len=64)          :: value
     type(type_InternalState)   :: is
-    type(ESMF_Grid)            :: wrfhydro_grid, regridded_grid
+    type(ESMF_Grid)            :: wrfhydro_grid
     type(ESMF_Mesh)            :: wrfhydro_mesh
+    type(ESMF_RouteHandle)     :: regrid_handle
     type(ESMF_Field)           :: field
     logical                    :: importConnected, exportConnected
     integer                    :: fIndex
@@ -923,25 +942,25 @@ module WRFHydro_NUOPC
     write (nStr,"(I0)") is%wrap%did
 
     ! call gluecode to create grid
-    ! wrfhydro_grid = wrfhydro_GridCreate(is%wrap%did, rc=rc)
-    wrfhydro_grid = wrfhydro_GridCreate_tmp(is%wrap%did, &
-         nx=204, ny=120, &
-         lon0=-105.1205, lat0=39.83927, &
-         dlon=0.003, dlat=.00001, &
-         rc=rc)
+    wrfhydro_grid = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+    ! wrfhydro_grid = wrfhydro_GridCreate_tmp(is%wrap%did, &
+    !      nx=204, ny=120, &
+    !      lon0=-105.1205, lat0=39.83927, &
+    !      dlon=0.003, dlat=.00001, &
+    !      rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
     wrfhydro_mesh = wrfhydro_open_mesh(rc)
     if(ESMF_STDERRORCHECK(rc)) return
 
-    regridded_grid = wrfhydro_regrid_mesh( &
+    regrid_handle = wrfhydro_regrid_mesh( &
          wrfhydro_grid, &
          wrfhydro_mesh, &
          is%wrap%did, &
          is%wrap%NStateImp(1), &
          rc)
     if(ESMF_STDERRORCHECK(rc)) return
-    stop "RIGHT HERE in WRFH Cap"
+    ! stop "RIGHT HERE in WRFH Cap"
 
     ! if (btest(verbosity,16)) then
     !   call WRFHYDRO_ESMF_LogGrid(WRFHYDRO_Grid, &
@@ -1282,9 +1301,12 @@ module WRFHydro_NUOPC
     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     print *, "WRFH: timestep = ", trim(s)
 
-    is%wrap%timeStepInt = 60
+    ! is%wrap%timeStepInt = 60
+    ! is%wrap%timeStepInt = 1
+    ! print *, "WRFH: Manually setting timeStepInt"
     print *, "is%wrap%timeStepInt = ", is%wrap%timeStepInt
     ! s = "P0Y0M0DT0H1M0S"
+    ! stop "INVESTIGATING TIME"
     ! override timestep
     if (is%wrap%timeStepInt /= 0) then
       call ESMF_TimeIntervalSet(timestep, &

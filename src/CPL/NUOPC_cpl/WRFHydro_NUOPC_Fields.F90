@@ -42,9 +42,9 @@ module wrfhydro_nuopc_fields
   logical, parameter :: EXPORT_T = .true.
   logical, parameter :: EXPORT_F = .false.
   logical, parameter :: TMP_EXPORT_T = .false.
-  logical, parameter :: TMP_IMPORT_T = .false.
+  logical, parameter :: TMP_IMPORT_T = .true.
 
-  type(cap_fld_type),target,dimension(20) :: cap_fld_list = (/          &
+  type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
@@ -84,6 +84,10 @@ module wrfhydro_nuopc_fields
     cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
                  "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
+                 "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
+    cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
+                 "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
+    cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
                  "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0)              &
     /)
 
@@ -429,6 +433,9 @@ module wrfhydro_nuopc_fields
     check_lsm_forcings = c_smc .and. c_slc .and. c_stc .and. &
                          c_infxsrt .and. c_soldrain
 
+    print *, "WRFH NUOPC TODO: fix check_lsm_forcings"
+    ! check_lsm_forcings = .false.
+    check_lsm_forcings = .true.
   end function
 
   !-----------------------------------------------------------------------------
@@ -762,7 +769,7 @@ module wrfhydro_nuopc_fields
 
     rc = ESMF_SUCCESS
     print *, "WRFH: field create mesh: ", trim(fld_name)
-    error stop "FOO"
+    error stop "FOO: good point to get to"
 
     if (memflg .eq. MEMORY_POINTER) then
       select case (trim(fld_name))
@@ -829,7 +836,7 @@ module wrfhydro_nuopc_fields
         !     farray=rt_domain(did)%smcmax1, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
         !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
-        case ('stc1')
+       case ('stc1')
           field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
             farray=rt_domain(did)%stc(:,:,1), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
@@ -905,7 +912,7 @@ module wrfhydro_nuopc_fields
 
 
 #undef METHOD
-#define METHOD "field_create"
+#define METHOD "field_create->field_create_grid"
   function field_create_grid(fld_name,grid,did,memflg,rc) &
        result(field_create)
     ! return value
@@ -1023,6 +1030,18 @@ module wrfhydro_nuopc_fields
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if (ESMF_STDERRORCHECK(rc)) return
         case ('soldrain')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%soldrain, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+
+       ! WRFH TODO: these are writing toe the same vars as infxsrt/soldrain
+       case ('sfcrunoff')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%infxsrt, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('udrunoff')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%soldrain, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
