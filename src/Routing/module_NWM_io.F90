@@ -3941,6 +3941,7 @@ subroutine output_lsmOut_NWM(domainId)
       allocate(xCoord(global_nx))
       allocate(yCoord(global_ny))
       allocate(yCoord2(global_ny))
+      print *, "Opening ", trim(nlst(1)%land_spatial_meta_flnm)
       iret = nf90_open(trim(nlst(1)%land_spatial_meta_flnm),NF90_NOWRITE,ncid=ftnGeo)
       if(iret .ne. 0) then
          ! Spatial metadata file not found for land grid. Warn the user no

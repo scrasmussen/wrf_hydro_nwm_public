@@ -3260,7 +3260,8 @@ end subroutine read_hydro_forcing_mpp1
              inquire (file=trim(inflnm), exist=fexist)
         endif
         if(.not. fexist) then
-            write(6,*) "Error: input file does not exist. Check ", trim(olddate)
+           write(6,*) "Error: input file does not exist. Check ", &
+                trim(inflnm)
             call hydro_stop( "LDASOUT input Error")
         endif
 

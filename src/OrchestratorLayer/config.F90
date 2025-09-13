@@ -225,7 +225,7 @@ contains
     !  ! Go through and make some logical checks for each hydro.namelist option.
     !  ! Some of these checks will depend on specific options chosen by the user.
 
-   if ( (self%sys_cpl .lt. 1) .or. (self%sys_cpl .gt. 4) ) then
+   if ( (self%sys_cpl .lt. 1) .or. (self%sys_cpl .gt. 5) ) then
        call hydro_stop("hydro.namelist ERROR: Invalid sys_cpl value specified.")
    endif
 

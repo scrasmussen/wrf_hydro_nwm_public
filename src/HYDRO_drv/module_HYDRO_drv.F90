@@ -574,6 +574,7 @@ contains
 !      2-- coupling with WRF but do not run offline lsm
 !      3-- coupling with LIS and do not run offline lsm
 !      4:  coupling with CLM
+!      5-- coupling with MPAS, do not run offline lsm
 !          if(nlst_rt(did)%SYS_CPL .eq. 0 .or. nlst_rt(did)%SYS_CPL .eq. 1 )then
 !                  call drive_noahLSF(did,kt)
 !          else
@@ -1378,7 +1379,8 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! get the dimension
-        call get_file_dimension(trim(nlst(did)%geo_static_flnm), ix,jx)
+        call get_file_dimension(trim(nlst(did)%geo_static_flnm), ix, jx)!, &
+             ! x_dim_var="x", y_dim_var="y") ! these variable can't be hard-coded
 
 
 #ifdef MPP_LAND
@@ -1405,8 +1407,8 @@ contains
 ! over write the ix and jx
             call MPP_LAND_PAR_INI(1,rt_domain(did)%ix,rt_domain(did)%jx,&
                 nlst(did)%AGGFACTRT)
-        else
-!  coupled with WRF, LIS
+        else ! coupled with WRF, LIS
+            print *, "Coupled with WRF, LIS, or MPAS"
             numprocs = node_info(1,1)
 
             call wrf_LAND_set_INIT(node_info,numprocs,nlst(did)%AGGFACTRT)
@@ -1674,6 +1676,7 @@ contains
         call get2d_lsm_vegtyp(RT_DOMAIN(did)%VEGTYP,RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx,trim(nlst(did)%geo_static_flnm))
 
 
+        print *, "MPAS TODO: should this sys_cpl if statement be entered?"
         if(nlst(did)%sys_cpl .eq. 2 ) then
 ! coupling with WRF
             if(present(soltyp0) ) then

@@ -37,7 +37,7 @@ contains
          call mpp_land_abort()
          call MPI_Finalize(ierr)
 #else
-         stop "FATAL ERROR: Program stopped. Recompile with environment variable HYDRO_D set to 1 for enhanced debug information."
+         error stop "FATAL ERROR: Program stopped. Recompile with environment variable HYDRO_D set to 1 for enhanced debug information."
 #endif
 
      return
