@@ -1,5 +1,3 @@
-#define FILENAME "WRFHydro_NUOPC_Fields.F90"
-#define MODNAME "wrfhydro_nuopc_fields"
 #include "WRFHydro_NUOPC_Macros.h"
 
 module wrfhydro_nuopc_fields
@@ -42,7 +40,7 @@ module wrfhydro_nuopc_fields
   logical, parameter :: EXPORT_T = .true.
   logical, parameter :: EXPORT_F = .false.
   logical, parameter :: TMP_EXPORT_T = .false.
-  logical, parameter :: TMP_IMPORT_T = .true.
+  logical, parameter :: TMP_IMPORT_T = .false.
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
@@ -80,7 +78,7 @@ module wrfhydro_nuopc_fields
     cap_fld_type("vegetation_type                         ","vegtyp  ", &
                  "1     ", IMPORT_F, EXPORT_F, 16.0d0),                 &
     cap_fld_type("surface_water_depth                     ","sfchead ", &
-                 "mm    ", IMPORT_F, TMP_EXPORT_T, 0.00d0),             &
+                 "mm    ", IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
                  "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
@@ -121,33 +119,33 @@ module wrfhydro_nuopc_fields
      module procedure field_realize_mesh
   end interface field_realize
 
-
+  character(*), parameter :: filename = "WRFHydro_NUOPC_Fields.F90"
 
   !-----------------------------------------------------------------------------
-  contains
+contains
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_dictionary_add"
   subroutine field_dictionary_add(fieldList, rc)
     type(cap_fld_type), intent(in) :: fieldList(:)
     integer, intent(out)           :: rc
     ! local variables
     integer :: n
     logical :: isPresent
+    character(*), parameter :: method ="field_dictionary_add"
+
 
     rc = ESMF_SUCCESS
 
     do n=lbound(fieldList,1),ubound(fieldList,1)
       isPresent = NUOPC_FieldDictionaryHasEntry( &
         fieldList(n)%sd_name, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
       if (.not.isPresent) then
         call NUOPC_FieldDictionaryAddEntry( &
           StandardName=trim(fieldList(n)%sd_name), &
           canonicalUnits=trim(fieldList(n)%units), &
           rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
       end if
     end do
 
@@ -155,8 +153,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_realize_mpas"
   subroutine field_realize_mesh(fieldList, importState, exportState, mesh, &
   did, realizeAllImport, realizeAllExport, memr_import, memr_export, rc)
     type(cap_fld_type), intent(inout) :: fieldList(:)
@@ -175,6 +171,7 @@ module wrfhydro_nuopc_fields
     logical :: realizeExport
     type(ESMF_Field) :: field_import
     type(ESMF_Field) :: field_export
+    character(*), parameter :: method = "field_realize_mpas"
 
     rc = ESMF_SUCCESS
 
@@ -185,8 +182,8 @@ module wrfhydro_nuopc_fields
           realizeImport = .true.
         else
           realizeImport = NUOPC_IsConnected(importState, &
-            fieldName=trim(fieldList(n)%st_name),rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+            fieldName=trim(fieldList(n)%st_name), rc=rc)
+          call check(rc, __LINE__)
         end if
       else
         realizeImport = .false.
@@ -195,14 +192,14 @@ module wrfhydro_nuopc_fields
       if ( realizeImport ) then
         field_import=field_create(fld_name=fieldList(n)%st_name, &
           mesh=mesh, did=did, memflg=memr_import, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         call NUOPC_Realize(importState, field=field_import, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_import = .true.
       else
         call ESMF_StateRemove(importState, (/fieldList(n)%st_name/), &
           relaxedflag=.true., rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_import = .false.
       end if
 
@@ -212,8 +209,8 @@ module wrfhydro_nuopc_fields
           realizeExport = .true.
         else
           realizeExport = NUOPC_IsConnected(exportState, &
-            fieldName=trim(fieldList(n)%st_name),rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+            fieldName=trim(fieldList(n)%st_name), rc=rc)
+          call check(rc, __LINE__)
         end if
       else
         realizeExport = .false.
@@ -222,24 +219,20 @@ module wrfhydro_nuopc_fields
       if( realizeExport ) then
         field_export=field_create(fld_name=fieldList(n)%st_name, &
           mesh=mesh, did=did, memflg=memr_export, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         call NUOPC_Realize(exportState, field=field_export, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_export = .true.
       else
         call ESMF_StateRemove(exportState, (/fieldList(n)%st_name/), &
           relaxedflag=.true., rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_export = .false.
       end if
     end do
   end subroutine field_realize_mesh
 
 
-
-
-#undef METHOD
-#define METHOD "field_realize"
   subroutine field_realize_grid(fieldList, importState, exportState, grid, &
   did, realizeAllImport, realizeAllExport, memr_import, memr_export, rc)
     type(cap_fld_type), intent(inout) :: fieldList(:)
@@ -258,6 +251,7 @@ module wrfhydro_nuopc_fields
     logical :: realizeExport
     type(ESMF_Field) :: field_import
     type(ESMF_Field) :: field_export
+    character(*), parameter :: method = "field_realize"
 
     rc = ESMF_SUCCESS
 
@@ -268,8 +262,8 @@ module wrfhydro_nuopc_fields
           realizeImport = .true.
         else
           realizeImport = NUOPC_IsConnected(importState, &
-            fieldName=trim(fieldList(n)%st_name),rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+            fieldName=trim(fieldList(n)%st_name), rc=rc)
+          call check(rc, __LINE__)
         end if
       else
         realizeImport = .false.
@@ -278,14 +272,14 @@ module wrfhydro_nuopc_fields
       if ( realizeImport ) then
         field_import=field_create(fld_name=fieldList(n)%st_name, &
           grid=grid, did=did, memflg=memr_import, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         call NUOPC_Realize(importState, field=field_import, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_import = .true.
       else
         call ESMF_StateRemove(importState, (/fieldList(n)%st_name/), &
           relaxedflag=.true., rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_import = .false.
       end if
 
@@ -295,8 +289,8 @@ module wrfhydro_nuopc_fields
           realizeExport = .true.
         else
           realizeExport = NUOPC_IsConnected(exportState, &
-            fieldName=trim(fieldList(n)%st_name),rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+            fieldName=trim(fieldList(n)%st_name), rc=rc)
+          call check(rc, __LINE__)
         end if
       else
         realizeExport = .false.
@@ -305,23 +299,20 @@ module wrfhydro_nuopc_fields
       if( realizeExport ) then
         field_export=field_create(fld_name=fieldList(n)%st_name, &
           grid=grid, did=did, memflg=memr_export, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         call NUOPC_Realize(exportState, field=field_export, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_export = .true.
       else
         call ESMF_StateRemove(exportState, (/fieldList(n)%st_name/), &
           relaxedflag=.true., rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
         fieldList(n)%rl_export = .false.
       end if
     end do
   end subroutine
 
   !-----------------------------------------------------------------------------
-
-#undef METHOD
-#define METHOD "lsm_forcings"
 
   function check_lsm_forcings(importState,rc)
     ! RETURN
@@ -342,18 +333,19 @@ module wrfhydro_nuopc_fields
     logical                    :: c_stc
     logical                    :: c_infxsrt
     logical                    :: c_soldrain
+    character(*), parameter :: method = "lsm_forcings"
 
     ! total soil moisture content
     call ESMF_StateGet(importState,itemSearch="smc", itemCount=s_smc, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="smc1",itemCount=s_smc1,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="smc2",itemCount=s_smc2,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="smc3",itemCount=s_smc3,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="smc4",itemCount=s_smc4,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="smc1",itemCount=s_smc1, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="smc2",itemCount=s_smc2, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="smc3",itemCount=s_smc3, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="smc4",itemCount=s_smc4, rc=rc)
+    call check(rc, __LINE__)
     if (s_smc.gt.0) then
       c_smc = NUOPC_IsConnected(importState, fieldName="smc")
     elseif ((s_smc1.gt.0) .and. (s_smc2.gt.0) .and. &
@@ -364,19 +356,19 @@ module wrfhydro_nuopc_fields
                NUOPC_IsConnected(importState, fieldName="smc4"))
     else
       c_smc = .false.
-    endif
+    end if
 
     ! liquid soil moisture content
     call ESMF_StateGet(importState,itemSearch="slc", itemCount=s_slc, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="sh2ox1",itemCount=s_slc1,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="sh2ox2",itemCount=s_slc2,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="sh2ox3",itemCount=s_slc3,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="sh2ox4",itemCount=s_slc4,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="sh2ox1",itemCount=s_slc1, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="sh2ox2",itemCount=s_slc2, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="sh2ox3",itemCount=s_slc3, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="sh2ox4",itemCount=s_slc4, rc=rc)
+    call check(rc, __LINE__)
     if (s_slc.gt.0) then
       c_slc = NUOPC_IsConnected(importState, fieldName="slc")
     elseif ((s_slc1.gt.0) .and. (s_slc2.gt.0) .and. &
@@ -387,19 +379,19 @@ module wrfhydro_nuopc_fields
                NUOPC_IsConnected(importState, fieldName="sh2ox4"))
     else
       c_slc = .false.
-    endif
+    end if
 
     ! soil temperature
     call ESMF_StateGet(importState,itemSearch="stc", itemCount=s_stc, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="stc1",itemCount=s_stc1,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="stc2",itemCount=s_stc2,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="stc3",itemCount=s_stc3,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-    call ESMF_StateGet(importState,itemSearch="stc4",itemCount=s_stc4,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="stc1",itemCount=s_stc1, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="stc2",itemCount=s_stc2, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="stc3",itemCount=s_stc3, rc=rc)
+    call check(rc, __LINE__)
+    call ESMF_StateGet(importState,itemSearch="stc4",itemCount=s_stc4, rc=rc)
+    call check(rc, __LINE__)
     if (s_stc.gt.0) then
       c_stc = NUOPC_IsConnected(importState, fieldName="stc")
     elseif ((s_stc1.gt.0) .and. (s_stc2.gt.0) .and. &
@@ -410,25 +402,25 @@ module wrfhydro_nuopc_fields
                NUOPC_IsConnected(importState, fieldName="stc4"))
     else
       c_stc = .false.
-    endif
+    end if
 
     ! infiltration excess
-    call ESMF_StateGet(importState,itemSearch="infxsrt",itemCount=s_infxsrt,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_StateGet(importState,itemSearch="infxsrt",itemCount=s_infxsrt, rc=rc)
+    call check(rc, __LINE__)
     if (s_infxsrt.gt.0) then
       c_infxsrt = NUOPC_IsConnected(importState, fieldName="infxsrt")
     else
       c_infxsrt = .false.
-    endif
+    end if
 
     ! soil drainage
-    call ESMF_StateGet(importState,itemSearch="soldrain",itemCount=s_soldrain,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_StateGet(importState,itemSearch="soldrain",itemCount=s_soldrain, rc=rc)
+    call check(rc, __LINE__)
     if (s_soldrain.gt.0) then
       c_soldrain = NUOPC_IsConnected(importState, fieldName="soldrain")
     else
       c_soldrain = .false.
-    endif
+    end if
 
     check_lsm_forcings = c_smc .and. c_slc .and. c_stc .and. &
                          c_infxsrt .and. c_soldrain
@@ -440,8 +432,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_advertise"
   subroutine field_advertise(fieldList, importState, exportState, &
   transferOffer, rc)
     type(cap_fld_type), intent(in)    :: fieldList(:)
@@ -451,6 +441,7 @@ module wrfhydro_nuopc_fields
     integer, intent(out)              :: rc
     ! local variables
     integer :: n
+    character(*), parameter :: method = "field_advertise"
 
     rc = ESMF_SUCCESS
 
@@ -462,7 +453,7 @@ module wrfhydro_nuopc_fields
           TransferOfferGeomObject=transferOffer, &
           name=fieldList(n)%st_name, &
           rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
       end if
       if (fieldList(n)%ad_export) then
         call NUOPC_Advertise(exportState, &
@@ -471,7 +462,7 @@ module wrfhydro_nuopc_fields
           TransferOfferGeomObject=transferOffer, &
           name=fieldList(n)%st_name, &
           rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call check(rc, __LINE__)
       end if
     end do
 
@@ -479,8 +470,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_advertise_log"
   subroutine field_advertise_log(fieldList, cname, rc)
     type(cap_fld_type), intent(in) :: fieldList(:)
     character(*), intent(in)       :: cname
@@ -491,6 +480,7 @@ module wrfhydro_nuopc_fields
     integer                    :: n
     character(32)              :: label
     character(ESMF_MAXSTR)     :: logMsg
+    character(*), parameter :: method = "field_advertise_log"
 
     rc = ESMF_SUCCESS
 
@@ -542,8 +532,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_realize_log"
   subroutine field_realize_log(fieldList, cname, rc)
     type(cap_fld_type), intent(in) :: fieldList(:)
     character(*), intent(in)       :: cname
@@ -554,6 +542,7 @@ module wrfhydro_nuopc_fields
     integer                    :: n
     character(32)              :: label
     character(ESMF_MAXSTR)     :: logMsg
+    character(*), parameter :: method = "field_realize_log"
 
     rc = ESMF_SUCCESS
 
@@ -605,8 +594,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "read_impexp_config_flnm"
   subroutine read_impexp_config_flnm(fname, fieldList, rc)
     character(len=30),intent(in)     :: fname
     type(cap_fld_type),intent(inout) :: fieldList(:)
@@ -620,25 +607,26 @@ module wrfhydro_nuopc_fields
     character(len=NUOPC_FreeFormatLen),allocatable :: tokenList(:)
     integer                            :: i,j
     integer                            :: stat
+    character(*), parameter :: method = "read_impexp_config_flnm"
 
     rc = ESMF_SUCCESS
 
 !   load fname into fieldsConfig
     fieldsConfig = ESMF_ConfigCreate(rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
     call ESMF_ConfigLoadFile(fieldsConfig, fname, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
 
 !   read export fields from config
     attrFF = NUOPC_FreeFormatCreate(fieldsConfig, &
       label="hyd_fields", rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
     call NUOPC_FreeFormatGet(attrFF, lineCount=lineCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
     do i=1, lineCount
       call NUOPC_FreeFormatGetLine(attrFF, line=i, &
         tokenCount=tokenCount, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
       if (.not.((tokenCount.eq.5).or.(tokenCount.eq.6))) then
         call ESMF_LogSetError(ESMF_FAILURE, &
           msg="Malformed ocn_export_fields item FORMAT="// &
@@ -646,43 +634,41 @@ module wrfhydro_nuopc_fields
 !            "['FILLVAL'] "// &
             "in file: "//trim(fname), &
           CONTEXT, rcToReturn=rc)
-        return ! bail out
-      endif
+        return
+      end if
       allocate(tokenList(tokenCount))
       call NUOPC_FreeFormatGetLine(attrFF, line=i, tokenList=tokenList, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
       call field_find_statename(fieldList, tokenList(1), location=j, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
       fieldList(j)%st_name=tokenList(1)
       fieldList(j)%sd_name=tokenList(2)
       fieldList(j)%units=tokenList(3)
       tokenList(4) = ESMF_UtilStringUpperCase(tokenList(4), rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
       fieldList(j)%ad_import=((tokenList(4).eq.".TRUE.") .or. &
                          (tokenList(4).eq."TRUE"))
       tokenList(5) = ESMF_UtilStringUpperCase(tokenList(5), rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
       fieldList(j)%ad_export=((tokenList(5).eq.".TRUE.") .or. &
                          (tokenList(5).eq."TRUE"))
       if (tokenCount.eq.6) then
         fieldList(j)%vl_fillv = ESMF_UtilString2Real(tokenList(6), rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-      endif
+        call check(rc, __LINE__)
+      end if
       deallocate(tokenList)
     enddo
 
 !   cleanup
     call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
     call ESMF_ConfigDestroy(fieldsConfig, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__)
 
   end subroutine read_impexp_config_flnm
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_find_standardname"
   subroutine field_find_standardname(fieldList, standardName, location, &
   fillValue, rc)
     type(cap_fld_type), intent(in)          :: fieldList(:)
@@ -692,6 +678,7 @@ module wrfhydro_nuopc_fields
     integer, intent(out)                    :: rc
     ! local variables
     integer :: n
+    character(*), parameter :: method = "field_find_standardname"
 
     rc = ESMF_RC_NOT_FOUND
 
@@ -711,14 +698,12 @@ module wrfhydro_nuopc_fields
       msg="Field not found in fieldList "//trim(standardName), &
       line=__LINE__, &
       file=__FILE__)) &
-      return  ! bail out
+      return
 
   end subroutine
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "field_find_statename"
   subroutine field_find_statename(fieldList, stateName, location, &
   fillValue, rc)
     type(cap_fld_type), intent(in)          :: fieldList(:)
@@ -728,6 +713,7 @@ module wrfhydro_nuopc_fields
     integer, intent(out)                    :: rc
     ! local variables
     integer :: n
+    character(*), parameter :: method = "field_find_statename"
 
     rc = ESMF_RC_NOT_FOUND
 
@@ -747,12 +733,11 @@ module wrfhydro_nuopc_fields
       msg="Field not found in fieldList "//trim(stateName), &
       line=__LINE__, &
       file=__FILE__)) &
-      return  ! bail out
+      return
 
   end subroutine field_find_statename
 
   !-----------------------------------------------------------------------------
-
   function field_create_mesh(fld_name, mesh, did, memflg, rc) &
        result(field_create)
     ! return value
@@ -768,119 +753,137 @@ module wrfhydro_nuopc_fields
 
 
     rc = ESMF_SUCCESS
-    print *, "WRFH: field create mesh: ", trim(fld_name)
-    error stop "FOO: good point to get to"
+    print *, "=== WRFH: realize, field create mesh: ", trim(fld_name)
 
     if (memflg .eq. MEMORY_POINTER) then
+       ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+       !      typekind=ESMF_TYPEKIND_R8, &
+       !      indexflag=ESMF_INDEX_DELOCAL, &
+       !      meshloc=ESMF_MESHLOC_ELEMENT, &
+       !      rc=rc)
+
       select case (trim(fld_name))
         ! case ('smc')
-        !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-        !     farray=rt_domain(did)%smc(:,:,:), gridToFieldMap=(/1,2/), &
-        !     ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
-        !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+        !        typekind=ESMF_TYPEKIND_R8, &
+        !        indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !        ! farray=rt_domain(did)%smc(:,:,:), &
+        !   ! field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+        !   !   farray=rt_domain(did)%smc(:,:,:), gridToFieldMap=(/1,2/), &
+        !   !   ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+        !   !   indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !   call check(rc, __LINE__)
         ! case ('slc')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%sh2ox(:,:,:), gridToFieldMap=(/1,2/), &
         !     ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('stc')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%stc(:,:,:), gridToFieldMap=(/1,2/), &
         !     ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('sh2ox1')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%sh2ox(:,:,1), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('sh2ox2')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%sh2ox(:,:,2), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('sh2ox3')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%sh2ox(:,:,3), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('sh2ox4')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%sh2ox(:,:,4), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
-        ! case ('smc1')
+        !   call check(rc, __LINE__)
+      ! case ('smc1')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%smc(:,:,1), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('smc2')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%smc(:,:,2), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('smc3')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%smc(:,:,3), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('smc4')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%smc(:,:,4), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('smcmax1')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%smcmax1, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
-       case ('stc1')
-          field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
-            farray=rt_domain(did)%stc(:,:,1), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
+      case ('stc1')
+          ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+          !      meshloc=ESMF_MESHLOC_ELEMENT, &
+          !   ! farray=rt_domain(did)%stc(:,:,1), &
+          !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+       field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+            typekind=ESMF_TYPEKIND_R8, &
+            indexflag=ESMF_INDEX_DELOCAL, &
+            meshloc=ESMF_MESHLOC_ELEMENT, &
+            rc=rc)
+
+
+          call check(rc, __LINE__)
         ! case ('stc2')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%stc(:,:,2), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('stc3')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%stc(:,:,3), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('stc4')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%stc(:,:,4), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('vegtyp')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%vegtyp, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('sfchead')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%overland%control%surface_water_head_lsm, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        !   call check(rc, __LINE__)
         ! case ('infxsrt')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%infxsrt, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if (ESMF_STDERRORCHECK(rc)) return
+        !   call check(rc, __LINE__)
         ! case ('soldrain')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%soldrain, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-        !   if (ESMF_STDERRORCHECK(rc)) return
+      !   !   call check(rc, __LINE__)
         case default
-          call ESMF_LogSetError(ESMF_FAILURE, &
-            msg=METHOD//": Field hookup missing: "//trim(fld_name), &
-            file=FILENAME,rcToReturn=rc)
-          return  ! bail out
+           print *, "ADD BACK IN "// trim(fld_name)
+           !     call ESMF_LogSetError(ESMF_FAILURE, &
+      !       msg=method//": Field hookup missing: "//trim(fld_name), &
+      !       file=filename, rcToReturn=rc)
+          return
       end select
     ! elseif (memflg .eq. MEMORY_COPY) then
     !   select case (trim(fld_name))
@@ -889,30 +892,27 @@ module wrfhydro_nuopc_fields
     !         typekind=ESMF_TYPEKIND_FIELD, gridToFieldMap=(/1,2/), &
     !         ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
     !         indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-    !       if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    !       call check(rc, __LINE__)
     !     case default
     !       field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
     !         typekind=ESMF_TYPEKIND_FIELD, &
     !         indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-    !       if (ESMF_STDERRORCHECK(rc)) return
+    !       call check(rc, __LINE__)
     !   end select
     !   call ESMF_FieldFill(field_create, dataFillScheme="const", &
     !     const1=ESMF_MISSING_VALUE, rc=rc)
-    !   if (ESMF_STDERRORCHECK(rc)) return
+    !   call check(rc, __LINE__)
     ! else
     !   cmemflg = memflg
     !   call ESMF_LogSetError(ESMF_FAILURE, &
-    !     msg=METHOD//": Field memory flag unknown: "//trim(cmemflg), &
-    !     file=FILENAME,rcToReturn=rc)
-    !   return  ! bail out
-    endif
+    !     msg=method//": Field memory flag unknown: "//trim(cmemflg), &
+    !     file=filename, rcToReturn=rc)
+    !   return
+    end if
 
   end function
 
 
-
-#undef METHOD
-#define METHOD "field_create->field_create_grid"
   function field_create_grid(fld_name,grid,did,memflg,rc) &
        result(field_create)
     ! return value
@@ -925,7 +925,7 @@ module wrfhydro_nuopc_fields
     integer,          intent(out) :: rc
     ! local variables
     character(len=16)       :: cmemflg
-
+    character(*), parameter :: method = "field_create->field_create_grid"
 
     rc = ESMF_SUCCESS
 
@@ -936,121 +936,121 @@ module wrfhydro_nuopc_fields
             farray=rt_domain(did)%smc(:,:,:), gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('slc')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,:), gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('stc')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%stc(:,:,:), gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('sh2ox1')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,1), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('sh2ox2')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,2), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('sh2ox3')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,3), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('sh2ox4')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,4), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('smc1')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,1), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('smc2')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,2), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('smc3')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,3), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('smc4')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,4), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('smcmax1')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smcmax1, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('stc1')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%stc(:,:,1), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('stc2')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%stc(:,:,2), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('stc3')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%stc(:,:,3), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('stc4')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%stc(:,:,4), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('vegtyp')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%vegtyp, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('sfchead')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%overland%control%surface_water_head_lsm, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case ('infxsrt')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%infxsrt, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         case ('soldrain')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%soldrain, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
 
        ! WRFH TODO: these are writing toe the same vars as infxsrt/soldrain
        case ('sfcrunoff')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%infxsrt, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         case ('udrunoff')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%soldrain, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         case default
           call ESMF_LogSetError(ESMF_FAILURE, &
-            msg=METHOD//": Field hookup missing: "//trim(fld_name), &
-            file=FILENAME,rcToReturn=rc)
-          return  ! bail out
+            msg=method//": Field hookup missing: "//trim(fld_name), &
+            file=filename, rcToReturn=rc)
+          return
       end select
     elseif (memflg .eq. MEMORY_COPY) then
       select case (trim(fld_name))
@@ -1059,30 +1059,28 @@ module wrfhydro_nuopc_fields
             typekind=ESMF_TYPEKIND_FIELD, gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call check(rc, __LINE__)
         case default
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             typekind=ESMF_TYPEKIND_FIELD, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
       end select
       call ESMF_FieldFill(field_create, dataFillScheme="const", &
         const1=ESMF_MISSING_VALUE, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+      call check(rc, __LINE__)
     else
       cmemflg = memflg
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Field memory flag unknown: "//trim(cmemflg), &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
-    endif
+        msg=method//": Field memory flag unknown: "//trim(cmemflg), &
+        file=filename, rcToReturn=rc)
+      return
+    end if
 
   end function
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_fill_uniform"
   subroutine state_fill_uniform(state, fillValue, rc)
     type(ESMF_State), intent(inout)        :: state
     real(ESMF_KIND_R8), intent(in)         :: fillValue
@@ -1094,36 +1092,37 @@ module wrfhydro_nuopc_fields
     type(ESMF_StateItem_Flag), allocatable :: itemTypeList(:)
     type(ESMF_Field)                       :: field
     integer                                :: stat
+    character(*), parameter :: method = "state_fill_uniform"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
 
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         call ESMF_StateGet(state, field=field, &
-          itemName=itemNameList(n),rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+          itemName=itemNameList(n), rc=rc)
+        call check(rc, __LINE__)
         call ESMF_FieldFill(field, dataFillScheme="const", &
           const1=fillValue, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-      endif
+        call check(rc, __LINE__)
+      end if
     enddo
 
     deallocate(itemNameList)
@@ -1133,8 +1132,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_fill_prescribe"
   subroutine state_fill_prescribe(state, fieldList, rc)
     type(ESMF_State), intent(inout)        :: state
     type(cap_fld_type), intent(in)         :: fieldList(:)
@@ -1147,39 +1144,40 @@ module wrfhydro_nuopc_fields
     type(ESMF_Field)                       :: field
     real(ESMF_KIND_R8)                     :: filVal
     integer                                :: stat
+    character(*), parameter :: method = "state_fill_prescribe"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
 
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         call field_find_statename(fieldList, &
           stateName=itemNameList(n), fillValue=filVal, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         call ESMF_StateGet(state, field=field, &
-          itemName=itemNameList(n),rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+          itemName=itemNameList(n), rc=rc)
+        call check(rc, __LINE__)
         call ESMF_FieldFill(field, dataFillScheme="const", &
           const1=filVal, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-      endif
+        call check(rc, __LINE__)
+      end if
     enddo
 
     deallocate(itemNameList)
@@ -1189,8 +1187,6 @@ module wrfhydro_nuopc_fields
 
  !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_fill_file"
   subroutine state_fill_file(state, filePrefix, rc)
     type(ESMF_State), intent(inout) :: state
     character(len=*), intent(in)    :: filePrefix
@@ -1203,40 +1199,41 @@ module wrfhydro_nuopc_fields
     type(ESMF_Field)                       :: field
     character(len=64)                      :: fldName
     integer                                :: stat
+    character(*), parameter :: method = "state_fill_file"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
 
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if ( itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         call ESMF_StateGet(state,field=field, &
-          itemName=itemNameList(n),rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+          itemName=itemNameList(n), rc=rc)
+        call check(rc, __LINE__)
         call NUOPC_GetAttribute(field, name="StandardName", &
           value=fldName, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         call ESMF_FieldRead(field, variableName=trim(fldName), &
           fileName=trim(filePrefix)//"_"//trim(itemNameList(n))//".nc", &
           iofmt=ESMF_IOFMT_NETCDF, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-      endif
+        call check(rc, __LINE__)
+      end if
     enddo
 
     deallocate(itemNameList)
@@ -1246,8 +1243,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_copy_tohyd"
   subroutine state_copy_tohyd(state, did, rc)
     type(ESMF_State), intent(inout) :: state
     integer, intent(in)             :: did
@@ -1262,44 +1257,45 @@ module wrfhydro_nuopc_fields
     real(ESMF_KIND_FIELD), pointer         :: farrayPtr2d(:,:)
     real(ESMF_KIND_FIELD), pointer         :: farrayPtr3d(:,:,:)
     integer                                :: stat
+    character(*), parameter :: method = "state_copy_tohyd"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
 
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         call ESMF_StateGet(state, field=field, &
-          itemName=itemNameList(n),rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+          itemName=itemNameList(n), rc=rc)
+        call check(rc, __LINE__)
         call ESMF_FieldGet(field, dimCount=dimCount, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         if (dimCount .eq. 2) then
           call ESMF_FieldGet(field, farrayPtr=farrayPtr2d, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         elseif (dimCount .eq. 3) then
           call ESMF_FieldGet(field, farrayPtr=farrayPtr3d, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         else
           call ESMF_LogSetError(ESMF_FAILURE, &
-            msg=METHOD//": dimCount is not supported.", &
-            file=FILENAME,rcToReturn=rc)
-          return  ! bail out
-        endif
+            msg=method//": dimCount is not supported.", &
+            file=filename, rcToReturn=rc)
+          return
+        end if
         select case (ItemNameList(n))
           case ('smc')
             rt_domain(did)%smc = farrayPtr3d
@@ -1344,11 +1340,11 @@ module wrfhydro_nuopc_fields
             rt_domain(did)%soldrain = farrayPtr2d
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
-              msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
-              file=FILENAME,rcToReturn=rc)
-            return  ! bail out
+              msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
+              file=filename, rcToReturn=rc)
+            return
         endselect
-      endif
+      end if
     enddo
 
     deallocate(itemNameList)
@@ -1358,8 +1354,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_copy_frhyd"
   subroutine state_copy_frhyd(state, did, rc)
     type(ESMF_State), intent(inout)         :: state
     integer, intent(in)                     :: did
@@ -1375,44 +1369,45 @@ module wrfhydro_nuopc_fields
     real(ESMF_KIND_FIELD), pointer         :: farrayPtr3d(:,:,:)
     integer                                :: stat
     character(len=16)                      :: cmissingv_flag
+    character(*), parameter :: method = "state_copy_frhyd"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
 
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         call ESMF_StateGet(state, field=field, &
-          itemName=itemNameList(n),rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+          itemName=itemNameList(n), rc=rc)
+        call check(rc, __LINE__)
         call ESMF_FieldGet(field, dimCount=dimCount, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         if (dimCount .eq. 2) then
           call ESMF_FieldGet(field, farrayPtr=farrayPtr2d, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         elseif (dimCount .eq. 3) then
           call ESMF_FieldGet(field, farrayPtr=farrayPtr3d, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
         else
           call ESMF_LogSetError(ESMF_FAILURE, &
-            msg=METHOD//": dimCount is not supported.", &
-            file=FILENAME,rcToReturn=rc)
-          return  ! bail out
-        endif
+            msg=method//": dimCount is not supported.", &
+            file=filename, rcToReturn=rc)
+          return
+        end if
         select case (ItemNameList(n))
           case ('smc')
             farrayPtr3d = rt_domain(did)%smc
@@ -1456,11 +1451,11 @@ module wrfhydro_nuopc_fields
             farrayPtr2d = rt_domain(did)%soldrain
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
-              msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
-              file=FILENAME,rcToReturn=rc)
-            return  ! bail out
+              msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
+              file=filename, rcToReturn=rc)
+            return
         end select
-      endif
+      end if
     enddo
 
     deallocate(itemNameList)
@@ -1470,8 +1465,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_check_missing"
   subroutine state_check_missing(state, did, rc)
     type(ESMF_State), intent(inout)   :: state
     integer, intent(in)               :: did
@@ -1484,23 +1477,24 @@ module wrfhydro_nuopc_fields
     real(ESMF_KIND_R8), parameter          :: chkVal = real(ESMF_MISSING_VALUE)
     logical                                :: missng
     integer                                :: stat
+    character(*), parameter :: method = "state_check_missing"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
@@ -1549,17 +1543,17 @@ module wrfhydro_nuopc_fields
             missng = any(rt_domain(did)%soldrain.eq.chkVal)
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
-              msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
-              file=FILENAME,rcToReturn=rc)
-            return  ! bail out
+              msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
+              file=filename, rcToReturn=rc)
+            return
         endselect
         if (missng) then
           call ESMF_LogSetError(ESMF_FAILURE, &
-            msg=METHOD//": Missing value: "//trim(itemNameList(n)), &
-            file=FILENAME,rcToReturn=rc)
-          return  ! bail out
-        endif
-      endif
+            msg=method//": Missing value: "//trim(itemNameList(n)), &
+            file=filename, rcToReturn=rc)
+          return
+        end if
+      end if
     enddo
     deallocate(itemNameList)
     deallocate(itemTypeList)
@@ -1568,8 +1562,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "state_prescribe_missing"
   subroutine state_prescribe_missing(state, did, fieldList, rc)
     type(ESMF_State), intent(inout)   :: state
     integer, intent(in)               :: did
@@ -1583,29 +1575,30 @@ module wrfhydro_nuopc_fields
     real(ESMF_KIND_R8), parameter          :: chkVal = real(ESMF_MISSING_VALUE)
     real(ESMF_KIND_R8)                     :: filVal
     integer                                :: stat
+    character(*), parameter :: method = "state_prescribe_missing"
 
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__)
 
     allocate(itemNameList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item name memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     allocate(itemTypeList(itemCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of state item type memory failed.", &
-      line=__LINE__, file=__FILE__)) return  ! bail out
+      line=__LINE__, file=__FILE__)) return
     call ESMF_StateGet(state,itemNameList=itemNameList, &
-      itemTypeList=itemTypeList,rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+      itemTypeList=itemTypeList, rc=rc)
+    call check(rc, __LINE__)
 
     do n=1, itemCount
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         call field_find_statename(fieldList, &
           stateName=itemNameList(n), fillValue=filVal, rc=rc)
-        if (ESMF_STDERRORCHECK(rc)) return
+        call check(rc, __LINE__)
         select case (itemNameList(n))
           case ('smc')
             where (rt_domain(did)%smc.eq.chkVal) &
@@ -1670,11 +1663,11 @@ module wrfhydro_nuopc_fields
               rt_domain(did)%soldrain = filVal
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
-              msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
-              file=FILENAME,rcToReturn=rc)
-            return  ! bail out
+              msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
+              file=filename, rcToReturn=rc)
+            return
         end select
-      endif
+      end if
     enddo
 
     deallocate(itemNameList)
@@ -1684,8 +1677,6 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
-#undef METHOD
-#define METHOD "model_debug"
   subroutine model_debug(state, did, memflg, filePrefix, rc)
     type(ESMF_State), intent(inout)   :: state
     integer, intent(in)               :: did
@@ -1701,6 +1692,7 @@ module wrfhydro_nuopc_fields
     type(ESMF_Grid)                        :: grid
     integer                                :: stat
     character(len=16)                      :: cmemflg
+    character(*), parameter :: method = "model_debug"
 
     rc = ESMF_SUCCESS
 
@@ -1708,52 +1700,60 @@ module wrfhydro_nuopc_fields
       call NUOPC_Write(state, &
         fileNamePrefix=filePrefix, overwrite=.true., &
         status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call check(rc, __LINE__)
     elseif(memflg .eq. MEMORY_COPY) then
       call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return ! bail out
+      call check(rc, __LINE__)
 
       allocate(itemNameList(itemCount), stat=stat)
       if (ESMF_LogFoundAllocError(statusToCheck=stat, &
         msg="Allocation of state item name memory failed.", &
-        line=__LINE__, file=__FILE__)) return  ! bail out
+        line=__LINE__, file=__FILE__)) return
       allocate(itemTypeList(itemCount), stat=stat)
       if (ESMF_LogFoundAllocError(statusToCheck=stat, &
         msg="Allocation of state item type memory failed.", &
-        line=__LINE__, file=__FILE__)) return  ! bail out
+        line=__LINE__, file=__FILE__)) return
       call ESMF_StateGet(state,itemNameList=itemNameList, &
-        itemTypeList=itemTypeList,rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+        itemTypeList=itemTypeList, rc=rc)
+      call check(rc, __LINE__)
 
       do n=1, itemCount
         if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
           call ESMF_StateGet(state, field=cpyfield, &
-            itemName=itemNameList(n),rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+            itemName=itemNameList(n), rc=rc)
+          call check(rc, __LINE__)
           call ESMF_FieldGet(cpyfield, grid=grid, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
+          call check(rc, __LINE__)
           outfield = field_create(itemNameList(n), grid=grid, did=did, &
             memflg=MEMORY_POINTER, rc=rc)
           call ESMF_FieldWrite(outfield, variableName=itemNameList(n), &
             fileName=trim(filePrefix)//"_"//trim(itemNameList(n))//".nc", &
             iofmt=ESMF_IOFMT_NETCDF, rc=rc)
           call ESMF_FieldDestroy(outfield, rc=rc)
-          if (ESMF_STDERRORCHECK(rc)) return
-        endif
+          call check(rc, __LINE__)
+        end if
       enddo
       deallocate(itemNameList)
       deallocate(itemTypeList)
     else
       cmemflg = memflg
       call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Field memory flag unknown: "//trim(cmemflg), &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
-    endif
+        msg=method//": Field memory flag unknown: "//trim(cmemflg), &
+        file=filename, rcToReturn=rc)
+      return
+    end if
 
   end subroutine model_debug
 
   !-----------------------------------------------------------------------------
+  subroutine check(rc, line)
+    integer, intent(in) :: rc
+    integer, intent(in) :: line
+    logical :: res
+    character(len=ESMF_MAXSTR), parameter :: file = __FILE__
 
-
+    res = ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=line, file=file)
+    if (res .eqv. .true.) error stop "Bad Check, msg = " // ESMF_LOGERR_PASSTHRU
+  end subroutine check
 end module wrfhydro_nuopc_fields
