@@ -243,7 +243,8 @@ module WRFHydro_NUOPC
        wrfhydro_GridCreate, &
        wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
        wrfhydro_get_restart, wrfhydro_GridCreate_tmp, &
-       wrfhydro_write_geo_file, regrid_import_mesh_to_grid
+       wrfhydro_write_geo_file, regrid_import_mesh_to_grid, &
+       regrid_export_grid_to_mesh
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
        field_create, field_realize, field_advertise, check_lsm_forcings, &
        field_advertise_log, field_realize_log, read_impexp_config_flnm, &
@@ -1567,10 +1568,6 @@ subroutine CheckImport(gcomp, rc)
     call regrid_import_mesh_to_grid(wrfhydro_grid, wrfhydro_mesh, &
          is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
 
-    print*, "DIAGNOSTIC =", diagnostic
-    stop "DIAFDJFDFD"
-
-
 
     do while (is%wrap%stepTimer(1) >= timestep)
       ! call wrfhydro advance
@@ -1585,6 +1582,11 @@ subroutine CheckImport(gcomp, rc)
       is%wrap%stepTimer(1) = &
         is%wrap%stepTimer(1) - timestep
     enddo
+
+    ! TODO: add (if mpas flag)
+    ! call regrid_export_grid_to_mesh(wrfhydro_grid, wrfhydro_mesh, &
+    !      is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
+
 
     if (is%wrap%memr_export .eq. MEMORY_COPY) then
       call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)

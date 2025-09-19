@@ -70,8 +70,8 @@ module wrfhydro_nuopc_gluecode
 
   public :: wrfhydro_write_geo_file
   public :: wrfhydro_GridCreate_tmp
-  public regrid_import_mesh_to_grid
-
+  public :: regrid_import_mesh_to_grid
+  public :: regrid_export_grid_to_mesh
 
   type(ESMF_RouteHandle) :: route_handle
   logical :: route_handle_initialized = .false.
@@ -919,6 +919,7 @@ contains
     if (ESMF_STDERRORCHECK(rc)) return
 
 
+
     ! if (ESMF_STDERRORCHECK(rc)) return
     ! call NUOPC_Realize(importState, field=field_import, rc=rc)
     ! if (ESMF_STDERRORCHECK(rc)) return
@@ -959,10 +960,9 @@ contains
 
     ! debugging
     integer :: unit
-    ! real(ESMF_KIND_R8), pointer :: meshp(:,:)
-    real(ESMF_KIND_R8), pointer :: meshp(:,:,:,:,:,:,:)
+    logical :: exists
 
-    call ESMF_LogWrite('--- STATE DEBUG: ', ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('--- IMPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
     call ESMF_StatePrint(state, rc=rc)
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
@@ -971,7 +971,7 @@ contains
 
     call ESMF_StateGet(state,itemNameList=itemNameList, rc=rc)
     call check(rc, __LINE__)
-    print *, "itemnamelist: ", itemNameList
+    print *, "Import itemnamelist: ", itemNameList
 
 
 
@@ -1001,36 +1001,154 @@ contains
           ! call ESMF_FieldGet(meshField, farrayPtr=meshp, rc=status)
           ! print *, "meshp=", meshp
 
-          call ESMF_FieldWrite(meshField, &
-               "vars/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+
+          inquire(file="vars/"//trim(cap_fld_list(n)%st_name)//"_grid_pre.nc", &
+               exist=exists)
+          if (exists .eqv. .false.) then
+             call ESMF_FieldWrite(gridField, &
+                  "vars/"//trim(cap_fld_list(n)%st_name)// "_grid_pre.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__)
+          end if
+
+
+          if (cap_fld_list(n)%import_handle_init .eqv. .false.) then
+             call ESMF_FieldRegridStore(srcField=meshField, &
+                  dstField=gridField, &
+                  regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+                  routehandle=cap_fld_list(n)%import_handle, rc=rc)
+             call check(rc, __LINE__)
+             cap_fld_list(n)%import_handle_init = .true.
+          end if
+
+          print*, "DEBUGGING: using var's handle to regrid field ", &
+               trim(cap_fld_list(n)%st_name)
+          call ESMF_FieldRegrid(meshField, gridField, &
+               cap_fld_list(n)%import_handle, rc=rc)
           call check(rc, __LINE__)
 
-          ! open(newunit=unit, file='vars/pre.txt', status='replace', &
-          !      action='write')
-          ! write(unit,'(*(G0,1X))') rt_domain(did)%stc(:,:,1)
-          ! close(unit)
-          call ESMF_FieldWrite(gridField, &
-               "vars/"//trim(cap_fld_list(n)%st_name)// "_grid_pre.nc", &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__)
+          ! DEBUG WRITING VARS
+          inquire(file="vars/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
+               exist=exists)
+          if (exists .eqv. .false.) then
+             call ESMF_FieldWrite(meshField, &
+                  "vars/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__)
+             call ESMF_FieldWrite(gridField, &
+                  "vars/"//trim(cap_fld_list(n)%st_name)// "_grid_post.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__)
+          end if
 
-          call ESMF_FieldRegrid(meshField, gridField, route_handle, rc=rc)
-          call check(rc, __LINE__)
-
-          call ESMF_FieldWrite(gridField, &
-               "vars/"//trim(cap_fld_list(n)%st_name)// "_grid_post.nc", &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__)
-
-          ! open(newunit=unit, file='vars/post.txt', status='replace', &
-          !      action='write')
-          ! write(unit,'(*(G0,1X))') rt_domain(did)%stc(:,:,1)
-          ! close(unit)
 
        end if
     end do
   end subroutine regrid_import_mesh_to_grid
+
+  subroutine regrid_export_grid_to_mesh(grid, mesh, state, did, memflg)
+    type(ESMF_Grid), intent(in) :: grid
+    type(ESMF_Mesh), intent(in) :: mesh
+    type(ESMF_State),intent(in) :: state
+    integer, intent(in) :: did
+    type(memory_flag), intent(in) :: memflg
+    type(ESMF_Field) :: meshField, gridField
+    integer :: n, rc, itemCount
+    character(len=64),allocatable          :: itemNameList(:)
+    logical :: exported
+
+    ! debugging
+    integer :: unit
+    logical :: exists
+
+    call ESMF_LogWrite('--- EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+    call ESMF_StatePrint(state, rc=rc)
+
+    call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
+    call check(rc, __LINE__)
+    allocate(itemNameList(itemCount), stat=rc)
+
+    call ESMF_StateGet(state,itemNameList=itemNameList, rc=rc)
+    call check(rc, __LINE__)
+    print *, "Export itemnamelist: ", itemNameList
+
+    do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
+       if (cap_fld_list(n)%ad_export) then
+          exported = NUOPC_IsConnected(state, &
+            fieldName=trim(cap_fld_list(n)%st_name), rc=rc)
+          call check(rc, __LINE__)
+
+          print *, "exported = ", exported,", name: ", cap_fld_list(n)%st_name
+          call ESMF_StateGet(state, itemName=trim(cap_fld_list(n)%st_name), &
+               field=meshField, rc=rc)
+          call check(rc, __LINE__)
+
+          gridField = field_create(cap_fld_list(n)%st_name, grid, did, &
+               memflg, rc)
+          call check(rc, __LINE__)
+
+          ! ESMF_FieldCreate(name=fld_name, grid=grid, &
+          !   farray=rt_domain(did)%stc(:,:,1), &
+          !   indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          ! gridField = ESMF_FieldCreate(name=cap_fld_list(n)%st_name, &
+          !      staggerloc=ESMF_STAGGERLOC_CENTER,         &
+          !      grid=grid, typekind=ESMF_TYPEKIND_R8, rc=rc)
+          ! call check(rc, __LINE__)
+
+          ! call ESMF_FieldGet(meshField, farrayPtr=meshp, rc=status)
+          ! print *, "meshp=", meshp
+
+
+          inquire(&
+               file="out_vars/"//trim(cap_fld_list(n)%st_name)// &
+               "_mesh_pre.nc", &
+               exist=exists)
+          if (exists .eqv. .false.) then
+             call ESMF_FieldWrite(meshField, &
+                  "out_vars/"//trim(cap_fld_list(n)%st_name)// &
+                  "_mesh_pre.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__)
+          end if
+
+          if (cap_fld_list(n)%export_handle_init .eqv. .false.) then
+             call ESMF_FieldRegridStore(srcField=gridField, &
+                  dstField=meshField, &
+                  regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+                  routehandle=cap_fld_list(n)%export_handle, rc=rc)
+             call check(rc, __LINE__)
+             cap_fld_list(n)%export_handle_init = .true.
+          end if
+
+          print*, "DEBUGGING: using var's handle to regrid field ", &
+               trim(cap_fld_list(n)%st_name)
+          call ESMF_FieldRegrid(gridField, meshField, &
+               cap_fld_list(n)%export_handle, rc=rc)
+          call check(rc, __LINE__)
+
+          ! DEBUG WRITING VARS
+          inquire(&
+               file="out_vars/"//trim(cap_fld_list(n)%st_name)// &
+               "_mesh_post.nc", &
+               exist=exists)
+          if (exists .eqv. .false.) then
+             call ESMF_FieldWrite(meshField, &
+                  "out_vars/"//trim(cap_fld_list(n)%st_name)// &
+                  "_mesh_post.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__)
+             call ESMF_FieldWrite(gridField, &
+                  "out_vars/"//trim(cap_fld_list(n)%st_name)// &
+                  "_grid.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__)
+          end if
+
+
+       end if
+    end do
+  end subroutine regrid_export_grid_to_mesh
+
 
   subroutine dump_state(state, label)
     use ESMF

@@ -25,14 +25,19 @@ module wrfhydro_nuopc_fields
 
   type cap_fld_type
     sequence
-    character(len=64)           :: sd_name   = "dummy" ! standard name
-    character(len=64)           :: st_name   = "dummy" ! state name
-    character(len=64)           :: units     = "-"     ! units
-    logical                     :: ad_import = .FALSE. ! advertise import
-    logical                     :: ad_export = .FALSE. ! advertise export
-    real(ESMF_KIND_R8)          :: vl_fillv  = ESMF_MISSING_VALUE ! default
-    logical                     :: rl_import = .FALSE. ! realize import
-    logical                     :: rl_export = .FALSE. ! realize export
+    character(len=64)      :: sd_name   = "dummy" ! standard name
+    character(len=64)      :: st_name   = "dummy" ! state name
+    character(len=64)      :: units     = "-"     ! units
+    logical                :: ad_import = .FALSE. ! advertise import
+    logical                :: ad_export = .FALSE. ! advertise export
+    real(ESMF_KIND_R8)     :: vl_fillv  = ESMF_MISSING_VALUE ! default
+    integer                :: num_dims  = 2
+    logical                :: rl_import = .FALSE. ! realize import
+    logical                :: rl_export = .FALSE. ! realize export
+    type(ESMF_RouteHandle) :: import_handle
+    logical                :: import_handle_init = .FALSE. ! realize export
+    type(ESMF_RouteHandle) :: export_handle
+    logical                :: export_handle_init = .FALSE. ! realize export
   end type cap_fld_type
 
   logical, parameter :: IMPORT_T = .true.
@@ -44,35 +49,35 @@ module wrfhydro_nuopc_fields
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
     cap_fld_type("inst_soil_temperature                   ","stc     ", &
-                 "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1  ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2  ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3  ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4  ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_1          ","smc1    ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_2          ","smc2    ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_3          ","smc3    ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_4          ","smc4    ", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
                  "K", IMPORT_T, EXPORT_F, 288.d0),                 &
     cap_fld_type("soil_temperature_layer_2                ","stc2    ", &
-                 "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_temperature_layer_3                ","stc3    ", &
-                 "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_temperature_layer_4                ","stc4    ", &
-                 "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_porosity                           ","smcmax1 ", &
                  "1     ", IMPORT_F, EXPORT_F, 0.45d0),                 &
     cap_fld_type("vegetation_type                         ","vegtyp  ", &
@@ -80,13 +85,16 @@ module wrfhydro_nuopc_fields
     cap_fld_type("surface_water_depth                     ","sfchead ", &
                  "mm    ", IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
-                 "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
+                 "mm    ", IMPORT_T, EXPORT_F, 0.00d0),             &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
-                 "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
+                 "mm    ", IMPORT_T, EXPORT_F, 0.00d0),             &
+    ! these two accumulated variables break during runtime
+    ! it could be they are pointing to the same variable
+    ! as infxsrt and soldrain on the MPAS side
     cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
-                 "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0),             &
+                 "mm    ", IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
-                 "mm    ", TMP_IMPORT_T, EXPORT_F, 0.00d0)              &
+                 "mm    ", IMPORT_F, EXPORT_F, 0.00d0)              &
     /)
 
   public cap_fld_list
@@ -762,7 +770,15 @@ contains
        !      meshloc=ESMF_MESHLOC_ELEMENT, &
        !      rc=rc)
 
-      select case (trim(fld_name))
+       field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+            typekind=ESMF_TYPEKIND_R8, &
+            indexflag=ESMF_INDEX_DELOCAL, &
+            meshloc=ESMF_MESHLOC_ELEMENT, &
+            rc=rc)
+       call check(rc, __LINE__)
+
+
+      ! select case (trim(fld_name))
         ! case ('smc')
         !   field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
         !        typekind=ESMF_TYPEKIND_R8, &
@@ -830,20 +846,18 @@ contains
         !     farray=rt_domain(did)%smcmax1, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
         !   call check(rc, __LINE__)
-      case ('stc1')
-          ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
-          !      meshloc=ESMF_MESHLOC_ELEMENT, &
-          !   ! farray=rt_domain(did)%stc(:,:,1), &
-          !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-       field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
-            typekind=ESMF_TYPEKIND_R8, &
-            indexflag=ESMF_INDEX_DELOCAL, &
-            meshloc=ESMF_MESHLOC_ELEMENT, &
-            rc=rc)
-
-
-          call check(rc, __LINE__)
-        ! case ('stc2')
+      ! case ('stc1')
+      !     ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+      !     !      meshloc=ESMF_MESHLOC_ELEMENT, &
+      !     !   ! farray=rt_domain(did)%stc(:,:,1), &
+      !     !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+      !    field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+      !         typekind=ESMF_TYPEKIND_R8, &
+      !         indexflag=ESMF_INDEX_DELOCAL, &
+      !         meshloc=ESMF_MESHLOC_ELEMENT, &
+      !         rc=rc)
+      !    call check(rc, __LINE__)
+      ! case ('stc2')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%stc(:,:,2), &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
@@ -878,13 +892,13 @@ contains
         !     farray=rt_domain(did)%soldrain, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
       !   !   call check(rc, __LINE__)
-        case default
-           print *, "ADD BACK IN "// trim(fld_name)
-           !     call ESMF_LogSetError(ESMF_FAILURE, &
-      !       msg=method//": Field hookup missing: "//trim(fld_name), &
-      !       file=filename, rcToReturn=rc)
-          return
-      end select
+      !   case default
+      !      print *, "ADD BACK IN "// trim(fld_name)
+      !      !     call ESMF_LogSetError(ESMF_FAILURE, &
+      ! !       msg=method//": Field hookup missing: "//trim(fld_name), &
+      ! !       file=filename, rcToReturn=rc)
+      !     return
+      ! end select
     ! elseif (memflg .eq. MEMORY_COPY) then
     !   select case (trim(fld_name))
     !     case ('smc','slc','stc')
@@ -1043,7 +1057,7 @@ contains
           call check(rc, __LINE__)
         case ('udrunoff')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%soldrain, &
+            farray=rt_domain(did)%soldrain(:,:), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__)
         case default
@@ -1338,6 +1352,12 @@ contains
             rt_domain(did)%infxsrt = farrayPtr2d
           case ('soldrain')
             rt_domain(did)%soldrain = farrayPtr2d
+          case ('sfcrunoff')
+             print *, "WRFH: check state_copy_tohyd for sfcrunoff is correct"
+             rt_domain(did)%infxsrt = farrayPtr2d
+          case ('udrunoff')
+             print *, "WRFH: check state_copy_tohyd for udrunoff is correct"
+            rt_domain(did)%soldrain = farrayPtr2d
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1449,6 +1469,12 @@ contains
             farrayPtr2d = rt_domain(did)%infxsrt
           case ('soldrain')
             farrayPtr2d = rt_domain(did)%soldrain
+          case ('sfcrunoff')
+             print *, "WRFH: check state_copy_frhyd for sfcrunoff is correct"
+             farrayPtr2d = rt_domain(did)%infxsrt
+          case ('udrunoff')
+             print *, "WRFH: check state_copy_frhyd for udrunoff is correct"
+             farrayPtr2d = rt_domain(did)%soldrain
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
