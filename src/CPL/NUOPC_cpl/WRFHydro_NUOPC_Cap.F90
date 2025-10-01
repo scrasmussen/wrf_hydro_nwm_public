@@ -255,6 +255,7 @@ module WRFHydro_NUOPC
 
   use WRFHYDRO_NUOPC_Flags
   use WRFHydro_ESMF_Extensions
+  use wrfhydro_nuopc_utils, only: check, printa
 
 
   implicit none
@@ -264,6 +265,7 @@ module WRFHydro_NUOPC
   public SetServices
   public SetVM
 
+  character(len=ESMF_MAXSTR), parameter :: file = __FILE__
   character(len=*), PARAMETER :: label_InternalState = 'InternalState'
   character(len=8), dimension(4) :: specialStringList = &
        ["min     ", "max     ", "bit16   ", "maxplus "]
@@ -329,33 +331,33 @@ module WRFHydro_NUOPC
       msg='WRFHYDRO: Allocation of internal state memory failed.', &
       file=FILENAME, rcToReturn=rc)) return ! bail out
     call ESMF_UserCompSetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! the NUOPC model component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! switching to IPD versions
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       userRoutine=InitializeP0, phase=0, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p1"/), userRoutine=InitializeP1, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p3"/), userRoutine=InitializeP3, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! attach specializing method(s)
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_DataInitialize, &
        specRoutine=DataInitialize, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call NUOPC_CompSpecialize(gcomp, speclabel=model_label_SetClock, &
       specRoutine=SetClock, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_MethodRemove(gcomp, label=model_label_CheckImport, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return  ! bail ou
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_CheckImport, &
@@ -363,10 +365,10 @@ module WRFHydro_NUOPC
     if (ESMF_STDERRORCHECK(rc)) return  ! bail ou
     call NUOPC_CompSpecialize(gcomp, speclabel=model_label_Advance, &
       specRoutine=ModelAdvance, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, &
       specRoutine=ModelFinalize, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
   end subroutine
 
@@ -399,34 +401,34 @@ module WRFHydro_NUOPC
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
          defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! Switch to IPDv03 by filtering all other phaseMap entries
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
       acceptStringList=(/"IPDv03p"/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     call WRFHydro_AttributeGet(rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! change directory for multiple instances
     if (is%wrap%multiInstance) then
@@ -435,14 +437,14 @@ module WRFHydro_NUOPC
           ESMF_LOGMSG_INFO)
       endif
       call WRFHYDRO_ESMF_ChDir(trim(cname),rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     ! prepare diagnostics folder
     if (btest(diagnostic,16) .OR. is%wrap%writeRestart) then
       call ESMF_UtilIOMkDir(pathName=trim(is%wrap%dirOutput), &
         relaxedFlag=.true., rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
     call ESMF_LogWrite("WRFH: exiting Initializep0", ESMF_LOGMSG_INFO, rc=rc)
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -461,72 +463,72 @@ module WRFHydro_NUOPC
 
       ! check gcomp for config
       call ESMF_GridCompGet(gcomp, configIsPresent=configIsPresent, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
 
       if (configIsPresent) then
         ! read and ingest free format component attributes
         call ESMF_GridCompGet(gcomp, config=config, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         attrFF = NUOPC_FreeFormatCreate(config, &
           label=trim(cname)//"_attributes::", relaxedflag=.true., rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call NUOPC_CompAttributeIngest(gcomp, attrFF, addFlag=.true., rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
 
       ! Realize all import fields
       atName="realize_all_import"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%realizeAllImport = (trim(atVal)=="TRUE")
       endif
 
       ! Realize all export fields
       atName="realize_all_export"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%realizeAllExport = (trim(atVal)=="TRUE")
       endif
 
       ! Determine hydro configuration filename
       atName="config_file"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%configFile = atVal
       endif
 
       ! Determine DAS configuration filename
       atName="das_config_file"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%dasConfigFile = atVal
       endif
 
       ! Time Step
       atName="time_step"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         read (atVal,*,iostat=stat) is%wrap%timeStepInt
         if (stat /= 0) then
           call ESMF_LogSetError(ESMF_FAILURE, &
@@ -539,173 +541,173 @@ module WRFHydro_NUOPC
       ! Forcing Directory
       atName="forcings_directory"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%forcingDir = trim(atVal)
       endif
 
       ! Determine Domain ID
       atName="did"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%did = ESMF_UtilString2Int(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
 
       ! Connect Nest to Nest
       atName="nest_to_nest"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%nestToNest = (trim(atVal)=="TRUE")
       endif
 
       ! import data memory type
       atName="field_memory_import"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%memr_import = atVal
       endif
 
       ! export data memory type
       atName="field_memory_export"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%memr_export = atVal
       endif
 
       ! import data initialization type
       atName="initialize_import"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%init_import = atVal
       endif
 
       ! backwards compatible setting (overrides initialize_import)
       atName="import_dependency"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         if (trim(atVal)=="TRUE") is%wrap%init_import = FILLV_DEPENDENCY
       endif
 
       ! export data initialization type
       atName="initialize_export"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%init_export = atVal
       endif
 
       ! backwards compatible setting (overrides initialize_export)
       atName="read_restart"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         if (trim(atVal)=="TRUE") is%wrap%init_export = FILLV_FILE
       endif
 
       ! Get check import
       atName="check_import"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%chck_import = atVal
       endif
 
       ! Get missing import handler
       atName="missing_import"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%misg_import = atVal
       endif
 
       ! Get reset import handler
       atName="reset_import"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%reset_import = (trim(atVal)=="TRUE")
       endif
 
       ! Get component output directory
       atName="output_directory"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%dirOutput = trim(atVal)
       endif
 
       ! Get component input directory
       atName="input_directory"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%dirInput = trim(atVal)
       endif
 
       ! Write cap restart state
       atName="write_restart"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%writeRestart = (trim(atVal)=="TRUE")
       endif
 
       ! Determine Import Dependency
       atName="multi_instance_hyd"
       call NUOPC_CompAttributeGet(gcomp, name=atName, isPresent=atPres, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (atPres) then
         call NUOPC_CompAttributeGet(gcomp, name=atName, value=atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         atVal = ESMF_UtilStringUpperCase(atVal, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         is%wrap%multiInstance = (trim(atVal)=="TRUE")
       endif
 
@@ -810,29 +812,31 @@ module WRFHydro_NUOPC
     call ESMF_LogWrite("WRFH: entering Initializep1", ESMF_LOGMSG_INFO, rc=rc)
 
     ! Query component for name, verbosity, and diagnostic values
-!    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
-!      diagnostic=diagnostic, rc=rc)
+    ! call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
+    !   diagnostic=diagnostic, rc=rc)
+    call check(rc, __LINE__, file)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
+
 
 
     wrfhydro_grid = wrfhydro_GridCreate_tmp(1, rc=rc)
@@ -843,6 +847,7 @@ module WRFHydro_NUOPC
          is%wrap%did, &
          is%wrap%NStateImp(1), &
          rc)
+    ! stop "need to export state"
 
     call wrfhydro_write_geo_file(wrfhydro_grid, wrfhydro_mesh, regrid_handle)
 
@@ -866,22 +871,24 @@ module WRFHydro_NUOPC
     if(.NOT.is%wrap%nestToNest) then
       is%wrap%NStateImp(1) = importState
       is%wrap%NStateExp(1) = exportState
+      call ESMF_LogWrite("WRFH: not nested export state", ESMF_LOGMSG_INFO, rc&
+           &=rc)
     else
       write (nStr,"(I0)") is%wrap%did
       call NUOPC_AddNestedState(importState, &
         CplSet=trim(is%wrap%hgrid), &
         nestedStateName="NestedStateImp_N"//trim(nStr), &
         nestedState=is%wrap%NStateImp(1), rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       call NUOPC_AddNestedState(exportState, &
         CplSet=trim(is%wrap%hgrid), &
         nestedStateName="NestedStateExp_N"//trim(nStr), &
         nestedState=is%wrap%NStateExp(1), rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     call field_dictionary_add(fieldList=cap_fld_list, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     !!
     !! advertise import and export fields
@@ -890,10 +897,12 @@ module WRFHydro_NUOPC
       importState=is%wrap%NStateImp(1), &
       exportState=is%wrap%NStateExp(1), &
       rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     if (btest(verbosity,16)) call field_advertise_log(cap_fld_list,cname,rc=rc)
+    call field_advertise_log(cap_fld_list,cname,rc=rc)
     call ESMF_LogWrite("WRFH: exiting Initializep1: advertise", ESMF_LOGMSG_INFO, rc=rc)
+    ! stop "looking at end of initializep1"
   end subroutine InitializeP1
 
   !-----------------------------------------------------------------------------
@@ -924,30 +933,31 @@ module WRFHydro_NUOPC
 
     print *, "WRFH: entering Initializep3: realize"
     call ESMF_LogWrite("WRFH: entering Initializep3: realize", ESMF_LOGMSG_INFO, rc=rc)
+
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     write (nStr,"(I0)") is%wrap%did
 
@@ -975,7 +985,7 @@ module WRFHydro_NUOPC
     ! if (btest(verbosity,16)) then
     !   call WRFHYDRO_ESMF_LogGrid(WRFHYDRO_Grid, &
     !     trim(cname)//"_"//rname//"_D"//trim(nStr),rc=rc)
-    !   call check(rc, __LINE__)
+    !   call check(rc, __LINE__, file)
     ! endif
 
     ! ! Write grid to NetCDF file.
@@ -983,8 +993,20 @@ module WRFHydro_NUOPC
     !   call WRFHYDRO_ESMF_GridWrite(WRFHYDRO_Grid, &
     !     trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
     !     rname//'_grid_D'//trim(nStr)//".nc", rc=rc)
-    !   call check(rc, __LINE__)
+    !   call check(rc, __LINE__, file)
     ! endif
+
+    ! THIS GET NOT IN CODE
+    ! call NUOPC_ModelGet(gcomp, importState=importState, &
+    !   exportState=exportState, rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! ! STATES OBJECTS ARE NOT VALID HERE
+    ! call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! call ESMF_StateLog(exportState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! stop "WRFH: in realize printing states"
+
 
 
     mesh = ESMF_MeshCreate(filename="frontrange.scrip.nc", &
@@ -1007,16 +1029,37 @@ module WRFHydro_NUOPC
       memr_import=is%wrap%memr_import, &
       memr_export=is%wrap%memr_export, &
       rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     is%wrap%lsm_forcings(1) = check_lsm_forcings(is%wrap%NStateImp(1),rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     if (btest(verbosity,16)) call field_realize_log(cap_fld_list,cname,rc=rc)
     if (btest(verbosity,16)) call LogMode()
     call ESMF_LogWrite("WRFH: exiting Initializep3: realize", &
          ESMF_LOGMSG_INFO, rc=rc)
-    print *, "WRFH: exiting Initializep3: realize"
+
+    ! print *, "WRFH: exiting Initializep3: realize"
+    ! stop "WRFH: exit initP3"
+    ! call ESMF_StateValidate(is%wrap%NStateImp(1), rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! stop "HJI"
+    ! call field_advertise_log(cap_fld_list,"HYDRO",rc=rc)
+
+
+    ! print *, "trying to print export state"
+    ! call ESMF_LogWrite("WRFH: checking export state", ESMF_LOGMSG_INFO, rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! call ESMF_StateValidate(is%wrap%NStateExp(1), rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! call ESMF_LogWrite("WRFH: printing export state", ESMF_LOGMSG_INFO, rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    ! call check(rc, __LINE__, file)
+    ! call ESMF_LogWrite("WRFH:afterprintexport state", ESMF_LOGMSG_INFO, rc=rc)
+    ! stop "TRYING TO LOOK AT WRFH EXPORT STATE"
+
+
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     !---------------------------------------------------------------------------
@@ -1069,41 +1112,41 @@ module WRFHydro_NUOPC
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the Component for its clock
     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! set up invalid time (by convention)
     call ESMF_TimeSet(invalidTime, yy=99999999, mm=01, dd=01, &
       h=00, m=00, s=00, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! get the current time out of the clock
     call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     write (nStr,"(I0)") is%wrap%did
 
@@ -1113,19 +1156,19 @@ module WRFHydro_NUOPC
         fillValue=ESMF_MISSING_VALUE, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       importUpdated = .TRUE.
     elseif (is%wrap%init_import .eq. FILLV_ZERO) then
       call state_fill_uniform(is%wrap%NStateImp(1), &
         fillValue=0.0_ESMF_KIND_R8, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       importUpdated = .TRUE.
     elseif (is%wrap%init_import .eq. FILLV_DEPENDENCY) then
       importCurrent = NUOPC_IsAtTime(is%wrap%NStateImp(1), &
         time=currTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (importCurrent) then
         call ESMF_LogWrite( &
           trim(cname)//': '//rname//' Initialize-Data-Dependency SATISFIED!!! Nest='//trim(nStr), &
@@ -1148,21 +1191,21 @@ module WRFHydro_NUOPC
           "_imp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       importUpdated = .TRUE.
     elseif (is%wrap%init_import .eq. FILLV_MODEL) then
       if (is%wrap%memr_import .eq. MEMORY_COPY) then
         call state_copy_frhyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
       call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (mdlRestart) then
         call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       else
         call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
       importUpdated = .TRUE.
     else
@@ -1180,14 +1223,14 @@ module WRFHydro_NUOPC
         fillValue=ESMF_MISSING_VALUE, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_ZERO) then
       call state_fill_uniform(is%wrap%NStateExp(1), &
         fillValue=0.0_ESMF_KIND_R8, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_PRESCRIBE) then
       call state_fill_prescribe(is%wrap%NStateExp(1), &
@@ -1200,21 +1243,21 @@ module WRFHydro_NUOPC
           "_exp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_MODEL) then
       if (is%wrap%memr_export .eq. MEMORY_COPY) then
         call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
       call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       if (mdlRestart) then
         call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       else
         call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
       exportUpdated = .TRUE.
     else
@@ -1230,19 +1273,19 @@ module WRFHydro_NUOPC
     ! generic code that all inter-model data dependencies are satisfied
     if (importUpdated.AND.exportUpdated) then
       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       ! Write initialization files
       if (btest(diagnostic,16)) then
         call NUOPC_Write(is%wrap%NStateImp(1), &
           fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
             rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call NUOPC_Write(is%wrap%NStateExp(1), &
           fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
             rname//"_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       endif
     endif
 
@@ -1273,42 +1316,42 @@ module WRFHydro_NUOPC
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the Component for its clock
     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the clock for its timestep
     call ESMF_ClockGet(modelClock, timeStep=timeStep, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the timestep for seconds
     call ESMF_TimeIntervalGet(timestep,s=dt,rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     print *, "WRFH: dt = ", dt
 
     call ESMF_TimeIntervalGet(timeStep, timeString=s, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     print *, "WRFH: timestep = ", trim(s)
 
     ! is%wrap%timeStepInt = 60
@@ -1321,25 +1364,25 @@ module WRFHydro_NUOPC
     if (is%wrap%timeStepInt /= 0) then
       call ESMF_TimeIntervalSet(timestep, &
         s=is%wrap%timeStepInt, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       call WRFHYDRO_set_timestep(is%wrap%did,real(is%wrap%timeStepInt),rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
       call ESMF_ClockSet(modelClock, timeStep=timeStep, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     else
       call WRFHYDRO_set_timestep(is%wrap%did,real(dt),rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     call NUOPC_CompSetClock(gcomp, modelClock, timeStep, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     is%wrap%clock(1) = modelClock
 
     ! Reset Timers
     call ESMF_TimeIntervalSet(is%wrap%stepTimer(1), &
       s_r8=0._ESMF_KIND_R8, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     if (btest(verbosity,16)) call LogClock()
 
@@ -1359,13 +1402,13 @@ module WRFHydro_NUOPC
       if (ESMF_ClockIsCreated(is%wrap%clock(1))) then
         call ESMF_ClockGet(is%wrap%clock(1), &
           currTime=currTime,timeStep=timestep,rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call ESMF_TimeGet(currTime, &
           timeString=currTimeStr,rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call ESMF_TimeIntervalGet(timestep, &
           timeString=timestepStr,rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       else
         currTimeStr = "(not_created)"
         timestepStr = "(not_created)"
@@ -1406,39 +1449,39 @@ subroutine CheckImport(gcomp, rc)
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the Component for its clock
     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! get the curr time out of the clock
     call ESMF_ClockGet(modelClock, currTime=modelCurrTime, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! check that Fields in the importState show correct timestamp
 
     allCurrTime = NUOPC_IsAtTime(is%wrap%NStateImp(1), modelCurrTime, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     if (.not.allCurrTime) then
       call ESMF_LogWrite(trim(cname)//": NUOPC INCOMPATIBILITY DETECTED: "// &
         "Import Fields not at correct time", &
@@ -1477,27 +1520,27 @@ subroutine CheckImport(gcomp, rc)
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
 
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the component for its clock, importState, and exportState
     call NUOPC_ModelGet(gcomp, &
@@ -1505,17 +1548,17 @@ subroutine CheckImport(gcomp, rc)
       importState=importState, &
       exportState=exportState, &
       rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the clock for its current time and timestep
     call ESMF_ClockGet(modelClock, &
       currTime=currTime, timeStep=timeStep, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     advEndTime = currTime + timeStep
     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_TimeGet(advEndTime, timeString=advEndTimeStr, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     write (nStr,"(I0)") is%wrap%did
 
@@ -1525,21 +1568,21 @@ subroutine CheckImport(gcomp, rc)
         fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
           rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
         overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     if (is%wrap%memr_import .eq. MEMORY_COPY) then
       call state_copy_tohyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     if (is%wrap%misg_import .eq. MISSINGVAL_FAIL) then
       call state_check_missing(is%wrap%NStateImp(1), did=is%wrap%did, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     elseif (is%wrap%misg_import .eq. MISSINGVAL_PRESCRIBE) then
       call state_prescribe_missing(is%wrap%NStateImp(1), did=is%wrap%did, &
         fieldList=cap_fld_list, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     elseif (is%wrap%misg_import .eq. MISSINGVAL_IGNORE) then
     ! DO NOTHING
     else
@@ -1555,13 +1598,13 @@ subroutine CheckImport(gcomp, rc)
         memflg=is%wrap%memr_import, &
         filePrefix=trim(is%wrap%dirOutput)//"/wrfhydro_"// &
           rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     is%wrap%stepTimer(1) = is%wrap%stepTimer(1) + timeStep
 
     call ESMF_ClockGet(is%wrap%clock(1),timeStep=timestep,rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
 
     ! TODO: add (if mpas flag)
@@ -1578,20 +1621,31 @@ subroutine CheckImport(gcomp, rc)
         is%wrap%clock(1),is%wrap%NStateImp(1),is%wrap%NStateExp(1),rc)
       if(ESMF_STDERRORCHECK(rc)) return ! bail out
       call ESMF_ClockAdvance(is%wrap%clock(1),rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       is%wrap%stepTimer(1) = &
         is%wrap%stepTimer(1) - timestep
-    enddo
-
-    ! TODO: add (if mpas flag)
-    ! call regrid_export_grid_to_mesh(wrfhydro_grid, wrfhydro_mesh, &
-    !      is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
-
+    end do
 
     if (is%wrap%memr_export .eq. MEMORY_COPY) then
       call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
+      print *, "POST CALL TO STATE_COPY_FRHYD"
     endif
+
+
+    call print_wrap(is%wrap)
+
+
+    call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    ! stop "looking at export state"
+
+
+
+    ! TODO: add (if mpas flag)
+    print *, "add this back in regrid_export_grid_to_mesh"
+    ! call regrid_export_grid_to_mesh(wrfhydro_grid, wrfhydro_mesh, &
+    !      is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
+
 
     if (is%wrap%reset_import) then
       if ((is%wrap%memr_import .eq. MEMORY_POINTER) .AND. &
@@ -1613,7 +1667,7 @@ subroutine CheckImport(gcomp, rc)
         fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
           rname//"_exp_D"//trim(nStr)//"_"//trim(advEndTimeStr)//"_", &
         overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
     call ESMF_LogWrite("WRFH: exiting Advance", ESMF_LOGMSG_INFO, rc=rc)
 
@@ -1647,13 +1701,13 @@ subroutine CheckImport(gcomp, rc)
       if (ESMF_ClockIsCreated(is%wrap%clock(nIndex))) then
         call ESMF_ClockGet(is%wrap%clock(nIndex), &
           currTime=nestCurrTime,timeStep=nestTimestep,rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call ESMF_TimeGet(nestCurrTime, &
           timeString=nCurrTimeStr,rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
         call ESMF_TimeIntervalGet(nestTimestep, &
           timeString=nTimeStepStr,rc=rc)
-        call check(rc, __LINE__)
+        call check(rc, __LINE__, file)
       else
         nCurrTimeStr = "(not_created)"
         nTimestepStr = "(not_created)"
@@ -1695,36 +1749,36 @@ subroutine CheckImport(gcomp, rc)
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
       specialStringList=specialStringList, &
       specialValueList=(/0,65535,65536,131071/), rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query Component for its internal State
     nullify(is%wrap)
     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     ! query the Component for its clock
     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     write (nStr,"(I0)") is%wrap%did
 
@@ -1734,11 +1788,11 @@ subroutine CheckImport(gcomp, rc)
         fileNamePrefix=trim(is%wrap%dirOutput)//"/restart_"//trim(cname)// &
           "_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-      call check(rc, __LINE__)
+      call check(rc, __LINE__, file)
     endif
 
     call wrfhydro_nuopc_fin(is%wrap%did,rc)
-    call check(rc, __LINE__)
+    call check(rc, __LINE__, file)
 
     deallocate(is%wrap, stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
@@ -1747,15 +1801,41 @@ subroutine CheckImport(gcomp, rc)
 
   end subroutine
   !-----------------------------------------------------------------------------
-  subroutine check(rc, line)
-    integer, intent(in) :: rc
-    integer, intent(in) :: line
-    logical :: res
-    character(len=ESMF_MAXSTR), parameter :: file = __FILE__
 
-    res = ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=line, file=file)
-    if (res .eqv. .true.) error stop "Bad Check, msg = " // ESMF_LOGERR_PASSTHRU
-  end subroutine check
+  subroutine print_wrap(wrap)
+    type(type_InternalStateStruct), intent(in) :: wrap
+    integer :: rc
+    print *, "=========================================="
+    print *, "realizeAllImport = ", wrap%realizeAllImport
+    print *, "realizeAllExport = ", wrap%realizeAllExport
+    print *, "configFile = ", wrap%configFile
+    print *, "dasConfigFile = ", wrap%dasConfigFile
+    print *, "timeStepInt = ", wrap%timeStepInt
+    print *, "forcingDir = ", wrap%forcingDir
+    print *, "did = ", wrap%did
+    print *, "nestToNest = ", wrap%nestToNest
+    ! print *, "memr_import = ", wrap%memr_import
+    ! print *, "memr_export = ", wrap%memr_export
+    ! print *, "init_import = ", wrap%init_import
+    ! print *, "init_export = ", wrap%init_export
+    ! print *, "chck_import = ", wrap%chck_import
+    ! print *, "misg_import = ", wrap%misg_import
+    print *, "reset_import = ", wrap%reset_import
+    print *, "dirOutput = ", wrap%dirOutput
+    print *, "dirInput = ", wrap%dirInput
+    print *, "writeRestart = ", wrap%writeRestart
+    print *, "multiInstance = ", wrap%multiInstance
+    print *, "hgrid = ", wrap%hgrid
+    print *, "nnests = ", wrap%nnests
+    ! print *, "clock(1) = ", wrap%clock(1)
+    ! print *, "stepTimer(1) = ", wrap%stepTimer(1)
+    ! print *, "NStateImp(1) = check LOG"
+    call ESMF_StatePrint(wrap%NStateImp(1), rc=rc)
+    call check(rc, __LINE__, file)
+    ! print *, "NStateExp(1) = check LOG"
+    call ESMF_StatePrint(wrap%NStateExp(1), rc=rc)
+    call check(rc, __LINE__, file)
+    ! print *, "lsm_forcings(1) = ", wrap%lsm_forcings(1)
 
+  end subroutine print_wrap
 end module
