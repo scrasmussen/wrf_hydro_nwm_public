@@ -5,6 +5,7 @@ endif (NOT TARGET esmf)
 
 ### Library Files
 list(APPEND wrfhydro_nuopc_files
+  wrfhydro_nuopc_utils.F90
   WRFHydro_NUOPC_Cap.F90
   WRFHydro_NUOPC_Gluecode.F90
   WRFHydro_NUOPC_Fields.F90
@@ -81,7 +82,6 @@ target_link_libraries(${hydro_nuopc_library}
   esmf
   ${NETCDF_LIBRARIES}
   )
-
 
 
 ### Library Installation
