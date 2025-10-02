@@ -192,7 +192,7 @@ endif()
 #set -DWRF_HYDRO_NUOPC from env
 message("WRF_HYDRO_NUOPC = " ${WRF_HYDRO_NUOPC} )
 if (WRF_HYDRO_NUOPC STREQUAL "1" )
-        add_definitions(-DWRF_HYDRO_NUOPC)
+        add_definitions(-DWRF_HYDRO_NUOPC -g)
 endif()
 
 option(BUILD_CROCUS "Build Crocus" ON)
