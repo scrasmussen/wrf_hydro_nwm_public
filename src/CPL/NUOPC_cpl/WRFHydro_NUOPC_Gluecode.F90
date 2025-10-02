@@ -1007,11 +1007,11 @@ contains
           ! print *, "meshp=", meshp
 
 
-          inquire(file="vars/"//trim(cap_fld_list(n)%st_name)//"_grid_pre.nc", &
+          inquire(file="vars_in/"//trim(cap_fld_list(n)%st_name)//"_grid_pre.nc", &
                exist=exists)
           if (exists .eqv. .false.) then
              call ESMF_FieldWrite(gridField, &
-                  "vars/"//trim(cap_fld_list(n)%st_name)// "_grid_pre.nc", &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// "_grid_pre.nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
@@ -1033,15 +1033,15 @@ contains
           call check(rc, __LINE__, file)
 
           ! DEBUG WRITING VARS
-          inquire(file="vars/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
+          inquire(file="vars_in/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
                exist=exists)
           if (exists .eqv. .false.) then
              call ESMF_FieldWrite(meshField, &
-                  "vars/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
              call ESMF_FieldWrite(gridField, &
-                  "vars/"//trim(cap_fld_list(n)%st_name)// "_grid_post.nc", &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// "_grid_post.nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
@@ -1063,7 +1063,7 @@ contains
     ! debugging
     integer :: unit
     logical :: exists
-    stop "GETTING TO REGRID EXPORT GRID TO MESH"
+    ! stop "GETTING TO REGRID EXPORT GRID TO MESH"
     call ESMF_LogWrite('_____ EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
     call ESMF_StatePrint(state, rc=rc)
 
@@ -1103,12 +1103,12 @@ contains
 
 
           inquire(&
-               file="out_vars/"//trim(cap_fld_list(n)%st_name)// &
+               file="vars_out/"//trim(cap_fld_list(n)%st_name)// &
                "_mesh_pre.nc", &
                exist=exists)
           if (exists .eqv. .false.) then
              call ESMF_FieldWrite(meshField, &
-                  "out_vars/"//trim(cap_fld_list(n)%st_name)// &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
                   "_mesh_pre.nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
@@ -1131,17 +1131,17 @@ contains
 
           ! DEBUG WRITING VARS
           inquire(&
-               file="out_vars/"//trim(cap_fld_list(n)%st_name)// &
+               file="vars_out/"//trim(cap_fld_list(n)%st_name)// &
                "_mesh_post.nc", &
                exist=exists)
           if (exists .eqv. .false.) then
              call ESMF_FieldWrite(meshField, &
-                  "out_vars/"//trim(cap_fld_list(n)%st_name)// &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
                   "_mesh_post.nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
              call ESMF_FieldWrite(gridField, &
-                  "out_vars/"//trim(cap_fld_list(n)%st_name)// &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
                   "_grid.nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
