@@ -57,21 +57,21 @@ module wrfhydro_nuopc_fields
     cap_fld_type("inst_soil_temperature","stc", &
                  "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_2","smc2", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_3","smc3", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_4","smc4", &
-                 "m3 m-3", IMPORT_T, TMP_EXPORT_T, 0.20d0),         &
+                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
                  "K", IMPORT_T, EXPORT_F, 288.d0),                 &
     cap_fld_type("soil_temperature_layer_2","stc2", &
@@ -285,13 +285,13 @@ contains
         if (realizeAllExport) then
           realizeExport = .true.
        else
-          call ESMF_LogWrite("WRFH: printing export state realize", &
-               ESMF_LOGMSG_INFO, rc=rc)
-          call ESMF_StateLog(exportState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+          ! call ESMF_LogWrite("WRFH: printing export state realize", &
+          !      ESMF_LOGMSG_INFO, rc=rc)
+          ! call ESMF_StateLog(exportState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
           realizeExport = NUOPC_IsConnected(exportState, &
                fieldName=trim(fieldList(n)%st_name), rc=rc)
           call check(rc, __LINE__, file)
-          print *, "WRFH: realize export ", trim(fieldList(n)%st_name)
+          ! call printa("WRFH: realize export "// trim(fieldList(n)%st_name))
                ! " realize_export ", realizeExport
           ! call ESMF_LogWrite("WRFH: this realize needs to be true", &
           !      ESMF_LOGMSG_INFO, rc=rc)
@@ -309,8 +309,8 @@ contains
         call NUOPC_Realize(exportState, field=field_export, rc=rc)
         call check(rc, __LINE__, file)
         fieldList(n)%rl_export = .true.
-        print *, "WRFH: created export ", trim(fieldList(n)%st_name)
-
+        ! print *, "WRFH: created export ", trim(fieldList(n)%st_name)
+        call printa("WRFH: realize export "// trim(fieldList(n)%st_name))
       else
         call ESMF_StateRemove(exportState, (/fieldList(n)%st_name/), &
              relaxedflag=.true., rc=rc)
@@ -851,7 +851,7 @@ contains
 
 
     rc = ESMF_SUCCESS
-    print *, "=== WRFH: realize, try field create mesh: ", trim(fld_name)
+    ! print *, "=== WRFH: realize, try field create mesh: ", trim(fld_name)
 
     if (memflg .eq. MEMORY_POINTER) then
        ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
@@ -859,7 +859,6 @@ contains
        !      indexflag=ESMF_INDEX_DELOCAL, &
        !      meshloc=ESMF_MESHLOC_ELEMENT, &
        !      rc=rc)
-
        field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
             typekind=ESMF_TYPEKIND_R8, &
             indexflag=ESMF_INDEX_DELOCAL, &
@@ -893,9 +892,16 @@ contains
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
         !   call check(rc, __LINE__, file)
         ! case ('sh2ox1')
-        !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-        !     farray=rt_domain(did)%sh2ox(:,:,1), &
-        !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !   ! field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+        !   !   farray=rt_domain(did)%sh2ox(:,:,1), &
+        !   !   indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !   field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+        !       typekind=ESMF_TYPEKIND_R8, &
+        !       indexflag=ESMF_INDEX_DELOCAL, &
+        !       meshloc=ESMF_MESHLOC_ELEMENT, &
+        !       rc=rc)
+        !  call check(rc, __LINE__, file)
+
         !   call check(rc, __LINE__, file)
         ! case ('sh2ox2')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
@@ -938,16 +944,16 @@ contains
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
         !   call check(rc, __LINE__, file)
       ! case ('stc1')
-      !     ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
-      !     !      meshloc=ESMF_MESHLOC_ELEMENT, &
-      !     !   ! farray=rt_domain(did)%stc(:,:,1), &
-      !     !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-      !    field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
-      !         typekind=ESMF_TYPEKIND_R8, &
-      !         indexflag=ESMF_INDEX_DELOCAL, &
-      !         meshloc=ESMF_MESHLOC_ELEMENT, &
-      !         rc=rc)
-      !    call check(rc, __LINE__, file)
+          ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+          !      meshloc=ESMF_MESHLOC_ELEMENT, &
+          !   ! farray=rt_domain(did)%stc(:,:,1), &
+          !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+         ! field_create = ESMF_FieldCreate(name=fld_name, mesh=mesh, &
+         !      typekind=ESMF_TYPEKIND_R8, &
+         !      indexflag=ESMF_INDEX_DELOCAL, &
+         !      meshloc=ESMF_MESHLOC_ELEMENT, &
+         !      rc=rc)
+         ! call check(rc, __LINE__, file)
       ! case ('stc2')
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%stc(:,:,2), &
@@ -982,14 +988,14 @@ contains
         !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
         !     farray=rt_domain(did)%soldrain, &
         !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-      !   !   call check(rc, __LINE__, file)
-      !   case default
-      !      print *, "ADD BACK IN "// trim(fld_name)
-      !      !     call ESMF_LogSetError(ESMF_FAILURE, &
-      ! !       msg=method//": Field hookup missing: "//trim(fld_name), &
-      ! !       file=filename, rcToReturn=rc)
-      !     return
-      ! end select
+        !   call check(rc, __LINE__, file)
+        !  case default
+        !    stop "ADD BACK IN " // trim(fld_name)
+        !    !     call ESMF_LogSetError(ESMF_FAILURE, &
+        !       msg=method//": Field hookup missing: "//trim(fld_name), &
+        !       file=filename, rcToReturn=rc)
+        !   return
+    !   end select
     ! elseif (memflg .eq. MEMORY_COPY) then
     !   select case (trim(fld_name))
     !     case ('smc','slc','stc')

@@ -711,7 +711,8 @@ module WRFHydro_NUOPC
         is%wrap%multiInstance = (trim(atVal)=="TRUE")
       endif
 
-      if (btest(verbosity,16)) then
+      ! if (btest(verbosity,16)) then
+      if (.true.) then
         call ESMF_LogWrite(trim(cname)//": Settings",ESMF_LOGMSG_INFO)
         write (logMsg, "(A,(A,I0))") trim(cname)//": ", &
           "Verbosity              = ",verbosity
@@ -783,7 +784,6 @@ module WRFHydro_NUOPC
           "Multiple Instances     = ",is%wrap%multiInstance
         call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
       endif
-
     end subroutine
 
   end subroutine
@@ -1106,6 +1106,10 @@ module WRFHydro_NUOPC
     logical                                :: mdlRestart
     integer                                :: stat
 
+    type(ESMF_Time)                        :: nextTime
+    type(ESMF_TimeInterval)                :: timeStep
+
+
     rc = ESMF_SUCCESS
 
     ! Query component for name, verbosity, and diagnostic values
@@ -1143,10 +1147,12 @@ module WRFHydro_NUOPC
     call check(rc, __LINE__, file)
 
     ! get the current time out of the clock
-    call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
+    call ESMF_ClockGet(modelClock, currTime=currTime, timeStep=timeStep, rc=rc)
     call check(rc, __LINE__, file)
     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
     call check(rc, __LINE__, file)
+    ! calculate next timeStep
+    nextTime = currTime + timeStep
 
     write (nStr,"(I0)") is%wrap%did
 
@@ -1219,54 +1225,66 @@ module WRFHydro_NUOPC
 
     ! initialize export state
     if (is%wrap%init_export .eq. FILLV_MISSING) then
-      call state_fill_uniform(is%wrap%NStateExp(1), &
-        fillValue=ESMF_MISSING_VALUE, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-      call check(rc, __LINE__, file)
-      exportUpdated = .TRUE.
+       call printa("initialize export state FILLV_MISSING")
+       call state_fill_uniform(is%wrap%NStateExp(1), &
+            fillValue=ESMF_MISSING_VALUE, rc=rc)
+       if (ESMF_STDERRORCHECK(rc)) return
+       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
+       call check(rc, __LINE__, file)
+       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_ZERO) then
-      call state_fill_uniform(is%wrap%NStateExp(1), &
-        fillValue=0.0_ESMF_KIND_R8, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-      call check(rc, __LINE__, file)
-      exportUpdated = .TRUE.
+       call printa("initialize export state FILLV_ZERO")
+       call state_fill_uniform(is%wrap%NStateExp(1), &
+            fillValue=0.0_ESMF_KIND_R8, rc=rc)
+       if (ESMF_STDERRORCHECK(rc)) return
+       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
+       call check(rc, __LINE__, file)
+       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_PRESCRIBE) then
-      call state_fill_prescribe(is%wrap%NStateExp(1), &
-        fieldList=cap_fld_list, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      exportUpdated = .TRUE.
+       call printa("initialize export state FILLV_PRESCRIBE")
+       call state_fill_prescribe(is%wrap%NStateExp(1), &
+            fieldList=cap_fld_list, rc=rc)
+       if (ESMF_STDERRORCHECK(rc)) return
+       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_FILE) then
-      call state_fill_file(is%wrap%NStateExp(1), &
-        filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
-          "_exp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
-      call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
-      call check(rc, __LINE__, file)
-      exportUpdated = .TRUE.
+       call printa("initialize export state FILLV_FILE")
+       call state_fill_file(is%wrap%NStateExp(1), &
+            filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
+            "_exp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
+       if (ESMF_STDERRORCHECK(rc)) return
+       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
+       call check(rc, __LINE__, file)
+       exportUpdated = .TRUE.
     elseif (is%wrap%init_export .eq. FILLV_MODEL) then
-      if (is%wrap%memr_export .eq. MEMORY_COPY) then
-        call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
-        call check(rc, __LINE__, file)
-      endif
-      call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-      call check(rc, __LINE__, file)
-      if (mdlRestart) then
-        call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
-        call check(rc, __LINE__, file)
-      else
-        call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-        call check(rc, __LINE__, file)
-      endif
-      exportUpdated = .TRUE.
+       call printa("initialize export state FILLV_MODEL") ! THIS ONE
+       if (is%wrap%memr_export .eq. MEMORY_COPY) then
+          call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
+          call check(rc, __LINE__, file)
+       endif
+       call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
+       call check(rc, __LINE__, file)
+       if (mdlRestart) then
+          call printa("TIME STAMP CURR TIME")
+          call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
+          call check(rc, __LINE__, file)
+       else
+          call printa("TIME STAMP INVALID TIME")
+          call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
+          call check(rc, __LINE__, file)
+       endif
+       call printa("setting timestamp of export to current, maybe wrong")
+       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
+       ! call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=nextTime, rc=rc)
+       call check(rc, __LINE__, file)
+       ! error stop "debugging time"
+       exportUpdated = .TRUE.
     else
-      initTypeStr = is%wrap%init_export
-      call ESMF_LogSetError(ESMF_FAILURE, &
-        msg="Export data initialize routine unknown "//trim(initTypeStr), &
-        line=__LINE__,file=__FILE__,rcToReturn=rc)
-      return  ! bail out
-      exportUpdated = .FALSE.
+       initTypeStr = is%wrap%init_export
+       call ESMF_LogSetError(ESMF_FAILURE, &
+            msg="Export data initialize routine unknown "//trim(initTypeStr), &
+            line=__LINE__,file=__FILE__,rcToReturn=rc)
+       return  ! bail out
+       exportUpdated = .FALSE.
     endif
 
     ! set InitializeDataComplete Attribute to "true", indicating to the
@@ -1278,17 +1296,16 @@ module WRFHydro_NUOPC
       if (btest(diagnostic,16)) then
         call NUOPC_Write(is%wrap%NStateImp(1), &
           fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-            rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+          rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
         call check(rc, __LINE__, file)
         call NUOPC_Write(is%wrap%NStateExp(1), &
           fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-            rname//"_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+          rname//"_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
         call check(rc, __LINE__, file)
       endif
     endif
-
   end subroutine
 
   !-----------------------------------------------------------------------------
@@ -1607,7 +1624,7 @@ subroutine CheckImport(gcomp, rc)
     call check(rc, __LINE__, file)
 
 
-    ! TODO: add (if mpas flag)
+    call printa("if importing add flag")
     call regrid_import_mesh_to_grid(wrfhydro_grid, wrfhydro_mesh, &
          is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
 
@@ -1637,14 +1654,10 @@ subroutine CheckImport(gcomp, rc)
 
 
     call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
-    ! stop "looking at export state"
 
-
-
-    ! TODO: add (if mpas flag)
-    print *, "add this back in regrid_export_grid_to_mesh"
-    ! call regrid_export_grid_to_mesh(wrfhydro_grid, wrfhydro_mesh, &
-    !      is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
+    call printa("TODO: add (if export mpas flag)")
+    call regrid_export_grid_to_mesh(wrfhydro_grid, wrfhydro_mesh, &
+         is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
 
 
     if (is%wrap%reset_import) then
