@@ -231,6 +231,7 @@
 module WRFHydro_NUOPC
   use ESMF
   use NUOPC
+  use MPI
   use NUOPC_Model, &
     model_routine_SS        => SetServices, &
     model_label_DataInitialize => label_DataInitialize, &
@@ -242,7 +243,7 @@ module WRFHydro_NUOPC
        wrfhydro_nuopc_fin, wrfhydro_regrid_mesh, wrfhydro_open_mesh, &
        wrfhydro_GridCreate, &
        wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
-       wrfhydro_get_restart, wrfhydro_GridCreate_tmp, &
+       wrfhydro_get_restart, wrfhydro_GridCreate_init, &
        wrfhydro_write_geo_file, regrid_import_mesh_to_grid, &
        regrid_export_grid_to_mesh
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
@@ -297,7 +298,9 @@ module WRFHydro_NUOPC
     type (ESMF_TimeInterval) :: stepTimer(1)
     type(ESMF_State)         :: NStateImp(1)
     type(ESMF_State)         :: NStateExp(1)
-    logical                  :: lsm_forcings(1)  = .FALSE.
+    logical                  :: lsm_forcings(1)  = .false.
+    logical                  :: hasImports = .false.
+    logical                  :: hasExports = .false.
   endtype
 
   type type_InternalState
@@ -805,6 +808,9 @@ module WRFHydro_NUOPC
     type(ESMF_VM)               :: vm
     integer                     :: fIndex
     character(len=9)            :: nStr
+    integer :: rank, np, comm, ierr
+
+    type(ESMF_Grid)            :: wrfhydro_grid_p1
 
     rc = ESMF_SUCCESS
 
@@ -838,22 +844,16 @@ module WRFHydro_NUOPC
     call check(rc, __LINE__, file)
 
 
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    call check(rc, __LINE__, file)
 
-    wrfhydro_grid = wrfhydro_GridCreate_tmp(1, rc=rc)
-    wrfhydro_mesh = wrfhydro_open_mesh(rc)
-    regrid_handle = wrfhydro_regrid_mesh( &
-         wrfhydro_grid, &
-         wrfhydro_mesh, &
-         is%wrap%did, &
-         is%wrap%NStateImp(1), &
-         rc)
-    ! stop "need to export state"
+    call ESMF_VMGet(vm, petCount=np, localPet=rank, mpiCommunicator=comm, &
+         rc=rc)
+    call check(rc, __LINE__, file)
 
-    call wrfhydro_write_geo_file(wrfhydro_grid, wrfhydro_mesh, regrid_handle)
-
-    ! stop "CREATING LOW-RES GRID"
-    print*, "CREATED LOW-RES GRID"
-
+    ! print *, rank, ": nx=", nx, "ny=",ny
+    print *, rank, ": np=", np
+    print *, rank, ": did =", is%wrap%did
 
     ! initialize wrfhydro
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
@@ -862,7 +862,42 @@ module WRFHydro_NUOPC
     call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
-    ! stop "editing nuopc_ini"
+    ! this only needs to be done once
+    if (np == 1) then
+       print *, rank, "entering wrfhydro grid create, mesh regrid section"
+       wrfhydro_mesh = wrfhydro_open_mesh(rc)
+       call check(rc, __LINE__, file)
+
+       wrfhydro_grid_p1 = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+       ! wrfhydro_grid_p1 = wrfhydro_GridCreate_init(vm, is%wrap%did, rc=rc)
+       call ESMF_GridValidate(wrfhydro_grid_p1, rc=rc)
+       call check(rc, __LINE__, file)
+
+       call check(rc, __LINE__, file) !
+       wrfhydro_grid = wrfhydro_grid_p1
+       regrid_handle = wrfhydro_regrid_mesh( &
+            wrfhydro_grid_p1, &
+            wrfhydro_mesh, &
+            is%wrap%did, &
+            is%wrap%NStateImp(1), &
+            rc)
+       call check(rc, __LINE__, file)
+       ! write to frontrange.d0
+       call wrfhydro_write_geo_file(wrfhydro_grid_p1, wrfhydro_mesh, regrid_handle)
+       print*, "CREATED LOW-RES GRID"
+    else
+       print *, "If you need to create frontrange.d01.nc, rerun with one procces"
+       print *, "TODO: make this work with np > 1"
+    end if
+
+
+    ! print *, rank, ": before MPI_Barrier"
+    ! if (np > 1) then
+    !    call MPI_Barrier(comm, ierr)
+    ! end if
+    ! ! stop "CREATING LOW-RES GRID"
+
+
     ! get hgrid for domain id
     call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
@@ -919,7 +954,7 @@ module WRFHydro_NUOPC
     integer                    :: verbosity, diagnostic
     character(len=64)          :: value
     type(type_InternalState)   :: is
-    type(ESMF_Grid)            :: wrfhydro_grid
+    type(ESMF_Grid)            :: wrfhydro_grid_l
     type(ESMF_Mesh)            :: wrfhydro_mesh
     type(ESMF_RouteHandle)     :: regrid_handle
     type(ESMF_Field)           :: field
@@ -927,7 +962,11 @@ module WRFHydro_NUOPC
     integer                    :: fIndex
     character(len=9)           :: nStr
 
+    integer :: nvars
     type(ESMF_Mesh) :: mesh
+
+    ! debugging variables
+    integer :: rank, ncount, nelem, sdim, ierr
 
     rc = ESMF_SUCCESS
 
@@ -961,26 +1000,36 @@ module WRFHydro_NUOPC
 
     write (nStr,"(I0)") is%wrap%did
 
+    ! ------  REMOVED THIS SECTION, DOESN"T GET USED?? ------
     ! call gluecode to create grid
-    wrfhydro_grid = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+    wrfhydro_grid_l = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+    call check(rc, __LINE__, file)
+
+    wrfhydro_grid = wrfhydro_grid_l
+    call ESMF_GridValidate(wrfhydro_grid, rc=rc)
+    call check(rc, __LINE__, file)
+
     ! wrfhydro_grid = wrfhydro_GridCreate_tmp(is%wrap%did, &
     !      nx=204, ny=120, &
     !      lon0=-105.1205, lat0=39.83927, &
     !      dlon=0.003, dlat=.00001, &
     !      rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__, file)
 
     wrfhydro_mesh = wrfhydro_open_mesh(rc)
-    if(ESMF_STDERRORCHECK(rc)) return
+    call check(rc, __LINE__, file)
 
+    print *, "TODO: remove this regrid mesh??"
+    ! removed it, handle doesn't get used here
     regrid_handle = wrfhydro_regrid_mesh( &
-         wrfhydro_grid, &
+         wrfhydro_grid_l, &
          wrfhydro_mesh, &
          is%wrap%did, &
          is%wrap%NStateImp(1), &
          rc)
     if(ESMF_STDERRORCHECK(rc)) return
     ! stop "RIGHT HERE in WRFH Cap"
+    ! ------------------- REMOVED TO HERE  ------------
 
     ! if (btest(verbosity,16)) then
     !   call WRFHYDRO_ESMF_LogGrid(WRFHYDRO_Grid, &
@@ -1011,6 +1060,15 @@ module WRFHydro_NUOPC
 
     mesh = ESMF_MeshCreate(filename="frontrange.scrip.nc", &
          fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    call ESMF_MeshGet(mesh, nodeCount=ncount, elementCount=nElem,&
+         & rc=rc)
+    call ESMF_MeshGet(mesh, spatialDim=sDim, rc=rc)
+    call check(rc, __LINE__, file, is%wrap%did)
+    print *, rank, ": hydro : frontrange mesh ncount=", ncount, &
+         "nelem=", nelem, "sdim=", sdim
+
     ! call field_realize(fieldList=cap_fld_list, &
     !   importState=is%wrap%NStateImp(1), &
     !   exportState=is%wrap%NStateExp(1), &
@@ -1039,8 +1097,6 @@ module WRFHydro_NUOPC
     call ESMF_LogWrite("WRFH: exiting Initializep3: realize", &
          ESMF_LOGMSG_INFO, rc=rc)
 
-    ! print *, "WRFH: exiting Initializep3: realize"
-    ! stop "WRFH: exit initP3"
     ! call ESMF_StateValidate(is%wrap%NStateImp(1), rc=rc)
     ! call check(rc, __LINE__, file)
     ! stop "HJI"
@@ -1058,6 +1114,19 @@ module WRFHydro_NUOPC
     ! call check(rc, __LINE__, file)
     ! call ESMF_LogWrite("WRFH:afterprintexport state", ESMF_LOGMSG_INFO, rc=rc)
     ! stop "TRYING TO LOOK AT WRFH EXPORT STATE"
+
+    ! note if WRF-Hydro has export and imports
+    call ESMF_StateGet(is%wrap%NStateExp(1), itemCount=nvars, rc=rc)
+    call check(rc, __LINE__, file)
+    if (nvars > 0) then
+       is%wrap%hasExports = .true.
+    end if
+
+    call ESMF_StateGet(is%wrap%NStateImp(1), itemCount=nvars, rc=rc)
+    call check(rc, __LINE__, file)
+    if (nvars > 0) then
+       is%wrap%hasImports = .true.
+    end if
 
 
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1528,10 +1597,11 @@ subroutine CheckImport(gcomp, rc)
     character(len=9)            :: nStr
     character(len=16)           :: misgValTypeStr
 
+    type(ESMF_Grid)            :: wrfhydro_grid_l
+
     rc = ESMF_SUCCESS
 
-
-    call ESMF_LogWrite("WRFH: entering Advance", ESMF_LOGMSG_INFO, rc=rc)
+    call printa("entering advance")
 
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
@@ -1623,10 +1693,25 @@ subroutine CheckImport(gcomp, rc)
     call ESMF_ClockGet(is%wrap%clock(1),timeStep=timestep,rc=rc)
     call check(rc, __LINE__, file)
 
+    if (is%wrap%hasImports) then
+       ! THIS GRIDCREATE BROKE THINGS IN SERIAL !!
+       wrfhydro_grid_l = wrfhydro_grid ! this works
+       ! wrfhydro_grid_l = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+       !!! wrfhydro_grid_l = wrfhydro_GridRead(is%wrap%did, rc=rc)
+       ! stop "THIS HYDRO GRID IS CREATED WRONG??"
+       call ESMF_GridValidate(wrfhydro_grid_l, rc=rc)
+       call check(rc, __LINE__, file)
+       ! print *, "grid validated in advance"
+       ! stop "GRID VALIDATED in advance"
 
-    call printa("if importing add flag")
-    call regrid_import_mesh_to_grid(wrfhydro_grid, wrfhydro_mesh, &
-         is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
+       ! not a function call
+       ! call ESMF_MeshValidate(wrfhydro_mesh, rc=rc)
+       ! stop "MESH VALIDATED in advance"
+       call regrid_import_mesh_to_grid(wrfhydro_grid_l, wrfhydro_mesh, &
+            is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
+       print *, "DEBUGGING ARTLESS WRHHYDRO_GRID"
+       print *, " -- this is where it was breaking in parallel --"
+    end if
 
 
     do while (is%wrap%stepTimer(1) >= timestep)
@@ -1655,10 +1740,17 @@ subroutine CheckImport(gcomp, rc)
 
     call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
 
-    call printa("TODO: add (if export mpas flag)")
-    call regrid_export_grid_to_mesh(wrfhydro_grid, wrfhydro_mesh, &
-         is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
+    if (is%wrap%hasExports) then
+       call ESMF_GridValidate(wrfhydro_grid_l, rc=rc)
+       call check(rc, __LINE__, file)
+       wrfhydro_mesh = wrfhydro_open_mesh(rc)
+       call check(rc, __LINE__, file)
 
+       call regrid_export_grid_to_mesh(wrfhydro_grid_l, wrfhydro_mesh, &
+            is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
+    end if
+
+    ! this is where it is breaking now
 
     if (is%wrap%reset_import) then
       if ((is%wrap%memr_import .eq. MEMORY_POINTER) .AND. &

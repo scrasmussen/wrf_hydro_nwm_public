@@ -70,7 +70,7 @@ module wrfhydro_nuopc_gluecode
   public :: wrfhydro_get_restart
 
   public :: wrfhydro_write_geo_file
-  public :: wrfhydro_GridCreate_tmp
+  public :: wrfhydro_GridCreate_init
   public :: regrid_import_mesh_to_grid
   public :: regrid_export_grid_to_mesh
 
@@ -106,8 +106,9 @@ module wrfhydro_nuopc_gluecode
   ! added to track the driver clock
   character(len=19)     :: startTimeStr = "0000-00-00_00:00:00"
 
-  type(ESMF_DistGrid)   :: wrfhydro_distGrid ! One DistGrid created with ConfigFile dimensions
-  character(len=512)  :: logMsg
+  type(ESMF_DistGrid)   :: wrfhydro_distgrid ! One DistGrid created with ConfigFile dimensions
+  logical :: wrfhydro_distgrid_initialized = .false.
+  character(len=512) :: logMsg
 
 
   interface read_mesh_var_and_regrid
@@ -284,7 +285,7 @@ contains
 
 
     ! Create DistGrid based on WRFHDYRO Config NX,NY
-    WRFHYDRO_distgrid = ESMF_DistGridCreate( &
+    wrfhydro_distgrid = ESMF_DistGridCreate( &
       minIndex=(/1,1/), maxIndex=(/nx_global(1),ny_global(1)/), &
 !     indexflag = ESMF_INDEX_DELOCAL, &
      deBlockList=deBlockList, &
@@ -293,6 +294,8 @@ contains
 !     connectionList=connectionList, &
       rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    wrfhydro_distgrid_initialized = .true.
+
 
     deallocate(deBlockList)
 
@@ -689,7 +692,8 @@ contains
 
     if (size(srcPtr) /= size(var_i)) then
        rc = ESMF_RC_ARG_SIZE
-       stop 'var_i length does not match local mesh ELEMENT count.'
+       print *, "size(srcPtr) =", size(srcPtr), "size(var_i)) =", size(var_i)
+       error stop 'var_i length does not match local mesh ELEMENT count.'
     end if
     ! if (size(dstPtr,1) /= size(outvar,1) .or. &
     !     size(dstPtr,2) /= size(outvar,2)) then
@@ -956,12 +960,15 @@ contains
     type(memory_flag), intent(in) :: memflg
     type(ESMF_Field) :: meshField, gridField
     integer :: n, rc, itemCount
-    character(len=64),allocatable          :: itemNameList(:)
+    character(len=64), allocatable :: itemNameList(:)
     logical :: imported
 
     ! debugging
     integer :: unit, i
     logical :: exists
+    integer :: rank, ierr
+    character(len=3) :: rank_s
+
     print *, 'WRFH: enter regrid_import_mesh_to_grid'
     call ESMF_LogWrite('WRFH: enter regrid_import_mesh_to_grid', ESMF_LOGMSG_INFO)
     call ESMF_LogWrite('--- WRFH: IMPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
@@ -976,8 +983,10 @@ contains
     call check(rc, __LINE__, file)
     do i=1,itemCount
        print *, "WRFH: import itemnamelist: ", itemNameList(i)
-       call ESMF_LogWrite("WRF: import itemnamelist: "// itemNameList(i), ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite("WRFH: import itemnamelist: "// itemNameList(i), ESMF_LOGMSG_INFO, rc=rc)
     end do
+
+    call handle_rank_string(rank, rank_s)
 
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_import) then
@@ -985,8 +994,10 @@ contains
             fieldName=trim(cap_fld_list(n)%st_name), rc=rc)
           call check(rc, __LINE__, file)
 
-          print *, "WRF: imported = ", imported,", name: ", cap_fld_list(n)%st_name
-          call ESMF_LogWrite("WRFH: imported "//cap_fld_list(n)%st_name, ESMF_LOGMSG_INFO, rc=rc)
+          print *, "WRFH: imported = ", imported,&
+               ", name: ", cap_fld_list(n)%st_name
+          call ESMF_LogWrite("WRFH: imported "//cap_fld_list(n)%st_name, &
+               ESMF_LOGMSG_INFO, rc=rc)
           call ESMF_StateGet(state, itemName=trim(cap_fld_list(n)%st_name), &
                field=meshField, rc=rc)
           call check(rc, __LINE__, file)
@@ -994,6 +1005,8 @@ contains
           gridField = field_create(cap_fld_list(n)%st_name, grid, did, &
                memflg, rc)
           call check(rc, __LINE__, file)
+          ! THIS GRID DOESN"T EXIST
+
 
           ! ESMF_FieldCreate(name=fld_name, grid=grid, &
           !   farray=rt_domain(did)%stc(:,:,1), &
@@ -1007,11 +1020,20 @@ contains
           ! print *, "meshp=", meshp
 
 
-          inquire(file="vars_in/"//trim(cap_fld_list(n)%st_name)//"_grid_pre.nc", &
+          inquire(file="vars_in/"//trim(cap_fld_list(n)%st_name)//&
+               "_grid_pre.nc", &
+               ! "_grid_pre_"//trim(rank_s)//".nc", &
                exist=exists)
           if (exists .eqv. .false.) then
              call ESMF_FieldWrite(gridField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)// "_grid_pre.nc", &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)//&
+                  ! "_grid_pre_"//trim(rank_s)//".nc", &
+                  "_grid_pre.nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call ESMF_FieldWrite(meshField, &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)//&
+                  "_mesh_pre.nc", &
+                  ! "_mesh_pre_"//trim(rank_s)//".nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
@@ -1021,7 +1043,12 @@ contains
              call ESMF_FieldRegridStore(srcField=meshField, &
                   dstField=gridField, &
                   regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+                  unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
                   routehandle=cap_fld_list(n)%import_handle, rc=rc)
+             ! unmappedDstList=unmapped, &  ! get failing ids
+             ! dstStatusField= dstStatus, & ! optional per-point codes
+             ! extrapMethod  = ESMF_EXTRAPMETHOD_NEAREST_STOD, &! fill stragglers
+             ! extrapNumSrcPnts=8, &        ! conservative default
              call check(rc, __LINE__, file)
              cap_fld_list(n)%import_handle_init = .true.
           end if
@@ -1033,15 +1060,21 @@ contains
           call check(rc, __LINE__, file)
 
           ! DEBUG WRITING VARS
-          inquire(file="vars_in/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
+          inquire(file="vars_in/"//trim(cap_fld_list(n)%st_name)// &
+               ! "_mesh_post_"//trim(rank_s)//".nc", &
+               "_mesh_post.nc", &
                exist=exists)
           if (exists .eqv. .false.) then
              call ESMF_FieldWrite(meshField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)// "_mesh.nc", &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// &
+                  "_mesh_post.nc", &
+                  ! "_mesh_post_"//trim(rank_s)//".nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
              call ESMF_FieldWrite(gridField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)// "_grid_post.nc", &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// &
+                  "_grid_post.nc", &
+                  ! "_grid_post_"//trim(rank_s)//".nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
@@ -1088,6 +1121,7 @@ contains
 
           meshField = field_create(cap_fld_list(n)%st_name, mesh, did, &
                memflg, rc)
+
           call check(rc, __LINE__, file)
 
           ! ESMF_FieldCreate(name=fld_name, grid=grid, &
@@ -1218,8 +1252,9 @@ contains
     enddo
   end subroutine dump_state
 
-  function wrfhydro_GridCreate_tmp(did,rc) &
+  function wrfhydro_GridCreate_init(vm, did,rc) &
        result(grid)
+    type(ESMF_VM), intent(in) :: vm
     type(ESMF_Grid) :: grid
     integer, intent(in) :: did
     integer, intent(out) :: rc
@@ -1243,6 +1278,7 @@ contains
     hires_file = "Fulldom_hires.nc"
     ! get lat/lon and nx/ny from Fulldom.nc
     print *, "WRFH: Opening high-resolution file ", hires_file
+    print *, "move wrfhydro grid file to namelist: ", hires_file
     stat = nf90_open(trim(hires_file), NF90_NOWRITE, ncid)
     call check_nf(stat)
 
@@ -1314,7 +1350,21 @@ contains
 
     ! rc = ESMF_SUCCESS
 
+    ! FOO ADD/REMOVE?
+    ! wrfhydro_distgrid = init_distgrid(vm)
+    ! print *, "create distgrid with nx, ny =", nx, ny
+    ! WRFHYDRO_distgrid = ESMF_DistGridCreate( &
+    !      minIndex=[1,1], maxIndex=[nx,ny], &
+    !      deBlockList=deBlockList, &
+    !      rc=rc)
+
+    if (wrfhydro_distgrid_initialized .eqv. .false.) then
+       error stop "Make sure wrfhydro_distgrid_initalized is initialized"
+    end if
+
+
     ! Single-tile grid (easy for testing); spherical coords in degrees.
+    ! and it works
     grid = ESMF_GridCreate(&
          regDecomp=[1, 1], &
          decompflag=[ESMF_DECOMP_BALANCED, ESMF_DECOMP_BALANCED], &
@@ -1322,7 +1372,17 @@ contains
          rc=rc)
     call check(rc, __LINE__, file)
 
-    call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    ! testing method in other wrfhydro_gridcreate()
+    ! grid = ESMF_GridCreate(name=hires_file, &
+    !      distgrid=wrfhydro_distGrid, &
+    !      coordSys=ESMF_COORDSYS_SPH_DEG, &
+    !      coordTypeKind=ESMF_TYPEKIND_COORD, &
+    !      ! gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
+    !      rc = rc)
+
+    call check(rc, __LINE__, file)
+
+   call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     call check(rc, __LINE__, file)
 
     ! Get writable pointers to the coordinate arrays and fill a regular lat/lon
@@ -1345,7 +1405,8 @@ contains
     call ESMF_LogWrite("exit: TMP WRFHYDRO GRID CREATE, FUTURE REPLACEMENT", &
          ESMF_LOGMSG_INFO)
     print *, "exit: TMP WRFHYDRO GRID CREATE, FUTURE REPLACEMENT"
-  end function wrfhydro_GridCreate_tmp
+    ! stop "DON'T WANT TO CALL THIS?"
+  end function wrfhydro_GridCreate_init
 
 #undef METHOD
 #define METHOD "wrfhydro_GridCreate"
@@ -1381,15 +1442,22 @@ contains
     rc = ESMF_SUCCESS
 
     ! grid_file = 'WRFHYDRO_Grid_'//trim(nlst(did)%hgrid)
-    grid_file = 'fulldom_hires_hydrofile.d01.nc'
-    print *, "change wrfhydro grid file? ", grid_file
+    ! grid_file = 'fulldom_hires_hydrofile.d01.nc'
+    grid_file = 'Fulldom_hires.nc'
+    print *, "move wrfhydro grid file to namelist: ", grid_file
+
+    ! print *, "wrfhydro_distGrid =", wrfhydro_distGrid
+    ! stop "pink panther"
+    if (wrfhydro_distgrid_initialized .eqv. .false.) then
+       error stop "Make sure wrfhydro_distgrid_initalized is initialized"
+    end if
     wrfhydro_grid = ESMF_GridCreate(name=grid_file, &
          distgrid=wrfhydro_distGrid, &
-         coordSys = ESMF_COORDSYS_SPH_DEG, &
+         coordSys=ESMF_COORDSYS_SPH_DEG, &
          coordTypeKind=ESMF_TYPEKIND_COORD, &
          ! gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
          rc = rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__, file)
 
     ! CENTERS
 
@@ -1400,7 +1468,7 @@ contains
       file=FILENAME, rcToReturn=rc)) return ! bail out
     call WRFHYDRO_ESMF_NetcdfReadIXJX("XLAT_M",nlst(did)%geo_static_flnm, &
       (/x_start,y_start/),latitude,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__, file)
 
     ! Get Local Longitude (lon)
     allocate(longitude(nx_local,ny_local),stat=stat)
@@ -1409,7 +1477,7 @@ contains
       file=FILENAME, rcToReturn=rc)) return ! bail out
     call WRFHYDRO_ESMF_NetcdfReadIXJX("XLONG_M",nlst(did)%geo_static_flnm, &
       (/x_start,y_start/),longitude,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__, file)
 
 #ifdef DEBUG
     ! Print Local Lat Lon Lower Left / Upper Right Centers
@@ -1421,16 +1489,16 @@ contains
 
     ! Add Center Coordinates to Grid
     call ESMF_GridAddCoord(wrfhydro_grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__, file)
 
     call ESMF_GridGetCoord(wrfhydro_grid, coordDim=1, localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, &
       computationalLBound=lbnd, computationalUBound=ubnd, &
       farrayPtr=coordXcenter, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+    call check(rc, __LINE__, file)
     call ESMF_GridGetCoord(wrfhydro_grid, coordDim=2, localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, farrayPtr=coordYcenter, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+    call check(rc, __LINE__, file)
 
     do j = lbnd(2),ubnd(2)
     do i = lbnd(1),ubnd(1)
@@ -1451,18 +1519,18 @@ contains
       file=FILENAME, rcToReturn=rc)) return ! bail out
     call WRFHYDRO_ESMF_NetcdfReadIXJX("LANDMASK",nlst(did)%geo_static_flnm, &
       (/x_start,y_start/),mask,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call check(rc, __LINE__, file)
 
     ! Add Grid Mask
     call ESMF_GridAddItem(wrfhydro_grid, itemFlag=ESMF_GRIDITEM_MASK, &
       staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__, file)
     ! Get pointer to Grid Mask array
     call ESMF_GridGetItem(wrfhydro_grid, itemflag=ESMF_GRIDITEM_MASK, &
       localDE=0, &
       staggerloc=ESMF_STAGGERLOC_CENTER, &
       farrayPtr=gridmask, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     do j = lbnd(2),ubnd(2)
     do i = lbnd(1),ubnd(1)
@@ -1522,16 +1590,16 @@ contains
 
       ! Add Corner Coordinates to Grid
       call ESMF_GridAddCoord(wrfhydro_grid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
-      if(ESMF_STDERRORCHECK(rc)) return ! bail out
+      call check(rc, __LINE__, file)
 
       call ESMF_GridGetCoord(wrfhydro_grid, coordDim=1, localDE=0, &
         staggerloc=ESMF_STAGGERLOC_CORNER, &
         computationalLBound=lbnd, computationalUBound=ubnd, &
         farrayPtr=coordXcorner, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+      call check(rc, __LINE__, file)
       call ESMF_GridGetCoord(wrfhydro_grid, coordDim=2, localDE=0, &
         staggerloc=ESMF_STAGGERLOC_CORNER, farrayPtr=coordYcorner, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+      call check(rc, __LINE__, file)
 
       do j = lbnd(2),ubnd(2)
       do i = lbnd(1),ubnd(1)
@@ -1546,7 +1614,7 @@ contains
         file=FILENAME,rcToReturn=rc)) return ! bail out
 
       call add_area(wrfhydro_grid, rc=rc)
-      if (ESMF_STDERRORCHECK(rc)) return
+      call check(rc, __LINE__, file)
 
     else
 #ifdef DEBUG
@@ -1559,7 +1627,8 @@ contains
     call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
 #endif
 
-  end function
+  end function wrfhydro_GridCreate
+
 
   !-----------------------------------------------------------------------------
 
@@ -2074,6 +2143,81 @@ contains
 #endif
 
   end subroutine
+
+
+  ! TODO: remove this function
+  function init_distgrid(vm) result(distGrid)
+    type(ESMF_VM), intent(in) :: vm
+    type(ESMF_DistGrid) :: distGrid
+
+    integer :: localPet, rc
+    call ESMF_VMGet(vm, localPet=localPet, &
+      mpiCommunicator=HYDRO_COMM_WORLD, rc=rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+!     call ESMF_VMBroadcast(vm, startx, count=numprocs, rootPet=IO_id, rc=rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+!     call ESMF_VMBroadcast(vm, starty, count=numprocs, rootPet=IO_id, rc=rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+!     call ESMF_VMBroadcast(vm, local_nx_size, count=numprocs, rootPet=IO_id, rc=rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+!     call ESMF_VMBroadcast(vm, local_ny_size, count=numprocs, rootPet=IO_id, rc=rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+!     allocate(deBlockList(2,2,numprocs))
+!     do i = 1, numprocs
+!       deBlockList(:,1,i) = (/startx(i),starty(i)/)
+!       deBlockList(:,2,i) = (/startx(i)+local_nx_size(i)-1, &
+!                              starty(i)+local_ny_size(i)-1/)
+! !      write (logMsg,"(A,I0,A,4(I0,A))") MODNAME//": deBlockList ", i, " = (", &
+! !        deBlockList(1,1,i),":",deBlockList(1,2,i),",", &
+! !        deBlockList(2,1,i),":",deBlockList(2,2,i),")"
+! !      call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
+!     enddo
+
+! !    allocate(connectionList(1),stat=stat)
+! !    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
+! !      msg=METHOD//': Allocation of connection list memory failed.', &
+! !      file=FILENAME, rcToReturn=rc)) return ! bail out
+! !    call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
+! !      tileIndexB=1, positionVector=(/nx_global(1), 0/), rc=rc)
+! !    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+
+
+!     ! Create DistGrid based on WRFHDYRO Config NX,NY
+!     WRFHYDRO_distgrid = ESMF_DistGridCreate( &
+!       minIndex=(/1,1/), maxIndex=(/nx_global(1),ny_global(1)/), &
+! !     indexflag = ESMF_INDEX_DELOCAL, &
+!      deBlockList=deBlockList, &
+! !     deLabelList=deLabelList, &
+! !     delayout=delayout, &
+! !     connectionList=connectionList, &
+!       rc=rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+!     deallocate(deBlockList)
+
+! !   deallocate(connectionList,stat=stat)
+! !   if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
+! !     msg=METHOD//': Deallocation of connection list memory failed.', &
+! !     file=FILENAME,rcToReturn=rc)) return ! bail out
+
+!     ! Get the Local Decomp Incides
+!     call set_local_indices(rc)
+!     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+  end function init_distgrid
+
+  subroutine handle_rank_string(rank, rank_s)
+    use mpi
+    integer, intent(inout) :: rank
+    character(len=3), intent(inout) :: rank_s
+    integer :: ierr
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! print *, "rank =", rank
+    ! write(rank_s, '(I0)') rank
+    if (rank == 0) rank_s = "0"
+    if (rank == 1) rank_s = "1"
+  end subroutine handle_rank_string
 
 
 !-----------------------------------------------------------------------------
