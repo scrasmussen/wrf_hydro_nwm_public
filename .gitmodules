@@ -1,3 +1,4 @@
 [submodule "src/Land_models/NoahMP"]
 	path = src/Land_models/NoahMP
-	url = git@github.com:scrasmussen/noahmp.git
+        branch = release-v5.0-NWM
+	url = https://github.com/scrasmussen/noahmp.git
