@@ -21,7 +21,7 @@
 module module_NoahMP_hrldas_driver
 
   use module_hrldas_netcdf_io ! =REFACTOR= add only
-  use NoahmpIOVarType, only: NoahmpIO_type
+  ! use NoahmpIOVarType, only: NoahmpIO_type
   use NoahmpIOVarInitMod, only : NoahmpIOVarInitDefault
   use NoahmpReadNamelistMod, only : NoahmpReadNamelist  !=REFACTOR=, add these??
   use NoahmpReadTableMod, only : NoahmpReadTable
@@ -30,7 +30,7 @@ module module_NoahMP_hrldas_driver
   use NoahmpDriverMainMod, only: NoahmpDriverMain
   use module_date_utilities, only: geth_newdate, geth_idts
   use orchestrator_base ! =REFACTOR= add only
-  use config_base, only: wrf_hydro, noah_lsm
+  use config_base, only: wrf_hydro , noah_lsm, noahmp
   use modi_ini_csts, only: ini_csts
 #ifdef MPP_LAND
   use module_mpp_land, only: MPP_LAND_PAR_INI, mpp_land_init, getLocalXY, mpp_land_bcast_char, mpp_land_sync
@@ -50,6 +50,7 @@ module module_NoahMP_hrldas_driver
    integer :: snow_assim, HRLDAS_ini_typ
    REAL,    allocatable, DIMENSION(:,:)   :: etpnd, greenfrac, prcp0
    real :: etpnd1
+   real :: num, denom
    character(len=19) :: forcDate
    ! LRK - Remove GEO_STATIC_FLNM
    !character(len = 256):: GEO_STATIC_FLNM
@@ -254,6 +255,7 @@ module module_NoahMP_hrldas_driver
 
   ! Note: the state variable is called NoahmpIO in the refactored NoahMP
   ! type(NoahmpIO_type)                                    :: state
+  ! type(NoahmpIO_type)                                    :: noah_lsm
   contains
 
   subroutine land_driver_ini(NTIME_out, wrfits,wrfite,wrfjts,wrfjte)
@@ -261,7 +263,7 @@ module module_NoahMP_hrldas_driver
      use config_base, only: nlst
      use module_rt_data, only: rt_domain
      use module_hrldas_HYDRO, only: open_print_mpp
-     use NoahmpIOVarType, only: NoahmpIO_type
+     ! use NoahmpIOVarType, only: NoahmpIO_type
      ! use module_bep_bem_helper, only: nurbm ! C.He 03/31/2021: add for bep_bem treatment in WRFv4.3
 
      implicit  none
@@ -272,6 +274,8 @@ module module_NoahMP_hrldas_driver
     integer, optional, intent(in) :: wrfits,wrfite,wrfjts,wrfjte
     !local
     integer ::   xstart, xend, ystart, yend, ixfull, jxfull
+	
+	! type(NoahmpIO_type), intent(inout) :: noah_lsm
 
 #ifdef MPP_LAND
     call read_dim(noah_lsm%hrldas_setup_file,ix_tmp,jx_tmp)
@@ -355,11 +359,11 @@ module module_NoahMP_hrldas_driver
   !!----------------------------------------------------------------------------
   !! channel_only
   call updateNameList("channel_only",0)
-  if(noah_lsm%forc_typ .eq. 9)  call updateNameList("channel_only",1)
+  if(wrf_hydro%forc_typ .eq. 9)  call updateNameList("channel_only",1)
   call updateNameList("channelBucket_only",0)
-  if(noah_lsm%forc_typ .eq. 10) call updateNameList("channelBucket_only",1)
+  if(wrf_hydro%forc_typ .eq. 10) call updateNameList("channelBucket_only",1)
 
-  if(noah_lsm%forc_typ .eq. 9 .or. noah_lsm%forc_typ .eq. 10) then
+  if(wrf_hydro%forc_typ .eq. 9 .or. wrf_hydro%forc_typ .eq. 10) then
      write(noah_lsm%olddate,'(I4.4,"-",I2.2,"-",I2.2,"_",I2.2,":",I2.2,":",I2.2)') &
           noah_lsm%start_year, noah_lsm%start_month, noah_lsm%start_day, noah_lsm%start_hour, noah_lsm%start_min, 0
      forcdate = noah_lsm%olddate
@@ -992,7 +996,7 @@ module module_NoahMP_hrldas_driver
      call mpp_land_bcast_char(19,noah_lsm%olddate(1:19))  ! =REFACTOR=, not in noahmpr
 #endif
      ITIMESTEP = 2
-     call lsm_rst_bi_in(noah_lsm)
+     call lsm_rst_bi_in()!noah_lsm)
   end if
 
      noah_lsm%STEPWTD = nint(noah_lsm%WTDDT*60. / noah_lsm%DTBL)
@@ -1263,7 +1267,7 @@ end if
 ! which is the LSM timestep, we declare it here
 ! since it does not exist at this point
   ITIME = 0
-  if(t0OutputFlag .eq. 1) call ldas_output(ITIME,noah_lsm)
+  if(t0OutputFlag .eq. 1) call ldas_output(ITIME)!,noah_lsm)
 !#else
 !  if (restart_filename_requested == " ") then
 !     if(t0OutputFlag .eq. 1) call ldas_output()
@@ -1276,9 +1280,17 @@ end subroutine land_driver_ini
 !===============================================================================
   subroutine land_driver_exe(itime)
     use module_hydro_io, only: read_channel_only
-    use NoahmpIOVarType, only: NoahmpIO_type
+    ! use NoahmpIOVarType, only: NoahmpIO_type
+	! use NoahmpVarType, only: noahmp_type
+	
     implicit  none
+
+	! type(NoahmpIO_type) :: noah_lsm
+	! type(noahmp_type)   :: noahmp
+	
     integer :: itime          ! timestep loop
+	
+	! type(NoahmpIO_type), intent(inout) :: noah_lsm
 
 !---------------------------------------------------------------------------------
 ! Read the forcing data.
@@ -1297,7 +1309,7 @@ end subroutine land_driver_ini
 #endif
 
 #ifdef WRF_HYDRO
-      if(noah_lsm%forc_typ .eq. 8) then
+      if(wrf_hydro%forc_typ .eq. 8) then
          call read_forc_ldasout(noah_lsm%olddate, noah_lsm%hgrid, noah_lsm%indir, noah_lsm%dtbl, &
               noah_lsm%ix, noah_lsm%jx, noah_lsm%infxsrt, noah_lsm%soldrain)
           call hrldas_drv_HYDRO(noah_lsm%TSLB(:,1:noah_lsm%NSOIL,:), &
@@ -1308,7 +1320,7 @@ end subroutine land_driver_ini
           noah_lsm%olddate = noah_lsm%newdate
           return
       end if
-      if(noah_lsm%forc_typ .eq. 9 .or. noah_lsm%forc_typ .eq. 10) then
+      if(wrf_hydro%forc_typ .eq. 9 .or. wrf_hydro%forc_typ .eq. 10) then
          !! JLM:: fix hgrid: This becomes 1 eventhough 3 is specified in hydro.namelist
          !! JLM: This is initalized by read_hrldas_hdrinfo
          !! JLM: Appears that we should differentiate the LSM and HYDRO igrids, define a local
@@ -1342,8 +1354,8 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
 
      if(wrf_hydro%finemesh .ne. 0) goto 991
-
-     if(noah_lsm%forc_typ .eq. 0) then
+     ! if(noah_lsm%forc_typ .eq. 0) then
+     if(wrf_hydro%forc_typ .eq. 0) then	 
         call READFORC_HRLDAS(noah_lsm%INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, &
              noah_lsm%OLDDATE, noah_lsm%xstart, noah_lsm%XEND, noah_lsm%YSTART, &
              noah_lsm%YEND, &
@@ -1359,7 +1371,8 @@ end subroutine land_driver_ini
         ! noah_lsm%VEGFRA = noah_lsm%VEGFRA * 100.
      else
         if(noah_lsm%olddate == forcDate) then
-           call HYDRO_frocing_drv(trim(noah_lsm%indir), noah_lsm%forc_typ, noah_lsm%snow_assim, &
+		   write(*,*) " noah_lsm%FORCING_TIMESTEP ", noah_lsm%FORCING_TIMESTEP
+           call HYDRO_frocing_drv(noah_lsm, trim(noah_lsm%indir), wrf_hydro%forc_typ, noah_lsm%snow_assim, &
                 noah_lsm%olddate, noah_lsm%xstart, noah_lsm%xend, noah_lsm%ystart, noah_lsm%yend,    &
                 noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
                 noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
@@ -1367,26 +1380,38 @@ end subroutine land_driver_ini
                 noah_lsm%forcing_name_LF, &
                 noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), noah_lsm%V_PHY(:,1,:), &
                 noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, &
-                noah_lsm%LAI, noah_lsm%VEGFRA, noah_lsm%SNOWH, ITIME, &
+                noah_lsm%LAI, noah_lsm%SNOWBL, noah_lsm%VEGFRA, noah_lsm%SNOWH, ITIME, &
                 noah_lsm%FORCING_TIMESTEP, prcp0)
 
                if(maxval(noah_lsm%VEGFRA) .le. 1) noah_lsm%VEGFRA = noah_lsm%VEGFRA * 100
 
+		   ! write(*,*) " noah_lsm%newdate:         ", noah_lsm%newdate
+		   ! write(*,*) " forcDate:                 ", forcDate
+
+		   
            call geth_newdate(noah_lsm%newdate, forcDate, noah_lsm%FORCING_TIMESTEP)
+
+		   ! write(*,*) " noah_lsm%newdate:         ", noah_lsm%newdate
+		   ! write(*,*) " forcDate:                 ", forcDate
+		   ! write(*,*) " noah_lsm%FORCING_TIMESTEP ", noah_lsm%FORCING_TIMESTEP
+
            forcDate = noah_lsm%newdate
         end if
+
      end if
 
 #else
      call READFORC_HRLDAS(noah_lsm%INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, noah_lsm%OLDDATE, &
-          noah_lsm%xstart, noah_lsm%XEND, noah_lsm%YSTART, noah_lsm%YEND, &
-          noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
-	  noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
-	  noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
-	  noah_lsm%forcing_name_LF, &
-          noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), noah_lsm%V_PHY(:,1,:), &
-	  noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, &
-          noah_lsm%VEGFRA, noah_lsm%update_veg, noah_lsm%LAI, noah_lsm%update_lai)
+             noah_lsm%xstart, noah_lsm%XEND, noah_lsm%YSTART, noah_lsm%YEND, &
+             noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
+	         noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
+	         noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
+	         noah_lsm%forcing_name_LF, &
+             noah_lsm%T_PHY(:,1,:), noah_lsm%QV_CURR(:,1,:), noah_lsm%U_PHY(:,1,:), noah_lsm%V_PHY(:,1,:), &
+	         noah_lsm%P8W(:,1,:), noah_lsm%GLW, noah_lsm%SWDOWN, noah_lsm%RAINBL_tmp, noah_lsm%SNOWBL, &
+             noah_lsm%VEGFRA, noah_lsm%update_veg, noah_lsm%LAI, noah_lsm%update_lai)	 
+	 
+
 
      ! =REFACTOR= THIS WAS IN NOAHMPR
      ! if(maxval(noah_lsm%VEGFRA) .le. 1) noah_lsm%VEGFRA = noah_lsm%VEGFRA * 100
@@ -1478,7 +1503,8 @@ end subroutine land_driver_ini
       ! Timing information for SFLX:
 
       call system_clock(count=noah_lsm%count_before_sflx, count_rate=noah_lsm%clock_rate)
-
+	  
+      ! noah_lsm%ACC_PRCPXY = ACCPRCP
       call NoahmpDriverMain(noah_lsm)
 ! =REFACTOR= how to handle spatial_soil??
 ! #ifdef SPATIAL_SOIL
@@ -1501,7 +1527,47 @@ end subroutine land_driver_ini
 !            , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
 !            , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
 ! #endif
+      ! Farshid Felfelani:
+	  ! ACCPRCP=noah_lsm%ACC_PRCPXY
+	  ACCPRCP=ACCPRCP+noah_lsm%ACC_PRCPXY
+	  ! ACCECAN=ACCECAN+noah_lsm%ACC_ECANXY
+	  ! ACCETRAN=ACCETRAN+noah_lsm%ACC_ETRANXY
+	  ! ACCEDIR=ACCEDIR+noah_lsm%ACC_EDIRXY
 
+      ! if(present(ACCPRCP)) ACCPRCP = ACCPRCP + PRCP * noah_lsm%dtbl
+      ACCECAN = ACCECAN + noah_lsm%ECANXY * noah_lsm%dtbl
+      ACCETRAN = ACCETRAN + noah_lsm%ETRANXY * noah_lsm%dtbl
+      ACCEDIR   = ACCEDIR + noah_lsm%EDIRXY * noah_lsm%dtbl
+	  
+	  
+      do J = noah_lsm%YSTART, noah_lsm%YEND
+		   do I = noah_lsm%XSTART, noah_lsm%XEND
+
+			  ! --- top 2 layers ---
+			  num   = 0.0
+			  denom = 0.0
+			  do kk = 1, 2
+				 num   = num   + noah_lsm%SMOIS(I,kk,J) * zsoil(kk)
+				 denom = denom + noah_lsm%SMCMAX_TABLE(noah_lsm%ISLTYP(I,J)) * zsoil(kk)
+			  end do
+			  SOILSAT_TOP(I,J) = num / denom
+
+			  ! --- all soil layers ---
+			  num   = 0.0
+			  denom = 0.0
+			  do kk = 1, noah_lsm%NSOIL
+				 num   = num   + noah_lsm%SMOIS(I,kk,J) * zsoil(kk)
+				 denom = denom + noah_lsm%SMCMAX_TABLE(noah_lsm%ISLTYP(I,J)) * zsoil(kk)
+			  end do
+			  SOILSAT(I,J) = num / denom
+
+		   end do
+      end do
+
+      write(*,*) "noah_lsm%dtbl, noah_lsm%FORCING_TIMESTEP", noah_lsm%dtbl, noah_lsm%FORCING_TIMESTEP	  ! 3600.000            3600
+
+	  ! ACCPRCP=noahmp%water%flux%PrecipTotAcc
+	
       call system_clock(count=noah_lsm%count_after_sflx, count_rate=noah_lsm%clock_rate)
       noah_lsm%sflx_count_sum = noah_lsm%sflx_count_sum + &
            (noah_lsm%count_after_sflx - noah_lsm%count_before_sflx)
@@ -1546,7 +1612,7 @@ end subroutine land_driver_ini
         if (mod(ITIME * noah_lsm%noah_timestep, noah_lsm%output_timestep) == 0) then
            ! convert RAINRATE back to mm/s for output
            noah_lsm%RAINBL = noah_lsm%RAINBL_tmp
-           call ldas_output(ITIME,noah_lsm)
+           call ldas_output(ITIME)!,noah_lsm)
         end if
      end if OUTPUT_FOR_HISTORY
 
@@ -1565,9 +1631,9 @@ end subroutine land_driver_ini
       if ( (noah_lsm%restart_frequency_hours .gt. 0) .and. &
            (mod(ITIME, int(noah_lsm%restart_frequency_hours*3600./nint(noah_lsm%dtbl))) == 0)) then
        if(noah_lsm%rst_bi_out .eq. 0) then ! =REFACTOR=, rst_bi_out, why not in noahmpr
-           call lsm_restart(noah_lsm)
+           call lsm_restart()!noah_lsm)
        else
-           call lsm_rst_bi_out(noah_lsm)
+           call lsm_rst_bi_out()!noah_lsm)
        end if
 #ifdef WRF_HYDRO
       else
@@ -1575,9 +1641,9 @@ end subroutine land_driver_ini
           if ( (noah_lsm%olddate( 9:10) == "01") .and. (noah_lsm%olddate(12:13) == "00") .and. &
                (noah_lsm%olddate(15:16) == "00") .and. (noah_lsm%olddate(18:19) == "00") ) then
                if(noah_lsm%rst_bi_out .eq. 0) then
-                   call lsm_restart(noah_lsm)  ! jlm - i moved all the restart code to a subroutine.
+                   call lsm_restart()!noah_lsm)  ! jlm - i moved all the restart code to a subroutine.
                else
-                   call lsm_rst_bi_out(noah_lsm)
+                   call lsm_rst_bi_out()!noah_lsm)
                end if
           end if
        end if
@@ -1606,10 +1672,11 @@ end subroutine land_driver_ini
 end subroutine land_driver_exe
 
 !!===============================================================================
-subroutine  ldas_output(itime, noah_lsm)
-  use NoahmpIOVarType, only: NoahmpIO_type
-  type(NoahmpIO_type) :: noah_lsm
+subroutine  ldas_output(itime)!, noah_lsm)
+  ! use NoahmpIOVarType, only: NoahmpIO_type
+  ! type(NoahmpIO_type), intent(inout) :: noah_lsm
   integer, intent(in)  :: itime ! time step of the LSM
+  ! write(*,*) "Farshid ITIME, noah_lsm%igrid ", ITIME, noah_lsm%igrid
 
 !#ifdef WRF_HYDRO
 !if ( (io_config_outputs .eq. 0) ) then
@@ -1992,10 +2059,10 @@ subroutine  ldas_output(itime, noah_lsm)
 end subroutine  ldas_output
 
 !!===============================================================================
-subroutine lsm_restart(noah_lsm)
-  use NoahmpIOVarType, only: NoahmpIO_type
+subroutine lsm_restart()!noah_lsm)
+  ! use NoahmpIOVarType, only: NoahmpIO_type
   implicit none
-  type(NoahmpIO_type) :: noah_lsm
+  ! type(NoahmpIO_type), intent(inout) :: noah_lsm
   character(len=256):: tmpStr
   integer :: ncid
 
@@ -2020,7 +2087,7 @@ subroutine lsm_restart(noah_lsm)
   if(my_id .eq. io_id) then
 #endif
      ierr = nf90_open(trim(tmpStr),  NF90_WRITE, ncid)
-     call define_rst_variables(ncid,noah_lsm)
+     call define_rst_variables(ncid)!,noah_lsm)
 #ifdef MPP_LAND
   end if
 #endif
@@ -2119,10 +2186,10 @@ subroutine lsm_restart(noah_lsm)
 
 end subroutine lsm_restart
 
-subroutine lsm_rst_bi_out(noah_lsm)
-  use NoahmpIOVarType, only: NoahmpIO_type
+subroutine lsm_rst_bi_out()!noah_lsm)
+  ! use NoahmpIOVarType, only: NoahmpIO_type
   implicit none
-  type(NoahmpIO_type) :: noah_lsm
+  ! type(NoahmpIO_type), intent(inout) :: noah_lsm
   integer :: iunit, ierr
   character(len=256) :: output_flnm, str_tmp
   integer  :: i0,ie, i, istep, mkdirStatus
@@ -2273,10 +2340,10 @@ subroutine lsm_rst_bi_out(noah_lsm)
 #endif
 end subroutine lsm_rst_bi_out
 
-subroutine lsm_rst_bi_in(noah_lsm)
-  use NoahmpIOVarType, only: NoahmpIO_type
+subroutine lsm_rst_bi_in()!noah_lsm)
+  ! use NoahmpIOVarType, only: NoahmpIO_type
   implicit none
-  type(NoahmpIO_type) :: noah_lsm
+  ! type(NoahmpIO_type), intent(inout) :: noah_lsm
   integer :: iunit, ierr
   character(len=256):: str_tmp
   integer  :: i0,ie, i, istep
@@ -2419,10 +2486,10 @@ subroutine lsm_rst_bi_in(noah_lsm)
 end subroutine lsm_rst_bi_in
 
 
-subroutine define_rst_variables(ncid, noah_lsm)
-  use NoahmpIOVarType, only: NoahmpIO_type
+subroutine define_rst_variables(ncid)!, noah_lsm)
+  ! use NoahmpIOVarType, only: NoahmpIO_type
   implicit none
-  type(NoahmpIO_type) :: noah_lsm
+  ! type(NoahmpIO_type), intent(inout) :: noah_lsm
   integer ncid
   !      character(len=*) :: tmpStr
 

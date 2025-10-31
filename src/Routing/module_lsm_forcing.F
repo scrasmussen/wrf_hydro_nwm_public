@@ -25,6 +25,7 @@ module module_lsm_forcing
 #endif
     use module_HYDRO_io, only: get_2d_netcdf, get_soilcat_netcdf, get2d_int
     use module_hydro_stop, only:HYDRO_stop
+	use config_base, only: wrf_hydro, noah_lsm
     use netcdf
 
 implicit none
@@ -923,7 +924,7 @@ Contains
 
 
 
- subroutine read_hydro_forcing_seq( &
+ subroutine read_hydro_forcing_seq(noah_lsm, &
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  &
        forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -931,7 +932,9 @@ Contains
        T2,q2x,u,v,pres,xlong,short,prcp1,&
        lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
+   use NoahmpIOVarType, only: NoahmpIO_type
    implicit none
+   type(NoahmpIO_type), intent(inout)    :: noah_lsm
    ! in variable
    character(len=*) :: olddate,hgrid,indir
    character(len=256) :: filename
@@ -1771,8 +1774,10 @@ Contains
        lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 
-
+   ! use NoahmpIOVarType, only: NoahmpIO_type
    implicit none
+   ! type(NoahmpIO_type), intent(inout)    :: noah_lsm
+
    ! in variable
    character(len=*) :: olddate,hgrid,indir
    character(len=256) :: filename
@@ -1817,7 +1822,7 @@ Contains
 
 
    if(my_id .eq. IO_id) then
-      call read_hydro_forcing_seq( &
+      call read_hydro_forcing_seq(noah_lsm, &
         indir,olddate,hgrid,&
         global_nx,global_ny,forc_typ,snow_assim,  &
         forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -2310,7 +2315,7 @@ Contains
   end subroutine geth_newdate
 
 
-subroutine read_hydro_forcing_mpp1( &
+subroutine read_hydro_forcing_mpp1(noah_lsm, &
      indir,olddate,hgrid, &
      ix,jx,forc_typ,snow_assim,  &
      forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -2318,7 +2323,12 @@ subroutine read_hydro_forcing_mpp1( &
      T2,q2x,u,v,pres,xlong,short,prcp1,&
      lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
+use NoahmpIOVarType, only: NoahmpIO_type
+
 implicit none
+
+type(NoahmpIO_type), intent(inout)    :: noah_lsm
+
 ! in variable
 character(len=*) :: olddate,hgrid,indir
 character(len=256) :: filename
@@ -2333,6 +2343,9 @@ character(len=256), intent(in)  :: forcing_name_SW
 character(len=256), intent(in)  :: forcing_name_PR
 character(len=256), intent(in)  :: forcing_name_SN
 character(len=256), intent(in)  :: forcing_name_LF
+! real, intent(in) ::  dt 
+! integer, intent(in) ::  dt
+integer ::  dt1
 real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
      prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
 real ::  dt, wrf_dt
@@ -2354,8 +2367,11 @@ inflnm = trim(indir)//"/"//&
 !!! FORC_TYPE 1 ============================================================================
 if(FORC_TYP.eq.1) then
    !!Create forcing data filename...
-   call geth_newdate(out_date,olddate,nint(dt))
-   inflnm = trim(indir)//"/"//&
+   ! call geth_newdate(out_date,olddate,nint(dt))
+   dt1 = noah_lsm%FORCING_TIMESTEP
+   ! dt = noah_lsm%FORCING_TIMESTEP
+   call geth_newdate(out_date,olddate,dt1)
+   inflnm = trim(noah_lsm%indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         ".LDASIN_DOMAIN"//hgrid
 
@@ -2389,7 +2405,7 @@ end if
 if(FORC_TYP.eq.2) then
 
 !!Create forcing data filename...
-   call geth_newdate(out_date,olddate,nint(dt))
+   call geth_newdate(out_date,olddate,dt1)!nint(dt))
    inflnm = trim(indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         out_date(15:16)//".LDASIN_DOMAIN"//hgrid
@@ -2431,8 +2447,8 @@ if(FORC_TYP.eq.3) then
       call hydro_stop("read_hydro_forcing_seq")
    endif
 
-   do i_forcing = 1, int(24*3600/dt)
-      wrf_dt = i_forcing*dt
+   do i_forcing = 1, int(24*3600/dt1)
+      wrf_dt = i_forcing*dt1
       call geth_newdate(out_date,olddate,nint(wrf_dt))
       inflnm2 = trim(indir)//"/"//&
            "wrfout_d0"//hgrid//"_"//&
@@ -2534,7 +2550,7 @@ if(FORC_TYP.eq.5) then
    if (ierr_flg.eq.0) then   ! use spec. precip
       !Convert units if necessary
       if (mmflag.eq.0) then    !Convert pcp grid to units of mm/s...
-         PRCP1=PRCP2/DT     !convert from mm to mm/s
+         PRCP1=PRCP2/dt1     !convert from mm to mm/s
 #ifdef HYDRO_D
          print*, "Supplemental pcp is accumulated pcp/dt. "
 #endif
@@ -2574,8 +2590,8 @@ if(FORC_TYP.eq.6) then
 #ifdef MPP_LAND
    if(my_id .eq. io_id) then
 #endif
-      do i_forcing = 1, nint(3600*12/dt)
-         call geth_newdate(out_date,olddate,nint(dt*i_forcing))
+      do i_forcing = 1, 3600*12/dt1 !nint(3600*12/dt)
+         call geth_newdate(out_date,olddate,dt1*i_forcing) !nint(dt*i_forcing))
          inflnm = trim(indir)//"/"//&
               out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
               ".LDASIN_DOMAIN"//hgrid
@@ -2593,8 +2609,8 @@ if(FORC_TYP.eq.6) then
 #ifdef MPP_LAND
       if(my_id .eq. io_id) then
 #endif
-         do i_forcing = 1, nint(3600*12/dt)
-            call geth_newdate(out_date,olddate,nint(dt*i_forcing))
+         do i_forcing = 1, 3600*12/dt1 ! nint(3600*12/dt)
+            call geth_newdate(out_date,olddate,dt1*i_forcing) !nint(dt*i_forcing))
             inflnm = trim(indir)//"/"//&
                  out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
                  out_date(15:16)//".LDASIN_DOMAIN"//hgrid
@@ -2630,7 +2646,7 @@ if(FORC_TYP.eq.6) then
    !Get specified precip....
    !VIP, dimensions of grid are currently hardwired in input subroutine!!!
    !!Create forcing data filename...
-   call geth_newdate(out_date,olddate,nint(dt))
+   call geth_newdate(out_date,olddate,dt1) !nint(dt))
    inflnm = trim(indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         out_date(15:16)//".PRECIP_FORCING.nc"
@@ -2661,7 +2677,7 @@ if(FORC_TYP.eq.6) then
       else
          PRCP1=PRCP2   !assumes PRCP2 is in mm/s
          if (mmflag.eq.0) then    !Convert pcp grid to units of mm/s...
-            PRCP1=PRCP2/DT     !convert from mm to mm/s
+            PRCP1=PRCP2/dt1     !convert from mm to mm/s
          end if  ! Endif mmflag
 #ifdef HYDRO_D
          if(my_id .eq. io_id) then

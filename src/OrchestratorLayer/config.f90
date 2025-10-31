@@ -3,6 +3,7 @@ module config_base
 
   use module_hydro_stop, only:HYDRO_stop
   use NoahmpIOVarType, only: NoahmpIO_type
+  use NoahmpVarType
   use NoahmpReadNamelistMod, only: NoahmpReadNamelist
 
   implicit none
@@ -202,6 +203,7 @@ module config_base
   ! type(NOAHLSM_OFFLINE_), protected, save :: noah_lsm
   ! type(NoahmpIO_type), protected, save :: noah_lsm
   type(NoahmpIO_type), save :: noah_lsm
+  type(noahmp_type), save   :: noahmp
   type(WRF_HYDRO_OFFLINE_), protected, save :: wrf_hydro
   type(namelist_rt_), dimension(max_domain), save :: nlst
 

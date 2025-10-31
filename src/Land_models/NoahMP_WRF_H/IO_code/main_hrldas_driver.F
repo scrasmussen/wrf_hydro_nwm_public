@@ -28,17 +28,18 @@ program noah_hrldas_driver
   ! this is used to drive NoahMP
   use module_noahmp_hrldas_driver, only: land_driver_ini, land_driver_exe
 #endif
-
+  ! use config_base, only: wrf_hydro, noah_lsm
   ! NEW MODULE WITH DT INCLUDING STATE, PARAMETER,FORCING AND GEOMETRY. Different modules
-  use NoahmpIOVarType, only: NoahmpIO_type
+  ! use NoahmpIOVarType, only: NoahmpIO_type
   use orchestrator_base
 
   implicit none
   integer :: ITIME, NTIME
+  ! type(NoahmpIO_type) :: noah_lsm
 
   call orchestrator%init()
 
-  call land_driver_ini(NTIME)
+  call land_driver_ini(NTIME)!, noah_lsm)
 
 #ifdef WRF_HYDRO
   do ITIME = 1, NTIME
@@ -46,7 +47,7 @@ program noah_hrldas_driver
   do ITIME = 0, NTIME
 #endif
      ! DTs must be passed to the exe.
-     call land_driver_exe(ITIME)
+     call land_driver_exe(ITIME)!, noah_lsm)
   end do
 #ifdef WRF_HYDRO
   !Pass state for destruction
