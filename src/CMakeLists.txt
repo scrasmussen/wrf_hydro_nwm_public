@@ -41,6 +41,12 @@ if (MODFLOW STREQUAL "1")
   add_subdirectory("CPL/MODFLOW_cpl")
 endif()
 
+if (WRF_HYDRO_NUDGING_IO STREQUAL "1" OR
+    WRF_HYDRO_NUDGING STREQUAL "1")
+        add_subdirectory("nudging/io")
+        add_dependencies(hydro_routing hydro_nudging_io)
+endif()
+
 if (WRF_HYDRO_NUDGING STREQUAL "1")
         add_subdirectory("nudging")
         add_dependencies(hydro_routing hydro_nudging)
@@ -142,6 +148,11 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 # hydro_routing_groundwater_nhd
                 # hydro_routing_groundwater_simple
         )
+
+        if (WRF_HYDRO_NUDGING_IO STREQUAL "1")
+          target_link_libraries(wrfhydro hydro_nudging_io)
+          add_dependencies(wrfhydro hydro_nudging_io)
+        endif()
 
         if (WRF_HYDRO_NUDGING STREQUAL "1")
                 target_link_libraries(wrfhydro hydro_nudging)
