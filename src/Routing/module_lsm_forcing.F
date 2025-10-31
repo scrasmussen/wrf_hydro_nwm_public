@@ -973,7 +973,7 @@ Contains
 
         inquire (file=trim(inflnm), exist=fexist)
         if ( .not. fexist ) then
-           print*, "no forcing data found1", inflnm
+           print*, "no forcing data found", inflnm
            call hydro_stop("In read_hydro_forcing_seq")
         endif
 
@@ -996,8 +996,8 @@ Contains
              out_date(15:16)//".LDASIN_DOMAIN"//hgrid
         inquire (file=trim(inflnm), exist=fexist)
         if ( .not. fexist ) then
-           print*, "no forcing data found2", inflnm
-           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found3")
+           print*, "no forcing data found", inflnm
+           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
         endif
         CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE, &
              forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -1020,8 +1020,8 @@ Contains
 
         inquire (file=trim(inflnm), exist=fexist)
         if ( .not. fexist ) then
-           print*, "no forcing data found4", inflnm
-           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found5")
+           print*, "no forcing data found", inflnm
+           call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
         endif
 
         do i_forcing = 1, int(24*3600/dt)
@@ -1262,7 +1262,7 @@ Contains
 
         if ( .not. fexist ) then
 #ifdef HYDRO_D
-           print*, "no forcing data found6", inflnm
+           print*, "no forcing data found", inflnm
 #endif
         else
            do i_forcing = 1, int(24*3600/dt)
@@ -2344,11 +2344,11 @@ character(len=256), intent(in)  :: forcing_name_PR
 character(len=256), intent(in)  :: forcing_name_SN
 character(len=256), intent(in)  :: forcing_name_LF
 ! real, intent(in) ::  dt 
-integer, intent(in) ::  dt
+! integer, intent(in) ::  dt
 integer ::  dt1
 real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
      prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
-real ::  wrf_dt
+real ::  dt, wrf_dt
 ! tmp variable
 character(len=256) :: inflnm, inflnm2, product
 integer  :: i,j,mmflag,ierr_flg
@@ -2366,39 +2366,23 @@ inflnm = trim(indir)//"/"//&
 
 !!! FORC_TYPE 1 ============================================================================
 if(FORC_TYP.eq.1) then
-   ! print*, "FF out_date (before): ", out_date
-   ! print*, "FF olddate  (before):  ", olddate
-   ! print*, "FF nint(dt) (before): ", nint(dt)
-   ! print*, "FF noah_lsm%FORCING_TIMESTEP: ", noah_lsm%FORCING_TIMESTEP
-   ! print*, "k           (before): ", k
    !!Create forcing data filename...
    ! call geth_newdate(out_date,olddate,nint(dt))
    dt1 = noah_lsm%FORCING_TIMESTEP
    ! dt = noah_lsm%FORCING_TIMESTEP
    call geth_newdate(out_date,olddate,dt1)
-   ! print*, "FF out_date: ", out_date
-   ! print*, "FF olddate:  ", olddate
-   print*, "FF dt  : ", dt
-   print*, "FF dt1 : ", dt1
-   print*, "k      : ", k
-   ! print*, "trim(indir)", trim(indir)
-   ! print*, "trim(noah_lsm%indir)", trim(noah_lsm%indir)
-   ! inflnm = trim(indir)//"/"//&
-        ! out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
-        ! ".LDASIN_DOMAIN"//hgrid
    inflnm = trim(noah_lsm%indir)//"/"//&
         out_date(1:4)//out_date(6:7)//out_date(9:10)//out_date(12:13)//&
         ".LDASIN_DOMAIN"//hgrid
 
    inquire (file=trim(inflnm), exist=fexist)
-   ! print*, "FF fexist before", fexist, trim(inflnm)
+
 #ifdef MPP_LAND
    call mpp_land_bcast_logical(fexist)
 #endif
-   ! print*, "FF fexist after", fexist, inflnm
    if ( .not. fexist ) then
-      print*, "no forcing data found7", inflnm
-      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found8")
+      print*, "no forcing data found", inflnm
+      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
    endif
 
 #ifdef HYDRO_D
@@ -2430,8 +2414,8 @@ if(FORC_TYP.eq.2) then
    call mpp_land_bcast_logical(fexist)
 #endif
    if ( .not. fexist ) then
-      print*, "no forcing data found9", inflnm
-      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found10")
+      print*, "no forcing data found", inflnm
+      call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
    endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,&
         forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
@@ -2459,7 +2443,7 @@ if(FORC_TYP.eq.3) then
    call mpp_land_bcast_logical(fexist)
 #endif
    if ( .not. fexist ) then
-      print*, "no forcing data found11", inflnm
+      print*, "no forcing data found", inflnm
       call hydro_stop("read_hydro_forcing_seq")
    endif
 
@@ -2737,7 +2721,7 @@ if(FORC_TYP.eq.7) then
 
    if ( .not. fexist ) then
 #ifdef HYDRO_D
-      print*, "no forcing data found12", inflnm
+      print*, "no forcing data found", inflnm
 #endif
    else
       do i_forcing = 1, int(24*3600/dt)

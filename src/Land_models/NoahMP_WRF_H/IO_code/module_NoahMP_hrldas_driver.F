@@ -50,6 +50,7 @@ module module_NoahMP_hrldas_driver
    integer :: snow_assim, HRLDAS_ini_typ
    REAL,    allocatable, DIMENSION(:,:)   :: etpnd, greenfrac, prcp0
    real :: etpnd1
+   real :: num, denom
    character(len=19) :: forcDate
    ! LRK - Remove GEO_STATIC_FLNM
    !character(len = 256):: GEO_STATIC_FLNM
@@ -1368,55 +1369,7 @@ end subroutine land_driver_ini
              noah_lsm%LAI, noah_lsm%update_lai)
         ! =REFACTOR=, they have this! what to do with this?
         ! noah_lsm%VEGFRA = noah_lsm%VEGFRA * 100.
-
-     ! else if(wrf_hydro%forc_typ .eq. 4) then
-        ! write(*,*) "Farshid, noah_lsm%forc_typ=4, ITIMESTEP", noah_lsm%ITIMESTEP
-        ! write(*,*) "Farshid, noah_lsm%forc_typ=4, itime", itime
-        !! Impose a fixed diurnal cycle...
-        !! assumes model timestep is 1 hr
-        !! assumes K=1 is 12z (Ks or ~ sunrise)
-        !! First Precip...
-        ! IF (noah_lsm%ITIMESTEP.EQ.2) THEN
-            ! noah_lsm%RAINBL_tmp =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
-
-        ! ELSEIF (noah_lsm%ITIMESTEP.GT.1) THEN
-
-            ! noah_lsm%RAINBL_tmp = 0.
-        ! END IF
-
-        ! noah_lsm%T_PHY(:,1,:)=290.0 + 3.0*(cos((2*3.1416*noah_lsm%ITIMESTEP/24.0)-12.0*2*3.1416/24.0))
-        ! noah_lsm%QV_CURR(:,1,:) = 0.01
-        ! noah_lsm%U_PHY(:,1,:) = 1.0
-        ! noah_lsm%V_PHY = 1.0
-        ! noah_lsm%P8W(:,1,:) = 100000.0
-        ! noah_lsm%GLW=400.0 + 25.0*(cos((2*3.1416*noah_lsm%ITIMESTEP/24.0)-12.0*2*3.1416/24.0))
-        ! noah_lsm%SWDOWN=450.0 + 450.0*(cos((2*3.1416*noah_lsm%ITIMESTEP/24.0)-12.0*2*3.1416/24.0))
-
      else
-		! write(*,*) " "
-		! write(*,*) "Farshid, noah_lsm and wrf_hydro forc_typ", noah_lsm%forc_typ, wrf_hydro%forc_typ
-		! write(*,*) "noah_lsm%olddate, forcDate", noah_lsm%olddate, forcDate
-		! write(*,*) " trim(noah_lsm%indir) ", trim(noah_lsm%indir)
-		! write(*,*) " wrf_hydro%forc_typ ", wrf_hydro%forc_typ
-		! write(*,*) " noah_lsm%snow_assim ", noah_lsm%snow_assim
-		! write(*,*) " noah_lsm%olddate ", noah_lsm%olddate
-		! write(*,*) " noah_lsm%xstart ", noah_lsm%xstart
-		! write(*,*) " noah_lsm%xend ", noah_lsm%xend
-		! write(*,*) " noah_lsm%ystart ", noah_lsm%ystart
-		! write(*,*) " noah_lsm%yend ", noah_lsm%yend
-		! write(*,*) " noah_lsm%forcing_name_T ", noah_lsm%forcing_name_T
-		! write(*,*) " noah_lsm%forcing_name_Q ", noah_lsm%forcing_name_Q
-		! write(*,*) " noah_lsm%forcing_name_U ", noah_lsm%forcing_name_U
-		! write(*,*) " noah_lsm%forcing_name_V ", noah_lsm%forcing_name_V
-		! write(*,*) " noah_lsm%forcing_name_P ", noah_lsm%forcing_name_P
-		! write(*,*) " noah_lsm%forcing_name_LW ", noah_lsm%forcing_name_LW
-		! write(*,*) " noah_lsm%forcing_name_SW ", noah_lsm%forcing_name_SW
-		! write(*,*) " noah_lsm%forcing_name_PR ", noah_lsm%forcing_name_PR
-		! write(*,*) " noah_lsm%forcing_name_SN ", noah_lsm%forcing_name_SN
-		! write(*,*) " noah_lsm%forcing_name_LF ", noah_lsm%forcing_name_LF
-		! write(*,*) " ITIME ", ITIME
-		! write(*,*) " noah_lsm%FORCING_TIMESTEP ", noah_lsm%FORCING_TIMESTEP
-
         if(noah_lsm%olddate == forcDate) then
 		   write(*,*) " noah_lsm%FORCING_TIMESTEP ", noah_lsm%FORCING_TIMESTEP
            call HYDRO_frocing_drv(noah_lsm, trim(noah_lsm%indir), wrf_hydro%forc_typ, noah_lsm%snow_assim, &
@@ -1444,6 +1397,7 @@ end subroutine land_driver_ini
 
            forcDate = noah_lsm%newdate
         end if
+
      end if
 
 #else
@@ -1579,6 +1533,37 @@ end subroutine land_driver_ini
 	  ! ACCECAN=ACCECAN+noah_lsm%ACC_ECANXY
 	  ! ACCETRAN=ACCETRAN+noah_lsm%ACC_ETRANXY
 	  ! ACCEDIR=ACCEDIR+noah_lsm%ACC_EDIRXY
+
+      ! if(present(ACCPRCP)) ACCPRCP = ACCPRCP + PRCP * noah_lsm%dtbl
+      ACCECAN = ACCECAN + noah_lsm%ECANXY * noah_lsm%dtbl
+      ACCETRAN = ACCETRAN + noah_lsm%ETRANXY * noah_lsm%dtbl
+      ACCEDIR   = ACCEDIR + noah_lsm%EDIRXY * noah_lsm%dtbl
+	  
+	  
+      do J = noah_lsm%YSTART, noah_lsm%YEND
+		   do I = noah_lsm%XSTART, noah_lsm%XEND
+
+			  ! --- top 2 layers ---
+			  num   = 0.0
+			  denom = 0.0
+			  do kk = 1, 2
+				 num   = num   + noah_lsm%SMOIS(I,kk,J) * zsoil(kk)
+				 denom = denom + noah_lsm%SMCMAX_TABLE(noah_lsm%ISLTYP(I,J)) * zsoil(kk)
+			  end do
+			  SOILSAT_TOP(I,J) = num / denom
+
+			  ! --- all soil layers ---
+			  num   = 0.0
+			  denom = 0.0
+			  do kk = 1, noah_lsm%NSOIL
+				 num   = num   + noah_lsm%SMOIS(I,kk,J) * zsoil(kk)
+				 denom = denom + noah_lsm%SMCMAX_TABLE(noah_lsm%ISLTYP(I,J)) * zsoil(kk)
+			  end do
+			  SOILSAT(I,J) = num / denom
+
+		   end do
+      end do
+
       write(*,*) "noah_lsm%dtbl, noah_lsm%FORCING_TIMESTEP", noah_lsm%dtbl, noah_lsm%FORCING_TIMESTEP	  ! 3600.000            3600
 
 	  ! ACCPRCP=noahmp%water%flux%PrecipTotAcc
@@ -1691,7 +1676,7 @@ subroutine  ldas_output(itime)!, noah_lsm)
   ! use NoahmpIOVarType, only: NoahmpIO_type
   ! type(NoahmpIO_type), intent(inout) :: noah_lsm
   integer, intent(in)  :: itime ! time step of the LSM
-  write(*,*) "Farshid ITIME, noah_lsm%ETRANXY ", ITIME, noah_lsm%ETRANXY
+  ! write(*,*) "Farshid ITIME, noah_lsm%igrid ", ITIME, noah_lsm%igrid
 
 !#ifdef WRF_HYDRO
 !if ( (io_config_outputs .eq. 0) ) then

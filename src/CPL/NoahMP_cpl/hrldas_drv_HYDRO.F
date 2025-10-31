@@ -118,7 +118,7 @@
             forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
             forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
             T2,q2x,u,v,pres,xlong,short,prcp1,&
-            lai,snowbl,fpar,snodep,FORCING_TIMESTEP,kt, pcp_old)
+            lai,snowbl,fpar,snodep,FORCING_TIMESTEP*1.0,kt, pcp_old)
        end subroutine HYDRO_frocing_drv
 
        subroutine get_greenfrac(inFile,greenfrac, idim, jdim, olddate,SHDMAX)
