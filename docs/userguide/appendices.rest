@@ -288,12 +288,31 @@ project directory.
 .. code-block:: console
 
   git clone https://github.com/NCAR/wrf_hydro_nwm_public.git
-  git clone --recurse-submodule --branch v4.6.1 https://github.com/wrf-model/WRF.git
+  git clone --recurse-submodule --branch v4.7.1 https://github.com/wrf-model/WRF.git
   git clone --branch v4.6.0 https://github.com/wrf-model/WPS.git
-  wget https://github.com/NCAR/wrf_hydro_nwm_public/releases/download/v5.4.0/croton_NY_training_example_v5.4.tar.gz
 
-4. Copy the uncompressed WPS geographic data into the WPS directory.
-5. Copy the uncompressed coupled example case into the project directory.
+
+4. Download and extract testcase and geographic data.
+
+.. code-block:: console
+
+  # download and extract files
+  wget https://github.com/NCAR/wrf_hydro_nwm_public/releases/download/v5.4.0/front_range_CO_example_testcase_coupled.tar.gz
+  wget http://www2.mmm.ucar.edu/wrf/src/wps_files/geog_high_res_mandatory.tar.gz
+  tar zxf front_range_CO_example_testcase_coupled.tar.gz
+  tar zxf geog_high_res_mandatory.tar.gz
+
+
+
+5. Move the newly extracted geographic data into the WPS directory.
+
+.. code-block:: console
+
+  # create directory and move geopgraphic data
+  mkdir -p run/WPS
+  mv WPS_GEOG/ run/WPS/geog
+
+
 6. Your project directory structure will look like the following:
 
 .. code-block:: console
@@ -337,11 +356,11 @@ with the updated version you just downloaded
   rm -r hydro
   cp -r ../wrf_hydro*/src hydro
 
-3.  Load appropriate modules on Derecho:
+3.  Load appropriate modules on Derecho, the following is an example for GNU compilers.
 
 .. code-block:: console
 
-  module load ncarenv gcc ncarcompilers cray-mpich craype
+  module load ncarenv gcc ncarcompilers cray-mpich craype netcdf cmake
 
 
 
@@ -349,10 +368,10 @@ with the updated version you just downloaded
 
 .. code-block:: console
 
-      cd …/WRF/
+      cd …/WRF*
       # CMake option to turn on WRF-Hydro nudging `-DWRF_HYDRO_NUDGING=1`
-      ./configure_new -x -p gfortran/gcc -- -DWRF_CORE=ARW -DWRF_NESTING=BASIC -DENABLE_HYDRO=ON -DWRF_CASE=EM_REAL
-      ./compile_new
+      ./configure_new -x -p gfortran/gcc -- -DWRF_CORE=ARW -DWRF_NESTING=BASIC -DENABLE_HYDRO=ON -DWRF_CASE=EM_REAL -DUSE_JASPER=OFF
+      ./compile_new -j4
 
 
 4b. Configure WRF: Old Method
@@ -393,15 +412,13 @@ with the updated version you just downloaded
 
 **Compiling the WRF Preprocessing System (WPS)**
 
-Make sure that paths are set as in Step #5b from above
-
 1. Navigate to the WPS source code directory at WPS*
 
 2. Configure the WPS
 
 .. code-block:: console
 
-  ./configure_new
+  ./configure_new -x -p gfortran -- -DBUILD_EXTERNALS=1
 
 For Derecho select option 43: Cray XC CLE/Linux x86_64, Intel Classic compilers   (dmpar).
 
@@ -433,7 +450,7 @@ WRF-Hydro will run).
   cd run/WPS
 
 
-2. Now copy the required files for the WPS geogrid utility into your run
+2. Now copy the required files for the WPS geogrid utility into your ``run/WPS``
    directory
 
 .. code-block:: console
@@ -445,9 +462,12 @@ WRF-Hydro will run).
 Edit the paths within this namelist as appropriate for your system
 
 3. Edit the path to geographic data in your ``namelist.wps`` file so that
+   ``geog_data_path`` points to the correct path.
 
 .. code-block:: console
 
+  geog_data_path = 'geog',
+  or
   geog_data_path = '/glade/work/wrfhelp/WPS_GEOG/',
 
 
@@ -467,10 +487,11 @@ steps.
 
 
 1. Now copy the additional required files for the WPS ungrib utility into your
-   run directory
+   ``run/WPS`` directory
 
 .. code-block:: console
 
+  cd run/WPS
   cp ../../WPS*/install/bin/ungrib.exe .
   cp ../../WPS*/link_grib.csh .
 
@@ -509,7 +530,7 @@ the model domain creating metgrid files to be used as input to the WRF real
 utility.
 
 1. Now copy additional the required files for the WPS metgrid utility into
-   your run directory
+   your ``run/WPS`` directory
 
 .. code-block:: console
 
@@ -541,7 +562,7 @@ First we will create a run directory and copy over or link the required files.
 .. code-block:: console
 
   cd project_directory
-  mkdir run
+  mkdir run # this directory should already exist by now
   cp -RL WRF*/run run/WRF
   cd run/WRF
 
@@ -550,7 +571,7 @@ First we will create a run directory and copy over or link the required files.
 
 .. code-block:: console
 
-  cp ../../WRF/hydro/src/template/HYDRO/*TBL .
+  cp ../../WRF/hydro/template/HYDRO/*TBL .
   cp ../../WRF/hydro/Land_models/NoahMP/run/*.TBL .
 
 3. Copy over the namelists for real / wrf (namelist.input) and the hydro components
