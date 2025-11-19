@@ -15,7 +15,9 @@ module wrfhydro_nuopc_gluecode
 ! !USES:
   use ESMF
   use NUOPC
+  use mpi
   use WRFHydro_ESMF_Extensions
+  use wrfhydro_nuopc_utils, only: array_write_i
   use module_mpp_land, only: &
     HYDRO_COMM_WORLD, &
     numprocs, &
@@ -75,7 +77,6 @@ module wrfhydro_nuopc_gluecode
   public :: regrid_export_grid_to_mesh
 
   type(ESMF_RouteHandle) :: route_handle
-  logical :: route_handle_initialized = .false.
 
   character(len=ESMF_MAXSTR), parameter :: file = __FILE__
   character(len=24), parameter :: filename = "WRFHydro_NUOPC_Gluecode"
@@ -709,6 +710,7 @@ contains
          rc=rc)
     call check(rc, __LINE__, file)
 
+    ! print*, trim(var_name), "dstPtr =", dstPtr
     outvar = nint(dstPtr)
 
     print *, "  outvar_i(1:2,1:2) =", outvar(1:2,1:2)
@@ -716,11 +718,13 @@ contains
   end subroutine read_mesh_var_and_regrid_i
 
   subroutine wrfhydro_write_geo_file(wrfhydro_grid, wrfhydro_mesh, &
-       regrid_handle)
+       regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
     use netcdf
     type(ESMF_Grid), intent(in) :: wrfhydro_grid
     type(ESMF_Mesh), intent(in) :: wrfhydro_mesh
-    type(ESMF_RouteHandle), intent(in) :: regrid_handle
+    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_bl
+    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_stod
+    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_dtos
     ! type(ESMF_Mesh)            :: wrfhydro_mesh
     character(:), allocatable :: mpas_file
 
@@ -747,11 +751,11 @@ contains
 
     ! locals
     integer :: nx, ny
-    type(ESMF_RouteHandle) :: regrid_handle_tmp
+    ! type(ESMF_RouteHandle) :: regrid_handle_tmp
 
     print *, "=== entering wrfhydro_write_geo_file ==="
     ! initialize values
-    regrid_handle_tmp = regrid_handle
+    ! regrid_handle_tmp = regrid_handle
 
     ! setup MPAS NetCDF variables
     mpas_file = "frontrange.static.nc"
@@ -798,20 +802,20 @@ contains
 
     ! nearest neighbor regridding
     call read_mesh_var_and_regrid('isltyp', soil_cat, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('ivgtyp', veg, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst) ! this might be overkill
+         regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst) ! this might be overkill
     call read_mesh_var_and_regrid('ivgtyp', lu_index, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('landmask', landmask, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     ! bilinear regridding
     call read_mesh_var_and_regrid('ter', hgt, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('latCell', lat, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('lonCell', lon, ncid, nCells, &
-         regrid_handle_tmp, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
     ! try turning off terrain and veg
     ! bilinear wont work for integer variables/categorical,
     !  - use nearest neightbor?? Majority would be the best choice if possible
@@ -827,6 +831,11 @@ contains
     print *, "veg(1:2,1:2) =", veg(1:2,1:2)
     print *, "lu_index(1:2,1:2) =", lu_index(1:2,1:2)
     print *, "landmask(1:2,1:2) =", landmask(1:2,1:2)
+    print *, "-----------------"
+    print *, "writing veg grid"
+    call array_write_i(veg, "veg_dtos.nc")
+    call array_write_i(lu_index, "veg_stod.nc")
+
 
     nx = size(hgt, dim=1)
     ny = size(hgt, dim=2)
@@ -835,7 +844,6 @@ contains
 
 
     print *, "=== exiting wrfhydro_write_geo_file ==="
-    ! stop "HIHI"
   end subroutine wrfhydro_write_geo_file
 
   function wrfhydro_open_mesh(rc) result(mesh)
@@ -852,11 +860,13 @@ contains
 
   end function wrfhydro_open_mesh
 
-  function wrfhydro_regrid_mesh(input_grid, mesh, did, importState, rc) result(handle)
+  function wrfhydro_regrid_mesh(input_grid, mesh, regrid_method, &
+       did, importState, rc) result(handle)
     type(ESMF_Grid), intent(in) :: input_grid
     type(ESMF_Mesh), intent(in) :: mesh
     integer, intent(in) :: did
     type(ESMF_State), intent(inout) :: importState
+    type(ESMF_RegridMethod_Flag), intent(in) :: regrid_method
     integer, intent(out) :: rc
     type(ESMF_RouteHandle) :: handle
     type(ESMF_Grid) :: grid
@@ -868,15 +878,30 @@ contains
     logical :: realizeImport, connected
     character(:), allocatable :: st_name
 
+    logical :: route_handle_initialized = .false.
+
+
+    route_handle_initialized = .false.
     file = __FILE__
     rc = ESMF_SUCCESS
     print *, "enter: wrfhydro_regrid_mesh"
     call ESMF_LogWrite("WRFH: enter wrfhydro_regrid_mesh", &
          ESMF_LOGMSG_INFO, rc=rc)
 
-    st_name = "tmp_var_name"
+    if (regrid_method == ESMF_REGRIDMETHOD_BILINEAR) then
+       st_name = "bilinear"
+    end if
+    if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_STOD) then
+       st_name = "nn_stod"
+       ! stop "GOOOD stod"
+    end if
+    if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_DTOS) then
+       st_name = "nn_dtos"
+       ! stop "GOOOD dtos"
+    end if
     ! check for import field
 
+    print *, "========", trim(st_name), "========"
 
     call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
     if (ESMF_STDERRORCHECK(rc)) return
@@ -906,12 +931,14 @@ contains
        call ESMF_RegridWeightGen(&
             srcFile='frontrange.scrip.nc', &
             dstFile='fulldom_hires_hydrofile.d01.nc', &
-            weightFile='weights.nc', &
-            regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+            weightFile='weights/'//st_name//'.nc', &
+            regridmethod=regrid_method, & ! FOOBAR: THIS SHOULD REGEN EVERYTIME
+! ESMF_REGRIDMETHOD_NEAREST_STOD, &
             rc=rc)
        ! Precompute Field sparse matrix multiplication with local factors
        call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
-            filename='weights.nc', routehandle=route_handle, rc=rc)
+            filename='weights/'//st_name//'.nc', &
+            routehandle=route_handle, rc=rc)
 
        ! generate regrid weights in to handle
        ! call ESMF_FieldRegridStore(srcfield=import_field, dstfield=new_field, &
@@ -965,7 +992,8 @@ contains
     ! error stop "where is this being called?"
   end function wrfhydro_regrid_mesh
 
-  subroutine regrid_import_mesh_to_grid(grid, mesh, state, did, memflg)
+  subroutine regrid_import_mesh_to_grid(grid, mesh, state, &
+       did, memflg)
     type(ESMF_Grid), intent(in) :: grid
     type(ESMF_Mesh), intent(in) :: mesh
     type(ESMF_State),intent(in) :: state
@@ -1065,17 +1093,20 @@ contains
              call ESMF_RegridWeightGen(&
                   srcFile='frontrange.scrip.nc', &
                   dstFile='fulldom_hires_hydrofile.d01.nc', &
-                  weightFile='weights_import.nc', &
-                  regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
+                  regridmethod=cap_fld_list(n)%regrid_method, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
              call ESMF_FieldSMMStore(srcField=meshfield, dstField=gridfield, &
-                  filename='weights_import.nc', & !routehandle=route_handle, rc=rc)
-                  routehandle=cap_fld_list(n)%import_handle, rc=rc)
+                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
+                  routehandle=cap_fld_list(n)%import_handle, &
+                  transposeRoutehandle=cap_fld_list(n)%export_handle, &
+                  rc=rc)
              call check(rc, __LINE__, file)
 
              cap_fld_list(n)%import_handle_init = .true.
+             cap_fld_list(n)%export_handle_init = .true.
           end if
 
           print*, "DEBUGGING: using var's handle to regrid field ", &
@@ -1209,23 +1240,25 @@ contains
 
           if (cap_fld_list(n)%export_handle_init .eqv. .false.) then
              call printa("Regridding export variables")
+             stop "TESTING transposeRouteHandle: THIS SHOULD NOT BE REACHED"
              ! call ESMF_FieldRegridStore(srcField=gridField, &
              !      dstField=meshField, &
              !      regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
              !      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
              !      routehandle=cap_fld_list(n)%export_handle, rc=rc)
              ! call check(rc, __LINE__, file)
+             stop "switch over to regrid method, using inverse though?"
              call ESMF_RegridWeightGen(&
                   srcFile='fulldom_hires_hydrofile.d01.nc', &
                   dstFile='frontrange.scrip.nc', &
-                  weightFile='weights_export.nc', &
+                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   regridmethod=ESMF_REGRIDMETHOD_NEAREST_STOD, &  ! <- no polygons required
                   ! regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
              call ESMF_FieldSMMStore(srcField=gridField, dstField=meshField, &
-                  filename='weights_export.nc', & !routehandle=route_handle, rc=rc)
+                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   routehandle=cap_fld_list(n)%export_handle, rc=rc)
              call check(rc, __LINE__, file)
              cap_fld_list(n)%export_handle_init = .true.
@@ -1235,7 +1268,7 @@ contains
                trim(cap_fld_list(n)%st_name)
           call ESMF_FieldRegrid(gridField, meshField, &
                cap_fld_list(n)%export_handle, rc=rc)
-p          call check(rc, __LINE__, file)
+          call check(rc, __LINE__, file)
 
           ! Debugging: write export vars after regrid
           call ESMF_FieldWrite(meshField, &
@@ -1503,6 +1536,8 @@ p          call check(rc, __LINE__, file)
 #endif
     character(:), allocatable :: grid_file
 
+    integer :: ierr, rank
+
 
 #ifdef DEBUG
     call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
@@ -1548,13 +1583,18 @@ p          call check(rc, __LINE__, file)
       (/x_start,y_start/),longitude,rc=rc)
     call check(rc, __LINE__, file)
 
-#ifdef DEBUG
+! #ifdef DEBUG
     ! Print Local Lat Lon Lower Left / Upper Right Centers
     write(logMsg,"(A,4(F0.3,A))") MODNAME//": Center Coordinates = (", &
       longitude(1,1),":",longitude(nx_local,ny_local),",", &
       latitude(1,1),":",latitude(nx_local,ny_local),")"
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-#endif
+! #endif
+
+    ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! print *, rank, ": nx_local, ny_local =", nx_local, ny_local
+    ! print *, rank, ": max/min lat = ", maxval(latitude), minval(latitude)
+    ! print *, rank, ": max/min lon = ", maxval(longitude), minval(longitude)
 
     ! Add Center Coordinates to Grid
     call ESMF_GridAddCoord(wrfhydro_grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
@@ -1695,6 +1735,8 @@ p          call check(rc, __LINE__, file)
 #ifdef DEBUG
     call ESMF_LogWrite(MODNAME//": leaving "//METHOD, ESMF_LOGMSG_INFO)
 #endif
+
+
 
   end function wrfhydro_GridCreate
 
