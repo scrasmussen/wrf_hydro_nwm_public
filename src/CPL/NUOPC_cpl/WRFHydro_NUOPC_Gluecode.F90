@@ -847,14 +847,69 @@ contains
   end subroutine wrfhydro_write_geo_file
 
   function wrfhydro_open_mesh(rc) result(mesh)
-    type(ESMF_Mesh) :: mesh
     integer, intent(out) :: rc
+    type(ESMF_Mesh) :: mesh
+    type(ESMF_DistGrid) :: distgrid
+    type(ESMF_VM)       :: vm
+    integer, allocatable :: gindex(:)
     character(:), allocatable :: mesh_file
+    character(len=256) :: iomsg
+    integer :: unit, iostat, irank, localCount
+    integer :: rank, np
+    integer :: idx, inode
+
     rc = ESMF_SUCCESS
+
+    ! add the following to make generic
+    call ESMF_VMGetGlobal(vm, rc=rc)
+    call check(rc, __LINE__, file)
+    call ESMF_VMGet(vm, localPet=rank, petCount=np, rc=rc)
+    call check(rc, __LINE__, file)
+
+    ! read
+    open(newunit=unit, file='frontrange.graph.info.part.2', &
+         status='old', action='read', iostat=iostat, iomsg=iomsg)
+    if (iostat /= 0) then
+       print *, trim(iomsg)
+       stop "Error opening [casename].graph.info.part.[np]"
+    end if
+
+    localCount = 0
+    do
+       read(unit, *, iostat=iostat) irank
+       if (iostat /= 0) exit
+       if (irank == rank) localCount = localCount + 1
+    end do
+
+    allocate(gindex(localCount))
+
+    print *, rank, "/", np, ": with localCount =", localCount
+
+    ! setup grid distribution
+    rewind(unit)
+    idx   = 0
+    inode = 0
+
+    do
+       read(unit, *, iostat=iostat) irank
+       if (iostat /= 0) exit
+
+       inode = inode + 1 ! inode = line number
+       if (irank == rank) then
+          idx = idx + 1
+          gindex(idx) = inode ! seqIndex = global node id
+       end if
+    end do
+    close(unit)
+
+
+    distgrid = ESMF_DistGridCreate(arbSeqIndexList=gindex, rc=rc)
+    call check(rc, __LINE__, file)
 
     mesh_file = "frontrange.scrip.nc"
     print *, "todo: read mesh_file name from namelist, currently ", trim(mesh_file)
     mesh = ESMF_MeshCreate(filename=mesh_file, &
+         elementDistgrid=distgrid, &
          fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
     call check(rc, __LINE__, file)
 
