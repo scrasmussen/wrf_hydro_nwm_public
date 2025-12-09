@@ -29,6 +29,7 @@ module wrfhydro_nuopc_fields
     character(len=64)      :: sd_name   = "dummy" ! standard name
     character(len=64)      :: st_name   = "dummy" ! state name
     character(len=64)      :: units     = "-"     ! units
+    type(ESMF_RegridMethod_Flag) :: regrid_method = ESMF_REGRIDMETHOD_BILINEAR
     logical                :: ad_import = .FALSE. ! advertise import
     logical                :: ad_export = .FALSE. ! advertise export
     real(ESMF_KIND_R8)     :: vl_fillv  = ESMF_MISSING_VALUE ! default
@@ -44,59 +45,83 @@ module wrfhydro_nuopc_fields
   character(len=ESMF_MAXSTR), parameter :: file = __FILE__
   logical, parameter :: IMPORT_T = .true.
   logical, parameter :: IMPORT_F = .false.
-  logical, parameter :: EXPORT_T = .true.
+  logical, parameter :: EXPORT_T = .false.
   logical, parameter :: EXPORT_F = .false.
   logical, parameter :: TMP_EXPORT_T = .false.
   logical, parameter :: TMP_IMPORT_T = .false.
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content","smc", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
     cap_fld_type("inst_soil_moisture_content","slc", &
-                 "m3 m-3", TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
     cap_fld_type("inst_soil_temperature","stc", &
-                 "K     ", TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
+                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_2","smc2", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_3","smc3", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_4","smc4", &
-                 "m3 m-3", IMPORT_T, EXPORT_T, 0.20d0),         &
+                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
-                 "K", IMPORT_T, EXPORT_F, 288.d0),                 &
+                 "K", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_F, 288.d0),                 &
     cap_fld_type("soil_temperature_layer_2","stc2", &
-                 "K     ", IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_temperature_layer_3","stc3", &
-                 "K     ", IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_temperature_layer_4","stc4", &
-                 "K     ", IMPORT_T, EXPORT_F, 288.d0),             &
+                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_porosity","smcmax1", &
-                 "1     ", IMPORT_F, EXPORT_F, 0.45d0),                 &
+                 "1     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_F, EXPORT_F, 0.45d0),                 &
     cap_fld_type("vegetation_type","vegtyp", &
-                 "1     ", IMPORT_F, EXPORT_F, 16.0d0),                 &
+                 ! "1     ", ESMF_REGRIDMETHOD_NEAREST_DTOS, &
+                 "1     ", ESMF_REGRIDMETHOD_NEAREST_STOD, &
+                 IMPORT_F, EXPORT_F, 16.0d0),                 &
     cap_fld_type("surface_water_depth","sfchead", &
-                 "mm    ", IMPORT_F, EXPORT_F, 0.00d0),             &
+                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("time_step_infiltration_excess","infxsrt", &
-                 "mm    ", IMPORT_T, EXPORT_F, 0.00d0),             &
+                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_F, 0.00d0),             &
     cap_fld_type("soil_column_drainage","soldrain", &
-                 "mm    ", IMPORT_T, EXPORT_F, 0.00d0),             &
+                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_T, EXPORT_F, 0.00d0),             &
+    ! FOOBAR: double check this is ok
     ! these two accumulated variables break during runtime
     ! it could be they are pointing to the same variable
     ! as infxsrt and soldrain on the MPAS side
     cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
-                 "mm    ", IMPORT_F, EXPORT_F, 0.00d0),             &
+                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
-                 "mm    ", IMPORT_F, EXPORT_F, 0.00d0)              &
+                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 IMPORT_F, EXPORT_F, 0.00d0)              &
     /)
 
   public cap_fld_list

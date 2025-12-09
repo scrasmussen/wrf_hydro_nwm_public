@@ -31,6 +31,7 @@ module WRFHydro_ESMF_Extensions
   use ESMF
   use NUOPC
   use NETCDF
+  use wrfhydro_nuopc_utils, only: check
 
   implicit none
 
@@ -141,6 +142,7 @@ module WRFHydro_ESMF_Extensions
   character(len=*),parameter :: NUOPC_COPY_FWD = 'from ESMF_Array to FORTRAN array'
   character(len=*),parameter :: NUOPC_COPY_BWD = 'from FORTRAN array to ESMF_Array'
 
+  character(len=ESMF_MAXSTR), parameter :: file = __FILE__
 
 contains
 
@@ -359,7 +361,9 @@ contains
   ! call using generic interface: WRFHYDRO_ESMF_GridWrite
   subroutine WRFHYDRO_ESMF_GridWrite_default(grid, fileName, overwrite, status, &
     timeslice, iofmt, relaxedflag, nclScript, map, rc)
-! ! ARGUMENTS
+    use mpi
+
+    ! ! ARGUMENTS
     type(ESMF_Grid),            intent(in)            :: grid
     character(len=*),           intent(in),  optional :: fileName
     logical,                    intent(in),  optional :: overwrite
@@ -441,6 +445,10 @@ contains
     logical                 :: lnclScript
     logical                 :: hasCorners
 
+
+    integer :: rank, ierr, localDeCount
+    integer :: eLB(2,1), eUB(2,1), uLB(2,1), uUB(2,1)
+
     if (present(rc)) rc = ESMF_SUCCESS
 
     ioCapable = (ESMF_IO_PIO_PRESENT .and. &
@@ -457,95 +465,131 @@ contains
         lfileName = trim(fileName)
       else
         call ESMF_GridGet(grid, name=gridName, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         lfileName = trim(gridName)//".nc"
       endif
 
+      print *, "WRITING TO ", lfilename
+
+
       arraybundle = ESMF_ArrayBundleCreate(rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
 
       ! -- centers --
 
       call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
         isPresent=isPresent, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
       if (isPresent) then
         call ESMF_GridGetCoord(grid, coordDim=1, &
           staggerLoc=ESMF_STAGGERLOC_CENTER, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArraySet(array, name="lon_center", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_GridGetCoord(grid, coordDim=2, &
           staggerLoc=ESMF_STAGGERLOC_CENTER, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArraySet(array, name="lat_center", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       endif
 
       ! -- corners --
 
       call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CORNER, &
         isPresent=hasCorners, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
       if (hasCorners) then
         call ESMF_GridGetCoord(grid, coordDim=1, &
           staggerLoc=ESMF_STAGGERLOC_CORNER, array=array, rc=rc)
         if (.not. ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) then
           call ESMF_ArraySet(array, name="lon_corner", rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
           call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         endif
         call ESMF_GridGetCoord(grid, coordDim=2, &
           staggerLoc=ESMF_STAGGERLOC_CORNER, array=array, rc=rc)
         if (.not. ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) then
           call ESMF_ArraySet(array, name="lat_corner", rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
           call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         endif
       endif
+
+      ! -- owner --
+      call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+      ! call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
+      !      itemflag=ESMF_GRIDITEM_AREA, array=array, rc=rc)
+      call ESMF_ArrayGet(array, &
+           dimCount=dimCount, localDeCount=localDeCount, rc=rc)
+      call check(rc, __LINE__, file)
+      call ESMF_ArrayGet(array, &
+           exclusiveLBound=eLB, exclusiveUBound=eUB, rc=rc)
+      call check(rc, __LINE__, file)
+      call ESMF_ArrayGet(array, &
+           computationalLBound=uLB, computationalUBound=uUB, rc=rc)
+      call check(rc, __LINE__, file)
+      print *, rank, ": dimCount =", dimCount, "localDeCount =", &
+           localDeCount
+      print *, rank, ": exclusives  : elb", eLb, "eub", eUb
+      print *, rank, ": computationl: ulb", uLb, "uUb", uUb
+      print *, "WRFH: grid write return early"
+      return
+      stop "bar"
+
+      call ESMF_ArraySet(array, name="owner", rc=rc)
+      call check(rc, __LINE__, file)
+      call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
+      call check(rc, __LINE__, file)
+      stop "hi"
+
+
+
+
 
       ! -- mask --
 
       call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_MASK, &
         staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
       if (isPresent) then
         call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
           itemflag=ESMF_GRIDITEM_MASK, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArraySet(array, name="mask", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       endif
 
       ! -- area --
 
       call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_AREA, &
         staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
       if (isPresent) then
         call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
           itemflag=ESMF_GRIDITEM_AREA, array=array, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArraySet(array, name="area", rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call ESMF_ArrayBundleAdd(arraybundle,(/array/),rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       endif
+
+
 
       call ESMF_ArrayBundleWrite(arraybundle, &
         fileName=trim(lfileName),rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
 
       call ESMF_ArrayBundleDestroy(arraybundle,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
 
       if (present(nclScript)) then
         lnclScript = nclScript
@@ -555,7 +599,7 @@ contains
 
       if (lnclScript) then
         call ESMF_GridGet(grid,dimCount=dimCount,rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
 
         ! allocate coordDim info accord. to dimCount and tileCount
         allocate(coordDimCount(dimCount), stat=stat)
@@ -566,7 +610,7 @@ contains
         ! get coordDim info
         call ESMF_GridGet(grid, coordDimCount=coordDimCount, &
           rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
 
         coordDimMax = 0
         do dimIndex=1,dimCount
@@ -582,15 +626,15 @@ contains
         if (coordDimMax == 1) then
           call WRFHYDRO_ESMF_NclScriptWrite(gridFile=lfileName, map=map, &
             uniformRect=.TRUE., writeCorners=hasCorners, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         else
           call WRFHYDRO_ESMF_NclScriptWrite(gridFile=lfileName, map=map, &
             writeCorners=hasCorners, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         endif
       endif
     endif
-  end subroutine
+  end subroutine WRFHYDRO_ESMF_GridWrite_default
 #undef METHOD
 
   !-----------------------------------------------------------------------------
@@ -648,7 +692,7 @@ contains
     call WRFHYDRO_ESMF_NclScriptWrite(gridFile, map=map, title=title, &
       nclFile=nclFile, uniformRect=uniformRect, writeCorners=writeCorners, &
       rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
   end subroutine
 #undef METHOD
@@ -700,22 +744,22 @@ contains
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_GLOBAL, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case ('conus','CONUS','Conus')
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_CONUS, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case ('irene','IRENE','Irene')
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_IRENE, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case ('frontrange','FRONTRANGE','FrontRange')
         call WRFHYDRO_ESMF_NclScriptWrite(gridFile, &
           map=WRFHYDRO_ESMF_MAPPRESET_FRONTRANGE, title=title, nclFile=nclFile, &
           uniformRect=uniformRect, writeCorners=writeCorners, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case default
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_VALUE,   &
           msg="Unknown map preset value "//trim(mapPreset)//".", &
@@ -782,10 +826,10 @@ contains
 
     ! Get current VM and pet number
     call ESMF_VMGetCurrent(vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     call ESMF_VMGet(vm, localPet=lpe, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (lpe /= 0) return
 
@@ -833,7 +877,7 @@ contains
     endif
 
     call ESMF_UtilIOUnitGet(fUnit, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
     open (fUnit,file=trim(lnclFile),action="write", &
       status="new",iostat=stat)
     if (stat /= 0) then
@@ -962,7 +1006,7 @@ contains
 
     call WRFHYDRO_ESMF_FerretScriptWrite(varName,dataFile,gridFile,slices, &
       map=map,scale=scale,jnlFile=jnlFile, uniformRect=uniformRect,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
   end subroutine
 #undef METHOD
@@ -1021,22 +1065,22 @@ contains
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_GLOBAL, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case ('conus','CONUS','Conus')
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_CONUS, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case ('irene','IRENE','Irene')
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_IRENE, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case ('frontrange','FRONTRANGE','FrontRange')
         call WRFHYDRO_ESMF_FerretScriptWrite(varName, dataFile, gridFile, slices, &
           map=WRFHYDRO_ESMF_MAPPRESET_FRONTRANGE, scale=scale, jnlFile=jnlFile, &
           uniformRect=uniformRect, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       case default
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_VALUE,   &
           msg="Unknown map preset value "//trim(mapPreset)//".", &
@@ -1109,10 +1153,10 @@ contains
 
     ! Get current VM and pet number
     call ESMF_VMGetCurrent(vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     call ESMF_VMGet(vm, localPet=lpe, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (lpe /= 0) return
 
@@ -1161,7 +1205,7 @@ contains
     endif
 
     call ESMF_UtilIOUnitGet(fUnit, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
     open (fUnit,file=trim(ljnlFile),action="write", &
       status="new",iostat=stat)
     if (stat /= 0) then
@@ -1296,10 +1340,10 @@ contains
     if (present(rc)) rc = ESMF_SUCCESS
 
     call ESMF_FieldGet(field,array=array,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,array=array,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
   end subroutine
 #undef METHOD
@@ -1340,36 +1384,36 @@ contains
     if (present(rc)) rc = ESMF_SUCCESS
 
     call ESMF_ArrayGet(array,typekind=typekind,rank=rank,localDeCount=localDeCount,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (rank == 2) then
       if (typekind == ESMF_TYPEKIND_I4) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_I42D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_I42D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         enddo
       elseif (typekind == ESMF_TYPEKIND_I8) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_I82D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_I82D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         enddo
       elseif (typekind == ESMF_TYPEKIND_R4) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_R42D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_R42D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         enddo
       elseif (typekind == ESMF_TYPEKIND_R8) then
         do deIndex=0,localDeCount-1
           call ESMF_ArrayGet(array,farrayPtr=farray_R82D,localDe=deIndex,rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
           call WRFHYDRO_ESMF_NetcdfReadIXJX(varname,filename,start,farray=farray_R82D, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+          call check(rc, __LINE__, file)
         enddo
       else
         call ESMF_LogSetError(rcToCheck=ESMF_RC_ARG_RANK,   &
@@ -1855,7 +1899,7 @@ contains
 
     do sIndex=1, size(stateList)
       call WRFHYDRO_ESMF_LogState(stateList(sIndex),nestedFlag,label,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
     enddo
 
   end subroutine
@@ -1913,7 +1957,7 @@ contains
 
     call ESMF_StateGet(state, nestedFlag=nestedFlag, &
       itemCount=itemCount, name=stateName, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (itemCount > 0 ) then
 
@@ -1924,7 +1968,7 @@ contains
 
       call ESMF_StateGet(state, nestedFlag=nestedFlag, &
         itemNameList=itemNameList,itemTypeList=itemTypeList, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
 
       do iIndex=1, itemCount
 
@@ -2001,7 +2045,7 @@ contains
 
     call ESMF_StateGet(state, itemCount=itemCount, &
       nestedFlag=nestedFlag,name=stateName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if(present(label)) then
       llabel = trim(label)
@@ -2011,7 +2055,7 @@ contains
 
     call ESMF_StateGet(state, itemCount=itemCount, &
       nestedFlag=nestedFlag,name=stateName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     allocate(itemNameList(itemCount),itemTypeList(itemCount),stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
@@ -2020,7 +2064,7 @@ contains
 
     call ESMF_StateGet(state, itemNameList=itemNameList, &
       itemTypeList=itemTypeList, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     do iIndex=1, itemCount
       if (itemTypeList(iIndex) /= ESMF_STATEITEM_FIELD) then
@@ -2090,7 +2134,7 @@ contains
     call ESMF_GridGet(grid, name=gridName, &
       localDeCount=localDeCount, distgrid=distgrid, &
       dimCount=dimCount,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     ! allocate coordDim info accord. to dimCount and tileCount
     allocate(coordDimCount(dimCount), &
@@ -2102,7 +2146,7 @@ contains
     ! get coordDim info
     call ESMF_GridGet(grid, coordDimCount=coordDimCount, &
       rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     coordDimMax = 0
     do dimIndex=1,dimCount
@@ -2129,7 +2173,7 @@ contains
 
     ! get dimCount and tileCount
     call ESMF_DistGridGet(distgrid, dimCount=dimCount, tileCount=tileCount, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     write (logMsg,"(A,A,(A,I0))") trim(llabel)//": ", &
       trim(gridName), &
@@ -2150,7 +2194,7 @@ contains
     ! get minIndex and maxIndex arrays
     call ESMF_DistGridGet(distgrid, minIndexPTile=minIndexPTile, &
        maxIndexPTile=maxIndexPTile, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     do tileIndex=1,tileCount
     do dimIndex=1,dimCount
@@ -2207,7 +2251,7 @@ contains
 
     do fIndex=1,size(fieldList)
       call WRFHYDRO_ESMF_LogField(fieldList(fIndex),llabel,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
     enddo
 
   end subroutine
@@ -2256,7 +2300,7 @@ contains
     endif
 
     call ESMF_FieldGet(field,status=fieldStatus,name=fieldName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (fieldStatus == ESMF_FIELDSTATUS_EMPTY) then
       fieldStatusStr = 'EMPTY'
@@ -2271,7 +2315,7 @@ contains
     if (fieldStatus == ESMF_FIELDSTATUS_COMPLETE .OR. &
     fieldStatus == ESMF_FIELDSTATUS_GRIDSET ) then
       call ESMF_FieldGet(field, geomtype=fieldGeomtype,rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
       if (fieldGeomtype == ESMF_GEOMTYPE_GRID) then
         fieldGeomtypeStr = 'GRID'
       elseif (fieldGeomtype == ESMF_GEOMTYPE_MESH) then
@@ -2289,15 +2333,15 @@ contains
 
     call NUOPC_GetAttribute(field, name="ConsumerConnection", &
       value=fieldConsumerConn, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     call NUOPC_GetAttribute(field, name="TransferOfferGeomObject", &
       value=fieldTransferOffer, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     call NUOPC_GetAttribute(field, name="TransferActionGeomObject", &
       value=fieldTransferAction, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     write (logMsg,"(A,A,(2A))") trim(llabel)//": ", &
       trim(fieldName), &
@@ -2355,10 +2399,10 @@ contains
     endif
 
     call ESMF_FieldGet(field,array=array,name=fieldName,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     call WRFHYDRO_ESMF_LogArrayLclVal(array,fieldName=fieldName,label=llabel,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
   end subroutine
 #undef METHOD
@@ -2411,27 +2455,27 @@ contains
     endif
 
     call ESMF_ArrayGet(array, typekind=typekind,rank=rank, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (typekind == ESMF_TYPEKIND_I4) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I4_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I4_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I4_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I4_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I4_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I4_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log utility range.", &
           ESMF_LOGMSG_INFO)
@@ -2439,22 +2483,22 @@ contains
     elseif (typekind == ESMF_TYPEKIND_I8) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I8_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I8_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I8_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I8_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_I8_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_I8_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log uttility range.", &
           ESMF_LOGMSG_INFO)
@@ -2462,22 +2506,22 @@ contains
     elseif (typekind == ESMF_TYPEKIND_R4) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R4_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R4_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R4_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R4_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R4_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R4_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log utility range.", &
           ESMF_LOGMSG_INFO)
@@ -2485,22 +2529,22 @@ contains
     elseif (typekind == ESMF_TYPEKIND_R8) then
       if (rank == 1) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R8_1D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R8_1D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 2) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R8_2D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R8_2D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       elseif (rank == 3) then
         call ESMF_ArrayGet(array, farrayPtr=dataPtr_R8_3D, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
         call WRFHYDRO_ESMF_LogFarrayLclVal(dataPtr_R8_3D, fieldName=fieldName, &
           label=trim(llabel), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+        call check(rc, __LINE__, file)
       else
         call ESMF_LogWrite(trim(llabel)//" rank out of log utility range.", &
           ESMF_LOGMSG_INFO)
@@ -3165,12 +3209,12 @@ contains
 
     ! query the CplComp for info
     call ESMF_CplCompGet(cplcomp, name=name, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     ! get the CplList Attribute
     call NUOPC_CompAttributeGet(cplcomp, name="CplList", &
       itemCount=cplListSize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+    call check(rc, __LINE__, file)
 
     if (cplListSize>0) then
       allocate(cplList(cplListSize), stat=stat)
@@ -3179,7 +3223,7 @@ contains
         CONTEXT, rcToReturn=rc)) return  ! bail out
       call NUOPC_CompAttributeGet(cplcomp, name="CplList", valueList=cplList, &
         rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, PASSTHRU)) return  ! bail out
+      call check(rc, __LINE__, file)
    else
      write (logMsg,"(A,A,A)") trim(llabel)//": ", &
        trim(name), &

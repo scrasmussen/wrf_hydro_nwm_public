@@ -309,7 +309,8 @@ module WRFHydro_NUOPC
 
   type(ESMF_Grid)            :: wrfhydro_grid
   type(ESMF_Mesh)            :: wrfhydro_mesh
-  type(ESMF_RouteHandle)     :: regrid_handle
+  type(ESMF_RouteHandle)     :: regrid_handle_nn_stod, regrid_handle_bl
+  type(ESMF_RouteHandle)     :: regrid_handle_nn_dtos
 
   !-----------------------------------------------------------------------------
   contains
@@ -875,15 +876,35 @@ module WRFHydro_NUOPC
 
        call check(rc, __LINE__, file) !
        wrfhydro_grid = wrfhydro_grid_p1
-       regrid_handle = wrfhydro_regrid_mesh( &
+       regrid_handle_bl = wrfhydro_regrid_mesh( &
             wrfhydro_grid_p1, &
             wrfhydro_mesh, &
+            ESMF_REGRIDMETHOD_BILINEAR, &
             is%wrap%did, &
             is%wrap%NStateImp(1), &
             rc)
        call check(rc, __LINE__, file)
+       !Original, better method, just testing other
+       regrid_handle_nn_stod = wrfhydro_regrid_mesh( &
+            wrfhydro_grid_p1, &
+            wrfhydro_mesh, &
+            ESMF_REGRIDMETHOD_NEAREST_STOD, &
+            is%wrap%did, &
+            is%wrap%NStateImp(1), &
+            rc)
+       call check(rc, __LINE__, file)
+       regrid_handle_nn_dtos = wrfhydro_regrid_mesh( &
+            wrfhydro_grid_p1, &
+            wrfhydro_mesh, &
+            ESMF_REGRIDMETHOD_NEAREST_DTOS, &
+            is%wrap%did, &
+            is%wrap%NStateImp(1), &
+            rc)
+       call check(rc, __LINE__, file)
+
        ! write to frontrange.d0
-       call wrfhydro_write_geo_file(wrfhydro_grid_p1, wrfhydro_mesh, regrid_handle)
+       call wrfhydro_write_geo_file(wrfhydro_grid_p1, wrfhydro_mesh, &
+            regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
        print*, "CREATED LOW-RES GRID"
     else
        print *, "If you need to create frontrange.d01.nc, rerun with one procces"
@@ -956,7 +977,7 @@ module WRFHydro_NUOPC
     type(type_InternalState)   :: is
     type(ESMF_Grid)            :: wrfhydro_grid_l
     type(ESMF_Mesh)            :: wrfhydro_mesh
-    type(ESMF_RouteHandle)     :: regrid_handle
+    type(ESMF_RouteHandle)     :: regrid_handle_l
     type(ESMF_Field)           :: field
     logical                    :: importConnected, exportConnected
     integer                    :: fIndex
@@ -1021,12 +1042,13 @@ module WRFHydro_NUOPC
 
     print *, "TODO: remove this regrid mesh??"
     ! removed it, handle doesn't get used here
-    regrid_handle = wrfhydro_regrid_mesh( &
-         wrfhydro_grid_l, &
-         wrfhydro_mesh, &
-         is%wrap%did, &
-         is%wrap%NStateImp(1), &
-         rc)
+    ! ARTLESS
+    ! regrid_handle_l = wrfhydro_regrid_mesh( &
+    !      wrfhydro_grid_l, &
+    !      wrfhydro_mesh, &
+    !      is%wrap%did, &
+    !      is%wrap%NStateImp(1), &
+    !      rc)
     if(ESMF_STDERRORCHECK(rc)) return
     ! stop "RIGHT HERE in WRFH Cap"
     ! ------------------- REMOVED TO HERE  ------------
@@ -1058,8 +1080,9 @@ module WRFHydro_NUOPC
 
 
 
-    mesh = ESMF_MeshCreate(filename="frontrange.scrip.nc", &
-         fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
+    ! mesh = ESMF_MeshCreate(filename="frontrange.scrip.nc", &
+    !      fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
+    mesh = wrfhydro_open_mesh(rc)
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     call ESMF_MeshGet(mesh, nodeCount=ncount, elementCount=nElem,&
@@ -1147,9 +1170,9 @@ module WRFHydro_NUOPC
         "Mode = ",trim(modeStr)
       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
 
-    end subroutine
+    end subroutine LogMode
 
-  end subroutine
+  end subroutine InitializeP3
 
   !-----------------------------------------------------------------------------
 
@@ -1652,11 +1675,16 @@ subroutine CheckImport(gcomp, rc)
     ! Write import files
     if (btest(diagnostic,16)) then
       call NUOPC_Write(is%wrap%NStateImp(1), &
-        fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+        ! fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+        !   rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+        fileNamePrefix="HYD_OUTPUT/diag_"//trim(cname)//"_"// &
           rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
         overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
       call check(rc, __LINE__, file)
     endif
+    ! calling NOUPC_Write didn't work
+    ! print *, "check directory ",trim(is%wrap%dirOutput)
+    ! stop "FOOBAR DEBUGGING"
 
     if (is%wrap%memr_import .eq. MEMORY_COPY) then
       call state_copy_tohyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
@@ -1704,9 +1732,15 @@ subroutine CheckImport(gcomp, rc)
        ! print *, "grid validated in advance"
        ! stop "GRID VALIDATED in advance"
 
+       ! Working on the mesh
+       wrfhydro_mesh = wrfhydro_open_mesh(rc)
+       call check(rc, __LINE__, file)
        ! not a function call
        ! call ESMF_MeshValidate(wrfhydro_mesh, rc=rc)
-       ! stop "MESH VALIDATED in advance"
+
+       call ESMF_MeshWrite(wrfhydro_mesh, "foo_mesh", rc=rc)
+       call check(rc, __LINE__, file)
+       ! stop "MESH WRITE in advance"
        call regrid_import_mesh_to_grid(wrfhydro_grid_l, wrfhydro_mesh, &
             is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
        print *, "DEBUGGING ARTLESS WRHHYDRO_GRID"
