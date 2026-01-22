@@ -112,14 +112,15 @@ or if the user is on Derecho they can use an NPL library.
 The following commands are specifically for use within a Jupyter notebook.
 
 ```python
-dir = 'path/to/output'
+dir = 'path/to/output/'
+grid_f = dir+"frontrange.grid.nc"
 init_f = dir + 'frontrange.static.nc'
 output_f = dir + 'history.2013-09-10_00.00.00.nc'
 
-# the arguments
-init = ux.open_dataset(dir+"frontrange.grid.nc", init,
+# the arguments related to time and variables are to make plotting easier
+init = ux.open_dataset(grid_f, init_f,
     decode_times=False, grid_kwargs={"decode_times": False, "drop_variables": ["Time"]},)
-mpas = ux.open_dataset(dir+"frontrange.grid.nc", output_f,
+mpas = ux.open_dataset(grid_f, output_f,
     decode_times=False, grid_kwargs={"decode_times": False, "drop_variables": ["Time"]},)
 ```
 
