@@ -124,10 +124,11 @@ mpas = ux.open_dataset(dir+"frontrange.grid.nc", output_f,
 ```
 
 The simplest way is to use `.plot()`.
-This will not work if there are Python statement that follow it due to implicit output,
-  which automatically displays the value of the last expression in a cell.
+In a Jupyter notebook, only the last expression in a cell is auto-displayed.
+If there are multiple plot statements adding `display()` is needed on all but the last.
 
 ```python
+display(mpas['smois'].plot())
 mpas['isltyp'].plot()
 ```
 
@@ -138,4 +139,13 @@ This is extremely usefull for plotting meshes side-by-side with the `(p1 + p2)` 
 p1 = mpas['vegfra'].isel(Time=0, drop=True).plot()
 p2 = mpas['isltyp'].plot(cmap='tab20')
 (p1 + p2)
+```
+
+If the width of the plots is too wide, they can be reduced by passing arguments to opts.
+
+```python
+p = 0.7
+w = int(p1.opts["width"] * p)
+h = int(p1.opts["height"] * p)
+(p1.opts(width=w, height=h) + p2.opts(width=w, height=h) + p3.opts(width=w, height=h))
 ```
