@@ -1,6 +1,13 @@
 # WRF-Hydro and MPAS Coupling
 
 ## Preprocessing Steps
+### NoahMP Files
+The NoahMP in MPAS is the refactored version and requires the refactored `NoahmpTable.TBL` version.
+The [MPTABLE.TBL](https://github.com/NCAR/wrf_hydro_nwm_public/blob/main/src/Land_models/NoahMP/run/MPTABLE.TBL)
+from the WRF-Hydro repository will not work.
+Variables like `LOW_DENSITY_RESIDENTIAL` and an urban Local Climate Zone (LCZ) classification scheme.
+It would need to be renamed `NoahmpTable.TBL` and even then will lead to `Fortran runtime error: End of file` errors.
+
 ### METIS
 Build [Metis](https://github.com/KarypisLab/METIS), it will install in `$HOME/local`
 METIS takes the testcase.graph.info file which has all the grid information, and decides
@@ -47,9 +54,11 @@ $ conda install -c conda-forge mpas_tools
 $ scrip_from_mpas -m testcase.graph.nc -s testcase.scrip.nc
 ```
 
-
 ### Initialization
 TODO: need to run in serial
+
+
+
 
 
 # Info
