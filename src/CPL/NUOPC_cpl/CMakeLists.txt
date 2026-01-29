@@ -19,6 +19,7 @@ list(APPEND wrfhydro_nuopc_deps
   hydro_mpp
   hydro_driver
   hydro_orchestrator
+  hydro_noahmp
 )
 
 list(APPEND wrfhydro_nuopc_linklibs
@@ -36,8 +37,15 @@ list(APPEND wrfhydro_nuopc_linklibs
   hydro_routing_reservoirs
   hydro_driver
   hydro_orchestrator
+  hydro_noahmp
   hydro_netcdf_layer
   fortglob
+  noahmp_util
+  noahmp_phys
+  noahmp_data
+  hydro_noahmp_cpl
+  snowcro
+  crocus_surfex
 )
 if (WRF_HYDRO_NUDGING STREQUAL "1")
   list(APPEND wrfhydro_nuopc_linklibs
@@ -74,8 +82,15 @@ add_library(${hydro_nuopc_library}
   $<TARGET_OBJECTS:hydro_driver>
   $<TARGET_OBJECTS:hydro_orchestrator>
   $<TARGET_OBJECTS:hydro_netcdf_layer>
+  $<TARGET_OBJECTS:hydro_noahmp>
+  $<TARGET_OBJECTS:hydro_noahmp_cpl>
   $<TARGET_OBJECTS:fortglob>
   $<TARGET_OBJECTS:wrfhydro_nuopc_obj>
+  $<TARGET_OBJECTS:noahmp_data>
+  $<TARGET_OBJECTS:noahmp_phys>
+  $<TARGET_OBJECTS:noahmp_util>
+  $<TARGET_OBJECTS:snowcro>
+  $<TARGET_OBJECTS:crocus_surfex>
   )
 target_link_libraries(${hydro_nuopc_library}
   PUBLIC

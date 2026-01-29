@@ -18,7 +18,12 @@ if(${PROJECT_NAME} STREQUAL "MPAS")
         if (WRF_HYDRO_NUDGING STREQUAL "1")
                 add_definitions(-DWRF_HYDRO_NUDGING=1)
         endif()
+
 endif()
+add_library(hydro_noahmp STATIC
+        Land_models/NoahMP/IO_code/module_hrldas_netcdf_io.F
+        Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.F
+)
 
 
 # build the various sup-projects
@@ -34,6 +39,7 @@ add_subdirectory("Routing/Diversions")
 add_subdirectory("Data_Rec")
 add_subdirectory("Routing")
 add_subdirectory("HYDRO_drv")
+# add_subdirectory("tools")
 if(${PROJECT_NAME} STREQUAL "WRF")
         add_subdirectory("CPL/WRF_cpl")
 endif()
@@ -49,9 +55,6 @@ if (WRF_HYDRO_NUDGING STREQUAL "1")
         add_dependencies(hydro_driver hydro_nudging)
 endif()
 
-if (WRF_HYDRO_NUOPC STREQUAL "1")
-        add_subdirectory("CPL/NUOPC_cpl")
-endif()
 
 # add module dependencies
 add_dependencies(hydro_debug_utils hydro_mpp)
@@ -110,13 +113,27 @@ if (HYDRO_LSM MATCHES "NoahMP")
         add_dependencies(hydro_noahmp_cpl hydro_mpp )
         add_dependencies(hydro_noahmp_cpl hydro_driver )
 
+        add_dependencies(hydro_noahmp
+          hydro_routing
+          hydro_noahmp_cpl
+          noahmp_data
+          noahmp_phys
+          noahmp_util
+        )
+        target_link_libraries(hydro_noahmp
+          hydro_routing
+          hydro_noahmp_cpl
+          noahmp_data
+          noahmp_phys
+          noahmp_util
+          )
+
         add_executable(wrfhydro
                 Land_models/NoahMP/IO_code/main_hrldas_driver.F
-                Land_models/NoahMP/IO_code/module_hrldas_netcdf_io.F
-                Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.F
         )
 
         target_include_directories(wrfhydro BEFORE PUBLIC ${PROJECT_BINARY_DIR}/mods)
+
 
         target_link_libraries(wrfhydro
                 hydro_utils
@@ -135,6 +152,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 noahmp_phys
                 noahmp_data
                 hydro_noahmp_cpl
+                hydro_noahmp
                 ${NETCDF_LIBRARIES}
                 # hydro_routing_groundwater
                 # hydro_routing_groundwater_bucket
@@ -256,4 +274,8 @@ elseif(${PROJECT_NAME} STREQUAL "WRF")
         )
 else()
         message("Unknown land surface model:" ${HYDRO_LSM} )
+endif()
+
+if (WRF_HYDRO_NUOPC STREQUAL "1")
+        add_subdirectory("CPL/NUOPC_cpl")
 endif()
