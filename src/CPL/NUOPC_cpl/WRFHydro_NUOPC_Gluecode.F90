@@ -1,7 +1,5 @@
 #include "WRFHydro_NUOPC_Macros.h"
 
-#define DEBUG
-
 module wrfhydro_nuopc_gluecode
 ! !MODULE: wrfhydro_nuopc_gluecode
 !
@@ -36,6 +34,8 @@ module wrfhydro_nuopc_gluecode
     mpp_land_bcast_real, &
     mpp_land_bcast_int1, &
     MPP_LAND_INIT
+  use module_noahmp_hrldas_driver, only: &
+       land_driver_ini, land_driver_exe
   use module_HYDRO_drv, only: &
     HYDRO_ini, &
     HYDRO_exe
@@ -82,7 +82,10 @@ module wrfhydro_nuopc_gluecode
   character(len=24), parameter :: filename = "WRFHydro_NUOPC_Gluecode"
   character(len=27), parameter :: modname = "WRFHydro_NUOPC_Gluecode.F90"
 
-  ! PARAMETERS
+  ! Debugging Parameter
+  logical, parameter :: debug = .FALSE.
+
+  ! Parameters
   character(len=ESMF_MAXSTR) :: indir = 'WRFHYDRO_FORCING'
   integer                    :: num_nests = UNINITIALIZED
   integer                    :: num_tiles
@@ -111,6 +114,9 @@ module wrfhydro_nuopc_gluecode
   logical :: wrfhydro_distgrid_initialized = .false.
   character(len=512) :: logMsg
 
+  logical :: wrfhydro_open_mesh_initialized = .false.
+  type(ESMF_Mesh) :: saved_wrfhydro_mesh
+  logical :: io_rank = .false.
 
   interface read_mesh_var_and_regrid
      module procedure read_mesh_var_and_regrid_i
@@ -142,13 +148,11 @@ contains
     type(ESMF_Time)             :: startTime
     type(ESMF_TimeInterval)     :: timeStep
     real(ESMF_KIND_R8)          :: dt
-#ifdef DEBUG
     character(ESMF_MAXSTR)      :: logMsg
-#endif
 
-#ifdef DEBUG
-    call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
-#endif
+    if (debug) then
+       call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
+    end if
 
     rc = ESMF_SUCCESS
 
@@ -208,10 +212,10 @@ contains
      ! Read information from hydro.namelist config file
      call init_namelist_rt_field(did)
 
-#ifdef DEBUG
-    call WRFHYDRO_nlstLog(did,MODNAME,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
-#endif
+    if (debug) then
+       call WRFHYDRO_nlstLog(did,MODNAME,rc=rc)
+       if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    end if
 
     if(nlst(did)%nsoil .gt. 4) then
       call ESMF_LogSetError(ESMF_FAILURE, &
@@ -225,17 +229,15 @@ contains
     call get_file_dimension(fileName=nlst(did)%geo_static_flnm, &
          ix=nx_global(1), jx=ny_global(1)) !, &
          ! x_dim_var="x", y_dim_var="y")
-
-
-    print *, "nx_global(1),ny_global(1) =", nx_global(1),ny_global(1)
+    if (debug) print *, "nx_global(1),ny_global(1) =", nx_global(1),ny_global(1)
     call MPP_LAND_INIT(nx_global(1), ny_global(1))
 
 
-#ifdef DEBUG
-    write (logMsg,"(A,2(I0,A))") MODNAME//": Global Dimensions = (", &
-      nx_global(1),",",ny_global(1),")"
-    call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
-#endif
+    if (debug) then
+       write (logMsg,"(A,2(I0,A))") MODNAME//": Global Dimensions = (", &
+            nx_global(1),",",ny_global(1),")"
+       call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
+    end if
 
     call log_map2d()
 
@@ -247,9 +249,9 @@ contains
     rt_domain(did)%ix = nx_global(1)
     rt_domain(did)%jx = ny_global(1)
 
-    print *, "DEBUGGING: rt_domain(did)%ix, rt_domain(did)%jx", &
+    if (debug) print *, "DEBUGGING: rt_domain(did)%ix, rt_domain(did)%jx", &
          rt_domain(did)%ix, rt_domain(did)%jx
-    print*, "DEBUGGING: nlst(did)%AGGFACTRT =", nlst(did)%AGGFACTRT
+    if (debug) print*, "DEBUGGING: nlst(did)%AGGFACTRT =", nlst(did)%AGGFACTRT
     ! stop "DEBUGGING GLUE"
 
 
@@ -477,7 +479,7 @@ contains
       !return  ! bail out
     endif
 
-    print *, "WRF-H GLUE: lsm_forcings =", lsm_forcings
+    if (debug) print *, "WRF-H GLUE: lsm_forcings =", lsm_forcings
     if((.not. RT_DOMAIN(did)%initialized) .and. (nlst(did)%rst_typ .eq. 1) ) then
       call ESMF_LogWrite(METHOD//": Restart initial data from offline file.", &
         ESMF_LOGMSG_INFO)
@@ -490,7 +492,7 @@ contains
           infxsrt=rt_domain(did)%infxsrt,soldrain=rt_domain(did)%soldrain)
       endif
     endif
-    print *, "DEBUGGING: COMPLETE"
+    if (debug) print *, "DEBUGGING: COMPLETE"
 
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)
@@ -567,7 +569,7 @@ contains
     integer, parameter :: soil_cat_n = 16
     integer, parameter :: land_cat_n = 24
 
-    print *, "=== entering write_netcdf_geo_file ==="
+    if (io_rank) print *, "=== entering write_netcdf_geo_file ==="
     ! Begin work
     ! Create/clobber file
     call check_nf(nf90_create(default_file, NF90_CLOBBER, ncid))
@@ -586,7 +588,8 @@ contains
     call check_nf(nf90_def_var(ncid, 'SCT_DOM', NF90_INT, [dim_we, dim_sn, dim_time], var_soil_cat))
     call check_nf(nf90_def_var(ncid, 'XLAT_M', NF90_FLOAT, [dim_we, dim_sn, dim_time], var_lat))
     call check_nf(nf90_def_var(ncid, 'XLONG_M', NF90_FLOAT, [dim_we, dim_sn, dim_time], var_lon))
-    call check_nf(nf90_def_var(ncid, 'VEGTYP', NF90_INT, [dim_we, dim_sn, dim_time], var_veg))
+    print *, "TOOK OUT VEGTYP, IS THIS CORRECT?"
+    ! call check_nf(nf90_def_var(ncid, 'VEGTYP', NF90_INT, [dim_we, dim_sn, dim_time], var_veg))
     call check_nf(nf90_def_var(ncid, 'LU_INDEX', NF90_INT, [dim_we, dim_sn, dim_time], var_lu_index))
     call check_nf(nf90_def_var(ncid, 'LANDMASK', NF90_INT, [dim_we, dim_sn, dim_time], var_landmask))
 
@@ -823,25 +826,24 @@ contains
     stat = nf90_close(ncid)
     call check_nf(stat)
 
-    print *, "ncells =", ncells
-    print *, "lat(1:2,1:2) =", lat(1:2,1:2)
-    print *, "lon(1:2,1:2) =", lon(1:2,1:2)
-    print *, "hgt(1:2,1:2) =", hgt(1:2,1:2)
-    print *, "soil_cat(1:2,1:2) =", soil_cat(1:2,1:2)
-    print *, "veg(1:2,1:2) =", veg(1:2,1:2)
-    print *, "lu_index(1:2,1:2) =", lu_index(1:2,1:2)
-    print *, "landmask(1:2,1:2) =", landmask(1:2,1:2)
-    print *, "-----------------"
-    print *, "writing veg grid"
-    call array_write_i(veg, "veg_dtos.nc")
-    call array_write_i(lu_index, "veg_stod.nc")
+    ! print *, "ncells =", ncells
+    ! print *, "lat(1:2,1:2) =", lat(1:2,1:2)
+    ! print *, "lon(1:2,1:2) =", lon(1:2,1:2)
+    ! print *, "hgt(1:2,1:2) =", hgt(1:2,1:2)
+    ! print *, "soil_cat(1:2,1:2) =", soil_cat(1:2,1:2)
+    ! print *, "veg(1:2,1:2) =", veg(1:2,1:2)
+    ! print *, "lu_index(1:2,1:2) =", lu_index(1:2,1:2)
+    ! print *, "landmask(1:2,1:2) =", landmask(1:2,1:2)
+    ! print *, "-----------------"
+    ! print *, "writing veg grid"
+    ! call array_write_i(veg, "veg_dtos.nc")
+    ! call array_write_i(lu_index, "veg_stod.nc")
 
 
     nx = size(hgt, dim=1)
     ny = size(hgt, dim=2)
     call write_netcdf_geo_file(nx, ny, hgt, soil_cat, lat, lon, veg, &
          lu_index, landmask)
-
 
     print *, "=== exiting wrfhydro_write_geo_file ==="
   end subroutine wrfhydro_write_geo_file
@@ -853,12 +855,18 @@ contains
     type(ESMF_VM)       :: vm
     integer, allocatable :: gindex(:)
     character(:), allocatable :: mesh_file
-    character(len=256) :: iomsg
+    character(len=256) :: iomsg, mpas_graph_file
     integer :: unit, iostat, irank, localCount
     integer :: rank, np
     integer :: idx, inode
 
     rc = ESMF_SUCCESS
+
+    if (wrfhydro_open_mesh_initialized) then
+       mesh = saved_wrfhydro_mesh
+       return
+    end if
+
 
     ! add the following to make generic
     call ESMF_VMGetGlobal(vm, rc=rc)
@@ -866,8 +874,18 @@ contains
     call ESMF_VMGet(vm, localPet=rank, petCount=np, rc=rc)
     call check(rc, __LINE__, file)
 
+
+    if (rank == 0) then
+       io_rank = .true.
+    end if
+
     ! read
-    open(newunit=unit, file='frontrange.graph.info.part.2', &
+    if (np == 1) then
+       mpas_graph_file = 'frontrange.graph.info'
+    else
+       write(mpas_graph_file, '(A,I0)') 'frontrange.graph.info.part.', np
+    end if
+    open(newunit=unit, file=mpas_graph_file, &
          status='old', action='read', iostat=iostat, iomsg=iomsg)
     if (iostat /= 0) then
        print *, trim(iomsg)
@@ -913,6 +931,9 @@ contains
          fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
     call check(rc, __LINE__, file)
 
+    ! save initialized mesh for future calls
+    saved_wrfhydro_mesh = mesh
+    wrfhydro_open_mesh_initialized = .true.
   end function wrfhydro_open_mesh
 
   function wrfhydro_regrid_mesh(input_grid, mesh, regrid_method, &
@@ -956,10 +977,11 @@ contains
     end if
     ! check for import field
 
-    print *, "========", trim(st_name), "========"
-
-    call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+    if (debug) then
+       print *, "========", trim(st_name), "========"
+       call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+       if (ESMF_STDERRORCHECK(rc)) return
+    end if
 
     import_field = ESMF_FieldCreate(name=st_name, &
          mesh=mesh, typekind=ESMF_TYPEKIND_R8, &
@@ -978,7 +1000,7 @@ contains
 
     ! Build the interpolation operator once
     if (route_handle_initialized .eqv. .false.) then
-       print *, "Initialized route_handle"
+       if (debug) print *, "Initialized route_handle"
        call ESMF_LogWrite("Initialized route_handle", &
          ESMF_LOGMSG_INFO, rc=rc)
 
@@ -1065,7 +1087,7 @@ contains
     integer :: rank, ierr
     character(len=3) :: rank_s
 
-    print *, 'WRFH: enter regrid_import_mesh_to_grid'
+    if (io_rank) print *, 'WRFH: enter regrid_import_mesh_to_grid'
     call ESMF_LogWrite('WRFH: enter regrid_import_mesh_to_grid', ESMF_LOGMSG_INFO)
     call ESMF_LogWrite('--- WRFH: IMPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
     call ESMF_StateLog(state, rc=rc)
@@ -1078,7 +1100,7 @@ contains
     call ESMF_StateGet(state,itemNameList=itemNameList, rc=rc)
     call check(rc, __LINE__, file)
     do i=1,itemCount
-       print *, "WRFH: import itemnamelist: ", itemNameList(i)
+       if (debug) print *, "WRFH: import itemnamelist: ", itemNameList(i)
        call ESMF_LogWrite("WRFH: import itemnamelist: "// itemNameList(i), ESMF_LOGMSG_INFO, rc=rc)
     end do
 
@@ -1090,7 +1112,7 @@ contains
             fieldName=trim(cap_fld_list(n)%st_name), rc=rc)
           call check(rc, __LINE__, file)
 
-          print *, "WRFH: imported = ", imported,&
+          if (debug) print *, "WRFH: imported = ", imported,&
                ", name: ", cap_fld_list(n)%st_name
           call ESMF_LogWrite("WRFH: imported "//cap_fld_list(n)%st_name, &
                ESMF_LOGMSG_INFO, rc=rc)
@@ -1116,21 +1138,22 @@ contains
 
           call check(rc, __LINE__, file)
 
-          ! --- Debugging: write import vars before regrid
-          call ESMF_FieldWrite(gridField, &
-               "vars_in/"//trim(cap_fld_list(n)%st_name)//&
-               ! "_grid_pre_"//trim(rank_s)//".nc", &
-               "_grid_pre.nc", &
-               overwrite=.true., &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call ESMF_FieldWrite(meshField, &
-               "vars_in/"//trim(cap_fld_list(n)%st_name)//&
-               "_mesh_pre.nc", &
-               overwrite=.true., &
-               ! "_mesh_pre_"//trim(rank_s)//".nc", &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
-          ! --- end debug ---
+          ! --- Debugging: write import mesh before regrid
+          if (debug) then
+             call ESMF_FieldWrite(gridField, &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)//&
+                                ! "_grid_pre_"//trim(rank_s)//".nc", &
+                  "_grid_pre.nc", &
+                  overwrite=.true., &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call ESMF_FieldWrite(meshField, &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)//&
+                  "_mesh_pre.nc", &
+                  overwrite=.true., &
+                                ! "_mesh_pre_"//trim(rank_s)//".nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+          end if
 
           if (cap_fld_list(n)%import_handle_init .eqv. .false.) then
              ! call ESMF_FieldRegridStore(srcField=meshField, &
@@ -1161,30 +1184,34 @@ contains
              call check(rc, __LINE__, file)
 
              cap_fld_list(n)%import_handle_init = .true.
-             cap_fld_list(n)%export_handle_init = .true.
+             ! cap_fld_list(n)%export_handle_init = .true.
+             ! stop "WAS THIS FIRST?" yes remove after debug
           end if
 
-          print*, "DEBUGGING: using var's handle to regrid field ", &
+
+          if (debug) print*, "DEBUGGING: using var's handle to regrid field ", &
                trim(cap_fld_list(n)%st_name)
           call ESMF_FieldRegrid(meshField, gridField, &
                cap_fld_list(n)%import_handle, rc=rc)
           call check(rc, __LINE__, file)
 
-          ! --- Debugging: write import mesh before regrid
-          call ESMF_FieldWrite(meshField, &
-               "vars_in/"//trim(cap_fld_list(n)%st_name)// &
-               "_mesh_post.nc", &
-               overwrite=.true., &
-               ! "_mesh_post_"//trim(rank_s)//".nc", &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
-          call ESMF_FieldWrite(gridField, &
-               "vars_in/"//trim(cap_fld_list(n)%st_name)// &
-               "_grid_post.nc", &
-               overwrite=.true., &
-               ! "_grid_post_"//trim(rank_s)//".nc", &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
+          ! --- Debugging: write import mesh after regrid
+          if (debug) then
+             call ESMF_FieldWrite(meshField, &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// &
+                  "_mesh_post.nc", &
+                  overwrite=.true., &
+                                ! "_mesh_post_"//trim(rank_s)//".nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+             call ESMF_FieldWrite(gridField, &
+                  "vars_in/"//trim(cap_fld_list(n)%st_name)// &
+                  "_grid_post.nc", &
+                  overwrite=.true., &
+                                ! "_grid_post_"//trim(rank_s)//".nc", &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+          end if
           ! --- end debug ---
 
        end if
@@ -1221,8 +1248,10 @@ contains
 
 
     ! stop "GETTING TO REGRID EXPORT GRID TO MESH"
-    call ESMF_LogWrite('_____ EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
-    call ESMF_StatePrint(state, rc=rc)
+    if (io_rank) print *, 'WRFH: enter regrid_export_grid_to_mesh'
+    if (io_rank) call ESMF_LogWrite('--- WRFH: EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+    if (debug) call ESMF_LogWrite('___ EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+    if (debug) call ESMF_StatePrint(state, rc=rc)
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
     call check(rc, __LINE__, file)
@@ -1230,7 +1259,7 @@ contains
 
     call ESMF_StateGet(state,itemNameList=itemNameList, rc=rc)
     call check(rc, __LINE__, file)
-    print *, "============ Export itemnamelist: ", itemNameList
+    if (debug) print *, "============ Export itemnamelist: ", itemNameList
 
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_export) then
@@ -1238,7 +1267,11 @@ contains
             fieldName=trim(cap_fld_list(n)%st_name), rc=rc)
           call check(rc, __LINE__, file)
 
-          print *, "exported = ", exported,", name: ", cap_fld_list(n)%st_name
+          if (debug) print *, "exported = ", exported,", name: ", cap_fld_list(n)%st_name
+          call ESMF_LogWrite("WRFH: exported "//cap_fld_list(n)%st_name, &
+               ESMF_LOGMSG_INFO, rc=rc)
+
+
 
           ! meshField = field_create(cap_fld_list(n)%st_name, mesh, did, &
           !      memflg, rc)
@@ -1279,65 +1312,88 @@ contains
           ! end if
 
           ! Debugging: write export mesh before regrid
-          call ESMF_FieldWrite(meshField, &
-               "vars_out/"//trim(cap_fld_list(n)%st_name)// &
-               "_mesh_pre.nc", &
-               overwrite=.true., &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
-          call ESMF_FieldWrite(gridField, &
-               "vars_out/"//trim(cap_fld_list(n)%st_name)// &
-               "_grid_pre.nc", &
-               overwrite=.true., &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
-          ! stop "ARTLESS"
+          if (debug) then
+          ! if (.true.) then
+             call ESMF_FieldWrite(meshField, &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
+                  "_mesh_pre.nc", &
+                  overwrite=.true., &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+             call ESMF_FieldWrite(gridField, &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
+                  "_grid_pre.nc", &
+                  overwrite=.true., &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+          end if
+
 
           if (cap_fld_list(n)%export_handle_init .eqv. .false.) then
+             call printa("SHOULD THIS NOT BE REACHED, INVERSE CALCULATED at 1178")
              call printa("Regridding export variables")
-             stop "TESTING transposeRouteHandle: THIS SHOULD NOT BE REACHED"
+             ! stop "hi"
              ! call ESMF_FieldRegridStore(srcField=gridField, &
              !      dstField=meshField, &
              !      regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
              !      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
              !      routehandle=cap_fld_list(n)%export_handle, rc=rc)
              ! call check(rc, __LINE__, file)
-             stop "switch over to regrid method, using inverse though?"
+             ! print *, "switch over to regrid method, using inverse though?"
+             ! call ESMF_RegridWeightGen(&
+             !      srcFile='fulldom_hires_hydrofile.d01.nc', &
+             !      dstFile='frontrange.scrip.nc', &
+             !      weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
+             !      regridmethod=cap_fld_list(n)%regrid_method, &
+             !      rc=rc)
+             ! call check(rc, __LINE__, file)
+             ! ! Precompute Field sparse matrix multiplication with local factors
+             ! call ESMF_FieldSMMStore(srcField=gridField, dstField=meshField, &
+             !      filename='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
+             !      routehandle=cap_fld_list(n)%export_handle, rc=rc)
+             ! call check(rc, __LINE__, file)
+
              call ESMF_RegridWeightGen(&
-                  srcFile='fulldom_hires_hydrofile.d01.nc', &
-                  dstFile='frontrange.scrip.nc', &
-                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
-                  regridmethod=ESMF_REGRIDMETHOD_NEAREST_STOD, &  ! <- no polygons required
-                  ! regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+                  srcFile='frontrange.scrip.nc', &
+                  dstFile='fulldom_hires_hydrofile.d01.nc', &
+                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_eximport.nc', &
+                  regridmethod=cap_fld_list(n)%regrid_method, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
-             call ESMF_FieldSMMStore(srcField=gridField, dstField=meshField, &
-                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
-                  routehandle=cap_fld_list(n)%export_handle, rc=rc)
+             call ESMF_FieldSMMStore(srcField=meshfield, dstField=gridfield, &
+                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_eximport.nc', &
+                  routehandle=cap_fld_list(n)%import_handle, &
+                  transposeRoutehandle=cap_fld_list(n)%export_handle, &
+                  rc=rc)
              call check(rc, __LINE__, file)
+
              cap_fld_list(n)%export_handle_init = .true.
           end if
 
-          print*, "DEBUGGING: using var's handle to regrid field ", &
+          if (debug) print*, "DEBUGGING: using var's handle to regrid field ", &
                trim(cap_fld_list(n)%st_name)
           call ESMF_FieldRegrid(gridField, meshField, &
                cap_fld_list(n)%export_handle, rc=rc)
           call check(rc, __LINE__, file)
 
-          ! Debugging: write export vars after regrid
-          call ESMF_FieldWrite(meshField, &
-               "vars_out/"//trim(cap_fld_list(n)%st_name)// &
-               "_mesh_post.nc", &
-               overwrite=.true., &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
-          call ESMF_FieldWrite(gridField, &
-               "vars_out/"//trim(cap_fld_list(n)%st_name)// &
-               "_grid_post.nc", &
-               overwrite=.true., &
-               variableName=trim(cap_fld_list(n)%st_name), rc=rc)
-          call check(rc, __LINE__, file)
+          ! Debugging: write export vars after regrid ARTLESS
+          if (debug) then
+          ! if (.true.) then
+             call ESMF_FieldWrite(meshField, &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
+                  "_mesh_post.nc", &
+                  overwrite=.true., &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+             call ESMF_FieldWrite(gridField, &
+                  "vars_out/"//trim(cap_fld_list(n)%st_name)// &
+                  "_grid_post.nc", &
+                  overwrite=.true., &
+                  variableName=trim(cap_fld_list(n)%st_name), rc=rc)
+             call check(rc, __LINE__, file)
+             stop "hi"
+          end if
        end if
     end do
     ! stop "CHECKING IF REGRID EXPORT GRID TO MESH WORKS"

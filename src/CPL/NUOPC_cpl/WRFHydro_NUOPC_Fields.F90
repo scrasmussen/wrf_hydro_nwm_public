@@ -50,6 +50,12 @@ module wrfhydro_nuopc_fields
   logical, parameter :: TMP_EXPORT_T = .false.
   logical, parameter :: TMP_IMPORT_T = .false.
 
+  logical, parameter :: EXPORT_SF_HEAD = .true.
+  ! logical, parameter :: EXPORT_SF_HEAD = .false.
+  ! logical, parameter :: EXPORT_SMC = .true.
+  logical, parameter :: EXPORT_SMC = .false.
+
+
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content","smc", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
@@ -118,10 +124,10 @@ module wrfhydro_nuopc_fields
     ! as infxsrt and soldrain on the MPAS side
     cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_F, EXPORT_F, 0.00d0),             &
+                 IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
     cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_F, EXPORT_F, 0.00d0)              &
+                 IMPORT_F, EXPORT_SMC, 0.00d0)              &
     /)
 
   public cap_fld_list
@@ -316,11 +322,15 @@ contains
           realizeExport = NUOPC_IsConnected(exportState, &
                fieldName=trim(fieldList(n)%st_name), rc=rc)
           call check(rc, __LINE__, file)
-          ! call printa("WRFH: realize export "// trim(fieldList(n)%st_name))
-               ! " realize_export ", realizeExport
+          if (realizeExport .eqv. .true.) then
+             call printa("export, true realizeexport of " &
+                  // trim(fieldList(n)%st_name))
+          else
+             call printa("export, false realizeexport of " &
+                  // trim(fieldList(n)%st_name))
+          end if
           ! call ESMF_LogWrite("WRFH: this realize needs to be true", &
           !      ESMF_LOGMSG_INFO, rc=rc)
-          ! stop "this realize needs to be true"
         end if
       else
           realizeExport = .false.
@@ -329,21 +339,24 @@ contains
       if( realizeExport ) then
         field_export = field_create(fld_name=fieldList(n)%st_name, &
              mesh=mesh, did=did, memflg=memr_export, rc=rc)
-        ! stop "RIGHT Q"
+        ! stop "investigating export, one should stop"
         call check(rc, __LINE__, file)
         call NUOPC_Realize(exportState, field=field_export, rc=rc)
         call check(rc, __LINE__, file)
         fieldList(n)%rl_export = .true.
         ! print *, "WRFH: created export ", trim(fieldList(n)%st_name)
-        call printa("WRFH: realize export "// trim(fieldList(n)%st_name))
+        call printa("realize export "// trim(fieldList(n)%st_name))
       else
+        call printa("realize remove export "//&
+             trim(fieldList(n)%st_name)// &
+             " ---------------------------")
         call ESMF_StateRemove(exportState, (/fieldList(n)%st_name/), &
              relaxedflag=.true., rc=rc)
         call check(rc, __LINE__, file)
         fieldList(n)%rl_export = .false.
       end if
    end do
-   call printa("WRFH: exit field_realize_mesh")
+   call printa("exit field_realize_mesh")
    ! stop "debugging field_realize_mesh"
   end subroutine field_realize_mesh
 
@@ -1051,6 +1064,7 @@ contains
 
   function field_create_grid(fld_name,grid,did,memflg,rc) &
        result(field_create)
+    use module_NoahMP_hrldas_driver, only: sfcrunoff, udrunoff
     ! return value
     type(ESMF_Field) :: field_create
     ! arguments
@@ -1172,17 +1186,36 @@ contains
           call check(rc, __LINE__, file)
 
        ! WRFH TODO: these are writing toe the same vars as infxsrt/soldrain
+          ! add for update the WRF state variable.
+          ! THIS IS FROM module_wrf_HYDRO.F90:209
+            ! do k = 1, nlst(did)%nsoil
+            !     ! grid%TSLB(its:ite,k,jts:jte) = RT_DOMAIN(did)%STC(:,:,k)
+            !     grid%smois(its:ite,k,jts:jte) = RT_DOMAIN(did)%smc(:,:,k)
+            !     grid%sh2o(its:ite,k,jts:jte) = RT_DOMAIN(did)%sh2ox(:,:,k)
+            ! end do
+          ! update WRF variable after running routing model.
+            ! grid%sfcheadrt(its:ite,jts:jte) = &
+            !   rt_domain(did)%overland%control%surface_water_head_lsm
+
        case ('sfcrunoff')
+
+          ! rt_domain(did)%overland%control%surface_water_head_lsm(:,:) = &
+          !      -776
+
+          ! 102 x 60
+          ! print *, shape(rt_domain(did)%overland%control%surface_water_head_lsm(:,:))
+          ! stop "hi"
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%infxsrt, &
+            farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
-        case ('udrunoff')
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%soldrain(:,:), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
-        case default
+       ! case ('udrunoff')
+       !    field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+       !      ! farray=rt_domain(did)%udrunoff(:,:), &
+       !      farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
+       !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+       !    call check(rc, __LINE__, file)
+       case default
           call ESMF_LogSetError(ESMF_FAILURE, &
             msg=method//": Field hookup missing: "//trim(fld_name), &
             file=filename, rcToReturn=rc)
@@ -1593,7 +1626,8 @@ contains
             farrayPtr2d = rt_domain(did)%soldrain
           case ('sfcrunoff')
              print *, "WRFH: check state_copy_frhyd for sfcrunoff is correct"
-             farrayPtr2d = rt_domain(did)%infxsrt
+             ! farrayPtr2d = rt_domain(did)%infxsrt ! original
+             farrayPtr2d = rt_domain(did)%overland%control%surface_water_head_lsm(:,:)
           case ('udrunoff')
              print *, "WRFH: check state_copy_frhyd for udrunoff is correct"
              farrayPtr2d = rt_domain(did)%soldrain
