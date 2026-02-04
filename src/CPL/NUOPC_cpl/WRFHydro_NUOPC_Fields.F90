@@ -51,9 +51,10 @@ module wrfhydro_nuopc_fields
   logical, parameter :: TMP_IMPORT_T = .false.
 
   logical, parameter :: EXPORT_SF_HEAD = .true.
+  logical, parameter :: EXPORT_SMC = .true.
+  logical, parameter :: EXPORT_SMC_F = .false.
   ! logical, parameter :: EXPORT_SF_HEAD = .false.
   ! logical, parameter :: EXPORT_SMC = .true.
-  logical, parameter :: EXPORT_SMC = .false.
 
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
@@ -80,16 +81,16 @@ module wrfhydro_nuopc_fields
                  IMPORT_T, EXPORT_T, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_2","smc2", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_3","smc3", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_4","smc4", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
                  "K", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_T, EXPORT_F, 288.d0),                 &
@@ -127,7 +128,8 @@ module wrfhydro_nuopc_fields
                  IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
     cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_F, EXPORT_SMC, 0.00d0)              &
+                 ! IMPORT_F, EXPORT_SMC, 0.00d0)              &
+                 IMPORT_F, EXPORT_F, 0.00d0)              &
     /)
 
   public cap_fld_list
@@ -1079,6 +1081,7 @@ contains
 
     rc = ESMF_SUCCESS
 
+    ! print *, "filed_create_grid fld_name = ", trim(fld_name)
     if (memflg .eq. MEMORY_POINTER) then
       select case (trim(fld_name))
         case ('smc')
@@ -1120,10 +1123,12 @@ contains
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
         case ('smc1')
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+           ! print *, "rt_domain(did)%smc(1:2,1:2,1) = ", rt_domain(did)%smc(1:2,1:2,1)
+
+           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,1), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
+           call check(rc, __LINE__, file)
         case ('smc2')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,2), &
@@ -1209,12 +1214,12 @@ contains
             farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
-       ! case ('udrunoff')
-       !    field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-       !      ! farray=rt_domain(did)%udrunoff(:,:), &
-       !      farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
-       !      indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-       !    call check(rc, __LINE__, file)
+       case ('udrunoff')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            ! farray=rt_domain(did)%udrunoff(:,:), &
+            farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          call check(rc, __LINE__, file)
        case default
           call ESMF_LogSetError(ESMF_FAILURE, &
             msg=method//": Field hookup missing: "//trim(fld_name), &
@@ -1245,6 +1250,7 @@ contains
         file=filename, rcToReturn=rc)
       return
     end if
+    ! print *, "end field_create_grid rc =", rc
 
   end function
 
