@@ -24,6 +24,8 @@ module wrfhydro_nuopc_fields
 
   private
 
+  logical, parameter :: debug_esmf = .false.
+
   type cap_fld_type
     sequence
     character(len=64)      :: sd_name   = "dummy" ! standard name
@@ -45,16 +47,19 @@ module wrfhydro_nuopc_fields
   character(len=ESMF_MAXSTR), parameter :: file = __FILE__
   logical, parameter :: IMPORT_T = .true.
   logical, parameter :: IMPORT_F = .false.
-  logical, parameter :: EXPORT_T = .false.
+  logical, parameter :: EXPORT_T = .true.
   logical, parameter :: EXPORT_F = .false.
   logical, parameter :: TMP_EXPORT_T = .false.
   logical, parameter :: TMP_IMPORT_T = .false.
 
   logical, parameter :: EXPORT_SF_HEAD = .true.
-  logical, parameter :: EXPORT_SMC = .true.
-  logical, parameter :: EXPORT_SMC_F = .false.
   ! logical, parameter :: EXPORT_SF_HEAD = .false.
+
   ! logical, parameter :: EXPORT_SMC = .true.
+  logical, parameter :: EXPORT_SMC = .false.
+
+  ! logical, parameter :: EXPORT_SH20 = .true.
+  logical, parameter :: EXPORT_SH20 = .false.
 
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
@@ -69,16 +74,16 @@ module wrfhydro_nuopc_fields
                  TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_T, 0.20d0),         &
+                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
                  "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_T, EXPORT_SMC, 0.20d0),         &
@@ -112,7 +117,7 @@ module wrfhydro_nuopc_fields
                  IMPORT_F, EXPORT_F, 16.0d0),                 &
     cap_fld_type("surface_water_depth","sfchead", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_F, EXPORT_F, 0.00d0),             &
+                 IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
     cap_fld_type("time_step_infiltration_excess","infxsrt", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_T, EXPORT_F, 0.00d0),             &
@@ -125,7 +130,7 @@ module wrfhydro_nuopc_fields
     ! as infxsrt and soldrain on the MPAS side
     cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
+                 IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
                  ! IMPORT_F, EXPORT_SMC, 0.00d0)              &
@@ -219,7 +224,7 @@ contains
 
     rc = ESMF_SUCCESS
 
-   call ESMF_LogWrite("WRFH: enter field_realize_mesh", &
+   if (debug_esmf) call ESMF_LogWrite("WRFH: enter field_realize_mesh", &
                ESMF_LOGMSG_INFO, rc=rc)
     call check(rc, __LINE__, file)
 
@@ -231,9 +236,9 @@ contains
     if (rc /= ESMF_SUCCESS) then
        error stop "WRFH: import state not valid"
     end if
-    call ESMF_LogWrite("WRFH: PRINTING IMPORTSTATE: ", &
+    if (debug_esmf) call ESMF_LogWrite("WRFH: PRINTING IMPORTSTATE: ", &
             ESMF_LOGMSG_INFO, rc=rc)
-    call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    if (debug_esmf) call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
     ! call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
     ! call ESMF_StateValidate(exportState, rc=rc)
     ! call check(rc, __LINE__)
@@ -301,10 +306,10 @@ contains
         call check(rc, __LINE__, file)
         call NUOPC_Realize(importState, field=field_import, rc=rc)
         call check(rc, __LINE__, file)
-        call printa("realize import "// trim(fieldList(n)%st_name))
+        if (debug_esmf) call printa("realize import "// trim(fieldList(n)%st_name))
         fieldList(n)%rl_import = .true.
      else
-        call printa("realize remove import "//&
+        if (debug_esmf) call printa("realize remove import "//&
              trim(fieldList(n)%st_name)// &
              " ---------------------------")
         call ESMF_StateRemove(importState, (/fieldList(n)%st_name/), &
@@ -325,10 +330,10 @@ contains
                fieldName=trim(fieldList(n)%st_name), rc=rc)
           call check(rc, __LINE__, file)
           if (realizeExport .eqv. .true.) then
-             call printa("export, true realizeexport of " &
+             if (debug_esmf) call printa("export, true realizeexport of " &
                   // trim(fieldList(n)%st_name))
           else
-             call printa("export, false realizeexport of " &
+             if (debug_esmf) call printa("export, false realizeexport of " &
                   // trim(fieldList(n)%st_name))
           end if
           ! call ESMF_LogWrite("WRFH: this realize needs to be true", &
@@ -347,9 +352,9 @@ contains
         call check(rc, __LINE__, file)
         fieldList(n)%rl_export = .true.
         ! print *, "WRFH: created export ", trim(fieldList(n)%st_name)
-        call printa("realize export "// trim(fieldList(n)%st_name))
+        if (debug_esmf) call printa("realize export "// trim(fieldList(n)%st_name))
       else
-        call printa("realize remove export "//&
+        if (debug_esmf) call printa("realize remove export "//&
              trim(fieldList(n)%st_name)// &
              " ---------------------------")
         call ESMF_StateRemove(exportState, (/fieldList(n)%st_name/), &
@@ -358,7 +363,7 @@ contains
         fieldList(n)%rl_export = .false.
       end if
    end do
-   call printa("exit field_realize_mesh")
+   if (debug_esmf) call printa("exit field_realize_mesh")
    ! stop "debugging field_realize_mesh"
   end subroutine field_realize_mesh
 
@@ -1209,7 +1214,7 @@ contains
 
           ! 102 x 60
           ! print *, shape(rt_domain(did)%overland%control%surface_water_head_lsm(:,:))
-          ! stop "hi"
+          stop "this should not be accessed"
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
