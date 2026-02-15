@@ -30,7 +30,7 @@ module wrfhydro_nuopc_gluecode
     decompose_data_real, &
     write_io_real, my_id, &
     mpp_land_bcast_real1, &
-    IO_id, &
+    IO_id, my_id, &
     mpp_land_bcast_real, &
     mpp_land_bcast_int1, &
     MPP_LAND_INIT
@@ -84,8 +84,10 @@ module wrfhydro_nuopc_gluecode
 
   ! Debugging Parameter
   logical, parameter :: debug = .FALSE.
-
+  logical :: debug_importexport_vars = .TRUE.
   integer :: debug_count = 0
+  ! export 3 vars, 2 with 4 layers
+  integer, parameter :: debug_count_max = 3
   character(len=:), allocatable :: fname
   character(len=32) :: scount
 
@@ -500,6 +502,10 @@ contains
 
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)
+
+    ! print *, "MAKING SFCHEAD 0.888888 TO TEST"
+    rt_domain(did)%overland%control%surface_water_head_lsm = 0.88888888888
+    ! rt_domain(did)%overland%control%surface_water_head_lsm = my_id / 10
 
     ! provide groundwater soil flux to WRF for fully coupled simulations (FERSCH 09/2014)
     !if(nlst(did)%GWBASESWCRT .eq. 3 ) then
@@ -1198,12 +1204,12 @@ contains
              call ESMF_FieldSMMStore(srcField=meshfield, dstField=gridfield, &
                   filename='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   routehandle=cap_fld_list(n)%import_handle, &
-                  transposeRoutehandle=cap_fld_list(n)%export_handle, &
+                  ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
              call check(rc, __LINE__, file)
 
              cap_fld_list(n)%import_handle_init = .true.
-             cap_fld_list(n)%export_handle_init = .true.
+             ! cap_fld_list(n)%export_handle_init = .true.
              ! error stop "WAS THIS FIRST?" !yes remove after debug
              ! routine is regrid_import_mesh_to_grid
 
@@ -1336,8 +1342,8 @@ contains
           ! end if
 
           ! Debugging: write export mesh before regrid
-          ! if (debug) then
-          if (.true.) then
+          if (debug_importexport_vars) then
+             write(scount,'(I0)') debug_count     ! I0 = no leading spaces
              fname = "vars_out/" &
                   //trim(cap_fld_list(n)%st_name) &
                   // "_mesh_pre" &
@@ -1363,7 +1369,8 @@ contains
 
 
           if (cap_fld_list(n)%export_handle_init .eqv. .false.) then
-             call printa("SHOULD THIS NOT BE REACHED, INVERSE CALCULATED at 1178")
+             ! call printa("THIS SHOULD SOMETIMES BE REACHED, INVERSE CALCULATED at 1178")
+             ! call printa("Double check")
              call printa("Regridding export variables")
              ! stop "hi"
              ! routine is regrid_export_grid_to_mesh
@@ -1388,21 +1395,22 @@ contains
              ! call check(rc, __LINE__, file)
 
              call ESMF_RegridWeightGen(&
-                  srcFile='frontrange.scrip.nc', &
-                  dstFile='fulldom_hires_hydrofile.d01.nc', &
-                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_eximport.nc', &
+                  srcFile='fulldom_hires_hydrofile.d01.nc', & ! grid
+                  dstFile='frontrange.scrip.nc', &            ! to mesh
+                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
+                  unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
-             call ESMF_FieldSMMStore(srcField=meshfield, dstField=gridfield, &
-                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_eximport.nc', &
-                  routehandle=cap_fld_list(n)%import_handle, &
-                  transposeRoutehandle=cap_fld_list(n)%export_handle, &
+             call ESMF_FieldSMMStore(srcField=gridfield, dstField=meshfield, &
+                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
+                  routehandle=cap_fld_list(n)%export_handle, &
+                  ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
              call check(rc, __LINE__, file)
 
-             cap_fld_list(n)%import_handle_init = .true.
+             ! cap_fld_list(n)%import_handle_init = .true.
              cap_fld_list(n)%export_handle_init = .true.
           end if
 
@@ -1412,8 +1420,10 @@ contains
                cap_fld_list(n)%export_handle, rc=rc)
           call check(rc, __LINE__, file)
 
-          ! if (debug) then
-          if (.true.) then
+          ! Debugging: write export vars after regrid ARTLESS
+          if (debug_importexport_vars) then
+             if (debug_count >= debug_count_max) &
+                  debug_importexport_vars = .false.
              fname = "vars_out/" &
                   //trim(cap_fld_list(n)%st_name) &
                   // "_mesh_post" &
@@ -1439,6 +1449,7 @@ contains
           end if
        end if
     end do
+    debug_count = debug_count + 1
     ! stop "CHECKING IF REGRID EXPORT GRID TO MESH WORKS"
   end subroutine regrid_export_grid_to_mesh
 
