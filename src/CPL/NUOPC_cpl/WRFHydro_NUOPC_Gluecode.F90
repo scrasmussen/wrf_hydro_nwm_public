@@ -87,7 +87,7 @@ module wrfhydro_nuopc_gluecode
   logical :: debug_importexport_vars = .TRUE.
   integer :: debug_count = 0
   ! export 3 vars, 2 with 4 layers
-  integer, parameter :: debug_count_max = 3
+  integer, parameter :: debug_count_max = 8
   character(len=:), allocatable :: fname
   character(len=32) :: scount
 
@@ -503,9 +503,12 @@ contains
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)
 
-    ! print *, "MAKING SFCHEAD 0.888888 TO TEST"
-    rt_domain(did)%overland%control%surface_water_head_lsm = 0.88888888888
+
+    ! rt_domain(did)%overland%control%surface_water_head_lsm = 0.444
+    ! print *, "CHANGING SFCHEAD TO TEST"
     ! rt_domain(did)%overland%control%surface_water_head_lsm = my_id / 10
+    ! print *, "CHANGING SMC TO TEST"
+    ! rt_domain(did)%smc(:,:,:) = 0.111
 
     ! provide groundwater soil flux to WRF for fully coupled simulations (FERSCH 09/2014)
     !if(nlst(did)%GWBASESWCRT .eq. 3 ) then
@@ -1394,6 +1397,18 @@ contains
              !      routehandle=cap_fld_list(n)%export_handle, rc=rc)
              ! call check(rc, __LINE__, file)
 
+
+             ! ESMF_UNMAPPEDACTION_IGNORE:
+             ! Destination points which do not have corresponding source
+             ! points are ignored and zeros are used for the entries of the
+             ! sparse matrix that is generated.
+             ! ESMF_REGION_EMPTY:
+             ! the elements in dstField will not be modified prior to the
+             ! sparse matrix multiplication and results will be added to the
+             ! incoming element values
+             ! ESMF_REGION_SELECT:
+             ! only zero out those elements in the destination Field that
+             ! will be updated by the sparse matrix multiplication
              call ESMF_RegridWeightGen(&
                   srcFile='fulldom_hires_hydrofile.d01.nc', & ! grid
                   dstFile='frontrange.scrip.nc', &            ! to mesh
@@ -1406,9 +1421,9 @@ contains
              call ESMF_FieldSMMStore(srcField=gridfield, dstField=meshfield, &
                   filename='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   routehandle=cap_fld_list(n)%export_handle, &
-                  ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
              call check(rc, __LINE__, file)
+             ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
 
              ! cap_fld_list(n)%import_handle_init = .true.
              cap_fld_list(n)%export_handle_init = .true.
@@ -1417,8 +1432,10 @@ contains
           if (debug) print*, "DEBUGGING: using var's handle to regrid field ", &
                trim(cap_fld_list(n)%st_name)
           call ESMF_FieldRegrid(gridField, meshField, &
-               cap_fld_list(n)%export_handle, rc=rc)
+               cap_fld_list(n)%export_handle, &
+               zeroregion=ESMF_REGION_SELECT, rc=rc)
           call check(rc, __LINE__, file)
+
 
           ! Debugging: write export vars after regrid ARTLESS
           if (debug_importexport_vars) then
