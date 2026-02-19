@@ -245,7 +245,8 @@ module WRFHydro_NUOPC
        wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
        wrfhydro_get_restart, wrfhydro_GridCreate_init, &
        wrfhydro_write_geo_file, regrid_import_mesh_to_grid, &
-       regrid_export_grid_to_mesh
+       regrid_export_grid_to_mesh, &
+       geo_static_file
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
        field_create, field_realize, field_advertise, check_lsm_forcings, &
        field_advertise_log, field_realize_log, read_impexp_config_flnm, &
@@ -253,6 +254,9 @@ module WRFHydro_NUOPC
        state_fill_prescribe, state_fill_file, state_copy_tohyd, &
        state_copy_frhyd, state_check_missing, state_prescribe_missing, &
        model_debug
+  ! TESTING
+  use module_rt_data, only: &
+    rt_domain
 
   use WRFHYDRO_NUOPC_Flags
   use WRFHydro_ESMF_Extensions
@@ -812,11 +816,13 @@ module WRFHydro_NUOPC
     integer :: rank, np, comm, ierr
 
     type(ESMF_Grid)            :: wrfhydro_grid_p1
+    logical :: geo_file_exists
 
     rc = ESMF_SUCCESS
 
 
-    call ESMF_LogWrite("WRFH: entering Initializep1", ESMF_LOGMSG_INFO, rc=rc)
+    ! call ESMF_LogWrite("WRFH: entering Initializep1", ESMF_LOGMSG_INFO, rc=rc)
+    call printa("WRFH: entering Initializep1")
 
     ! Query component for name, verbosity, and diagnostic values
     ! call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
@@ -860,11 +866,20 @@ module WRFHydro_NUOPC
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
+
+    ! CHICKEN AND EGG ISSUE, INI NEEDED FOR wrfhydro_GridCreate_init
+    !  needs
+    ! this was before geo_static_file inquirty, ok to be after?
     call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    ! SFCRUNOFF IS 0 AT THIS POINT
+
 
     ! this only needs to be done once
-    if (np == 1) then
+    ! This requires info from wrfhydro_nuopc_ini which requires
+    ! the geo_static_file to exist, chicken-and-egg problem
+    inquire(file=geo_static_file, exist=geo_file_exists)
+    if (.not. geo_file_exists .and. np == 1) then
        print *, rank, "entering wrfhydro grid create, mesh regrid section"
        wrfhydro_mesh = wrfhydro_open_mesh(rc)
        call check(rc, __LINE__, file)
@@ -906,17 +921,14 @@ module WRFHydro_NUOPC
        call wrfhydro_write_geo_file(wrfhydro_grid_p1, wrfhydro_mesh, &
             regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
        print*, "CREATED LOW-RES GRID"
+       stop "Static Geo File Created, Restart Hydro"
+    else if (.not. geo_file_exists .and. np /= 1) then
+       print *, "Error: static geo file ", geo_static_file, " does not exists"
+       print *, "Rerun with np=1 and hydro will create the geo file"
+       stop "Static Geo File Does Not Exist"
     else
-       print *, "If you need to create frontrange.d01.nc, rerun with one procces"
-       print *, "TODO: make this work with np > 1"
+       print *, "Static geo file exists, continuing"
     end if
-
-
-    ! print *, rank, ": before MPI_Barrier"
-    ! if (np > 1) then
-    !    call MPI_Barrier(comm, ierr)
-    ! end if
-    ! ! stop "CREATING LOW-RES GRID"
 
 
     ! get hgrid for domain id
@@ -957,7 +969,8 @@ module WRFHydro_NUOPC
 
     if (btest(verbosity,16)) call field_advertise_log(cap_fld_list,cname,rc=rc)
     call field_advertise_log(cap_fld_list,cname,rc=rc)
-    call ESMF_LogWrite("WRFH: exiting Initializep1: advertise", ESMF_LOGMSG_INFO, rc=rc)
+    ! call ESMF_LogWrite("WRFH: exiting Initializep1: advertise", ESMF_LOGMSG_INFO, rc=rc)
+    call printa("WRFH: exiting Initializep1: advertise")
     ! stop "looking at end of initializep1"
   end subroutine InitializeP1
 
@@ -1626,6 +1639,12 @@ subroutine CheckImport(gcomp, rc)
 
     call printa("entering advance")
 
+    ! 0 here
+    ! print *, "sfchead=",&
+    !      rt_domain(1)%overland%control%surface_water_head_lsm(25:50,25:50)
+    ! stop "SEARCHING FOR non-0"
+
+
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
@@ -1747,6 +1766,11 @@ subroutine CheckImport(gcomp, rc)
        print *, " -- this is where it was breaking in parallel --"
     end if
 
+    ! it is zero here, good!
+    ! print *, "sfchead=",&
+    !      rt_domain(1)%overland%control%surface_water_head_lsm(25:50,25:50)
+    ! stop "IT IS non-0 here??, FIX!"
+
 
     do while (is%wrap%stepTimer(1) >= timestep)
       ! call wrfhydro advance
@@ -1759,8 +1783,13 @@ subroutine CheckImport(gcomp, rc)
       call ESMF_ClockAdvance(is%wrap%clock(1),rc=rc)
         call check(rc, __LINE__, file)
       is%wrap%stepTimer(1) = &
-        is%wrap%stepTimer(1) - timestep
+           is%wrap%stepTimer(1) - timestep
+      print *, "timestep taken!"
     end do
+      ! it is non-zero here, big
+      ! print *, "sfchead=",&
+      !    rt_domain(1)%overland%control%surface_water_head_lsm(25:50,25:50)
+      ! stop "IT IS non-0 here??, but how big?!"
 
     if (is%wrap%memr_export .eq. MEMORY_COPY) then
       call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
@@ -1769,7 +1798,7 @@ subroutine CheckImport(gcomp, rc)
     endif
 
 
-    call print_wrap(is%wrap)
+    ! call print_wrap(is%wrap)
 
 
     call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
@@ -1809,6 +1838,11 @@ subroutine CheckImport(gcomp, rc)
       call check(rc, __LINE__, file)
     endif
     call ESMF_LogWrite("WRFH: exiting Advance", ESMF_LOGMSG_INFO, rc=rc)
+
+    print *, "sfchead=",&
+         rt_domain(1)%overland%control%surface_water_head_lsm(45:50,45:50)
+    ! stop "IT IS non-0 here, FIX!"
+
 
     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 

@@ -55,11 +55,11 @@ module wrfhydro_nuopc_fields
   logical, parameter :: EXPORT_SF_HEAD = .true.
   ! logical, parameter :: EXPORT_SF_HEAD = .false.
 
-  ! logical, parameter :: EXPORT_SMC = .true.
-  logical, parameter :: EXPORT_SMC = .false.
+  logical, parameter :: EXPORT_SMC = .true.
+  ! logical, parameter :: EXPORT_SMC = .false.
 
-  ! logical, parameter :: EXPORT_SH20 = .true.
-  logical, parameter :: EXPORT_SH20 = .false.
+  logical, parameter :: EXPORT_SH20 = .true.
+  ! logical, parameter :: EXPORT_SH20 = .false.
 
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
@@ -114,7 +114,7 @@ module wrfhydro_nuopc_fields
     cap_fld_type("vegetation_type","vegtyp", &
                  ! "1     ", ESMF_REGRIDMETHOD_NEAREST_DTOS, &
                  "1     ", ESMF_REGRIDMETHOD_NEAREST_STOD, &
-                 IMPORT_F, EXPORT_F, 16.0d0),                 &
+                 IMPORT_F, EXPORT_F, 16.0d0),                 & !FIX
     cap_fld_type("surface_water_depth","sfchead", &
                  "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
@@ -1179,11 +1179,14 @@ contains
             farray=rt_domain(did)%vegtyp, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
-        case ('sfchead')
+       case ('sfchead')
+          ! print *, "sfchead=",&
+          !      rt_domain(did)%overland%control%surface_water_head_lsm(0:5,0:5)
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%overland%control%surface_water_head_lsm, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
+          ! stop "CHECKING"
         case ('infxsrt')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%infxsrt, &
