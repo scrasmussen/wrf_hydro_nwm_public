@@ -424,6 +424,9 @@ contains
     ! local variables
     type(ESMF_TimeInterval)     :: timeStep
 
+    ! debugging
+    integer :: rank, ierr
+
 #ifdef DEBUG
     call ESMF_LogWrite(MODNAME//": entered "//METHOD, ESMF_LOGMSG_INFO)
 #endif
@@ -513,11 +516,18 @@ contains
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)
 
-    print *, "sfchead=",&
-         rt_domain(1)%overland%control%surface_water_head_lsm(40:50,40:50)
+    ! print *, "sfchead=",&
+    !      rt_domain(1)%overland%control%surface_water_head_lsm(40:50,40:50)
     ! stop "IT IS non-0 here??, but how big?!"
 
-    ! rt_domain(did)%overland%control%surface_water_head_lsm = 0.444
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    rank = rank + 1
+
+    ! rt_domain(did)%smc(:,:,:) = 0.333 * rank
+    ! rt_domain(did)%overland%control%surface_water_head_lsm = 0.555 * rank
+
+    ! rt_domain(did)%overland%control%surface_water_head_lsm = 0
+    ! rt_domain(did)%overland%control%surface_water_head_lsm = 0.555 * rank
     ! print *, "CHANGING SFCHEAD TO TEST"
     ! rt_domain(did)%overland%control%surface_water_head_lsm = my_id / 10
     ! print *, "CHANGING SMC TO TEST"
@@ -963,10 +973,22 @@ contains
     distgrid = ESMF_DistGridCreate(arbSeqIndexList=gindex, rc=rc)
     call check(rc, __LINE__, file)
 
+    ! if (rank == 1) then
+    !    call ESMF_DistGridPrint(distgrid, rc=rc)
+    !    call check(rc, __LINE__, file)
+    ! end if
+    ! call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    ! ! if (rank == 1) then
+    ! !    call ESMF_DistGridPrint(distgrid, rc=rc)
+    ! !    call check(rc, __LINE__, file)
+    ! ! end if
+    ! stop "hi"
+
     mesh_file = "frontrange.scrip.nc"
     print *, "todo: read mesh_file name from namelist, currently ", trim(mesh_file)
     mesh = ESMF_MeshCreate(filename=mesh_file, &
          elementDistgrid=distgrid, &
+         ! convertToDual=.false., & ! didn't do anything
          fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
     call check(rc, __LINE__, file)
 
@@ -1249,14 +1271,17 @@ contains
     ! stop "look at import meshes"
   end subroutine regrid_import_mesh_to_grid
 
-  subroutine regrid_export_grid_to_mesh(grid, mesh, state, did, memflg)
+  subroutine regrid_export_grid_to_mesh(grid, mesh, state, &
+       saved_import_state, did, memflg)
     use MPI
     type(ESMF_Grid), intent(in) :: grid
     type(ESMF_Mesh), intent(in) :: mesh
     type(ESMF_State),intent(in) :: state
+    type(ESMF_State),intent(in) :: saved_import_state
     integer, intent(in) :: did
     type(memory_flag), intent(in) :: memflg
     type(ESMF_Field) :: meshField, gridField
+    type(ESMF_Field) :: importMeshField
     integer :: n, rc, itemCount
     character(len=64), allocatable :: itemNameList(:)
     logical :: exported
@@ -1273,6 +1298,9 @@ contains
 
     integer :: rank, localDECount, localDE
     type(ESMF_TypeKind_Flag) :: tk
+
+    real(ESMF_KIND_R8), pointer :: import_mesh(:)
+    real(ESMF_KIND_R8), pointer :: export_mesh(:)
 
 
     integer :: ierr
@@ -1293,23 +1321,46 @@ contains
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_export) then
           exported = NUOPC_IsConnected(state, &
-            fieldName=trim(cap_fld_list(n)%st_name), rc=rc)
+               fieldName=trim(cap_fld_list(n)%st_name), rc=rc)
+          if (.not. exported) then
+             error stop "Variable " // trim(cap_fld_list(n)%st_name) // " should be exported"
+          end if
           call check(rc, __LINE__, file)
 
           if (debug) print *, "exported = ", exported,", name: ", cap_fld_list(n)%st_name
           if (debug) call ESMF_LogWrite("WRFH: exported "//cap_fld_list(n)%st_name, &
                ESMF_LOGMSG_INFO, rc=rc)
 
-
-
+          ! FOOBAR LOOK HERE
           ! meshField = field_create(cap_fld_list(n)%st_name, mesh, did, &
           !      memflg, rc)
           ! call check(rc, __LINE__, file)
           ! will this work better??
-          call ESMF_StateGet(state, itemName=trim(cap_fld_list(n)%st_name), &
-               field=meshField, rc=rc)
-          call check(rc, __LINE__, file)
+          ! THIS LOOKS BAD FOR NP=2
 
+          ! sfhead is export only, so doen't have an import mesh to copy
+          if (cap_fld_list(n)%ad_import) then
+             call ESMF_StateGet(saved_import_state, &
+                  itemName=trim(cap_fld_list(n)%st_name), &
+                  field=importMeshField, rc=rc)
+             call check(rc, __LINE__, file)
+             call ESMF_FieldGet(importMeshField,   farrayPtr=import_mesh, rc=rc)
+             call check(rc, __LINE__, file)
+
+             call ESMF_StateGet(state, &
+                  itemName=trim(cap_fld_list(n)%st_name), &
+                  field=meshField, rc=rc)
+             call check(rc, __LINE__, file)
+             call ESMF_FieldGet(meshField,   farrayPtr=export_mesh, rc=rc)
+             call check(rc, __LINE__, file)
+
+             export_mesh(:) = import_mesh(:)
+          else
+             call ESMF_StateGet(state, &
+                  itemName=trim(cap_fld_list(n)%st_name), &
+                  field=meshField, rc=rc)
+             call check(rc, __LINE__, file)
+          end if
 
           ! should probably be called field_get?
           ! print *, "==============================="
@@ -1388,6 +1439,7 @@ contains
                zeroregion=ESMF_REGION_SELECT, rc=rc)
           call check(rc, __LINE__, file)
 
+
           if (show_export_once) then
              fname = "vars_out/" &
                   //trim(cap_fld_list(n)%st_name) &
@@ -1412,9 +1464,13 @@ contains
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
+
+          call ESMF_FieldDestroy(gridField, rc=rc)
+          call check(rc, __LINE__, file)
        end if
     end do
 
+    ! stop "test"
     show_export_once = .false.
   end subroutine regrid_export_grid_to_mesh
 

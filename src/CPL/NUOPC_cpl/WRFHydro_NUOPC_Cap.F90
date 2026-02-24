@@ -1055,7 +1055,6 @@ module WRFHydro_NUOPC
 
     print *, "TODO: remove this regrid mesh??"
     ! removed it, handle doesn't get used here
-    ! ARTLESS
     ! regrid_handle_l = wrfhydro_regrid_mesh( &
     !      wrfhydro_grid_l, &
     !      wrfhydro_mesh, &
@@ -1762,8 +1761,7 @@ subroutine CheckImport(gcomp, rc)
        ! stop "MESH WRITE in advance"
        call regrid_import_mesh_to_grid(wrfhydro_grid_l, wrfhydro_mesh, &
             is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
-       print *, "DEBUGGING ARTLESS WRHHYDRO_GRID"
-       print *, " -- this is where it was breaking in parallel --"
+       print *, " -- this is where it was breaking in parallel, still? --"
     end if
 
     ! it is zero here, good!
@@ -1810,7 +1808,8 @@ subroutine CheckImport(gcomp, rc)
        call check(rc, __LINE__, file)
 
        call regrid_export_grid_to_mesh(wrfhydro_grid_l, wrfhydro_mesh, &
-            is%wrap%NStateExp(1), did=is%wrap%did, memflg=is%wrap%memr_export)
+            is%wrap%NStateExp(1), is%wrap%NStateImp(1), &
+            did=is%wrap%did, memflg=is%wrap%memr_export)
     end if
 
     ! this is where it is breaking now
@@ -1839,8 +1838,8 @@ subroutine CheckImport(gcomp, rc)
     endif
     call ESMF_LogWrite("WRFH: exiting Advance", ESMF_LOGMSG_INFO, rc=rc)
 
-    print *, "sfchead=",&
-         rt_domain(1)%overland%control%surface_water_head_lsm(45:50,45:50)
+    ! print *, "sfchead=",&
+    !      rt_domain(1)%overland%control%surface_water_head_lsm(45:50,45:50)
     ! stop "IT IS non-0 here, FIX!"
 
 

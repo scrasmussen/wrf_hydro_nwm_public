@@ -894,6 +894,8 @@ contains
     ! local variables
     character(len=16)       :: cmemflg
 
+    real(ESMF_KIND_R8), pointer :: p(:)   ! mesh element field is 1D local array
+
 
     rc = ESMF_SUCCESS
     ! print *, "=== WRFH: realize, try field create mesh: ", trim(fld_name)
@@ -910,8 +912,14 @@ contains
             meshloc=ESMF_MESHLOC_ELEMENT, &
             rc=rc)
        call check(rc, __LINE__, file)
+       call ESMF_FieldGet(field_create, farrayPtr=p, rc=rc)
+       call check(rc, __LINE__, file)
+       ! p = -9999.0d0
+       p = 0.0
 
-       print *, "=== WRFH: realize, success field created mesh: ", trim(fld_name)
+       ! print *, "=== WRFH: realize, success field created mesh: ", trim(fld_name)
+
+       ! error stop "hi"
 
       ! select case (trim(fld_name))
         ! case ('smc')
