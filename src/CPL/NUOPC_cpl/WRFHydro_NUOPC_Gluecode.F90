@@ -855,6 +855,12 @@ contains
 
     stat = nf90_close(ncid)
     call check_nf(stat)
+    call ESMF_FieldDestroy(f_src, rc=rc)
+    call check(rc, __LINE__, file)
+    call ESMF_FieldDestroy(f_dst, rc=rc)
+    call check(rc, __LINE__, file)
+
+
     nx = size(hgt, dim=1)
     ny = size(hgt, dim=2)
     call write_netcdf_full_resolution_file(nx, ny, hgt, soil_cat, lat, lon, &
@@ -1092,10 +1098,10 @@ contains
     ! ! call NUOPC_Realize(importState, field=field, rc=rc)
 
     ! memory cleanup, only used to create route handle
-    call ESMF_FieldDestroy(import_field, noGarbage=.true., rc=rc)
+    call ESMF_FieldDestroy(import_field, rc=rc)
     call check(rc, __LINE__, file)
 
-    call ESMF_FieldDestroy(new_field, noGarbage=.true., rc=rc)
+    call ESMF_FieldDestroy(new_field, rc=rc)
     call check(rc, __LINE__, file)
 
 
