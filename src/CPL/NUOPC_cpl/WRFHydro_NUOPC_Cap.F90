@@ -243,10 +243,10 @@ module WRFHydro_NUOPC
        wrfhydro_nuopc_fin, wrfhydro_regrid_mesh, wrfhydro_open_mesh, &
        wrfhydro_GridCreate, &
        wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
-       wrfhydro_get_restart, wrfhydro_GridCreate_init, &
-       wrfhydro_write_geo_file, regrid_import_mesh_to_grid, &
+       wrfhydro_get_restart, wrfhydro_grid_create_from_fulldom, &
+       wrfhydro_write_full_resolution_file, regrid_import_mesh_to_grid, &
        regrid_export_grid_to_mesh, &
-       geo_static_file
+       full_resolution_file
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
        field_create, field_realize, field_advertise, check_lsm_forcings, &
        field_advertise_log, field_realize_log, read_impexp_config_flnm, &
@@ -862,35 +862,17 @@ module WRFHydro_NUOPC
     print *, rank, ": np=", np
     print *, rank, ": did =", is%wrap%did
 
-    ! initialize wrfhydro
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
-
-
-    ! CHICKEN AND EGG ISSUE, INI NEEDED FOR wrfhydro_GridCreate_init
-    !  needs
-    ! this was before geo_static_file inquirty, ok to be after?
-    call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
-    if(ESMF_STDERRORCHECK(rc)) return ! bail out
-    ! SFCRUNOFF IS 0 AT THIS POINT
-
-
-    ! this only needs to be done once
-    ! This requires info from wrfhydro_nuopc_ini which requires
-    ! the geo_static_file to exist, chicken-and-egg problem
-    inquire(file=geo_static_file, exist=geo_file_exists)
+    inquire(file=full_resolution_file, exist=geo_file_exists)
     if (.not. geo_file_exists .and. np == 1) then
        print *, rank, "entering wrfhydro grid create, mesh regrid section"
        wrfhydro_mesh = wrfhydro_open_mesh(rc)
        call check(rc, __LINE__, file)
 
-       wrfhydro_grid_p1 = wrfhydro_GridCreate(is%wrap%did, rc=rc)
-       ! wrfhydro_grid_p1 = wrfhydro_GridCreate_init(vm, is%wrap%did, rc=rc)
+       ! wrfhydro_grid_p1 = wrfhydro_GridCreate(is%wrap%did, rc=rc)
+       wrfhydro_grid_p1 = wrfhydro_grid_create_from_fulldom(rc=rc)
        call ESMF_GridValidate(wrfhydro_grid_p1, rc=rc)
        call check(rc, __LINE__, file)
 
-       call check(rc, __LINE__, file) !
-       wrfhydro_grid = wrfhydro_grid_p1
        regrid_handle_bl = wrfhydro_regrid_mesh( &
             wrfhydro_grid_p1, &
             wrfhydro_mesh, &
@@ -899,7 +881,7 @@ module WRFHydro_NUOPC
             is%wrap%NStateImp(1), &
             rc)
        call check(rc, __LINE__, file)
-       !Original, better method, just testing other
+
        regrid_handle_nn_stod = wrfhydro_regrid_mesh( &
             wrfhydro_grid_p1, &
             wrfhydro_mesh, &
@@ -917,19 +899,27 @@ module WRFHydro_NUOPC
             rc)
        call check(rc, __LINE__, file)
 
-       ! write to frontrange.d0
-       call wrfhydro_write_geo_file(wrfhydro_grid_p1, wrfhydro_mesh, &
-            regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
+       ! write to frontrange.fulldom
+       call wrfhydro_write_full_resolution_file(wrfhydro_grid_p1, &
+            wrfhydro_mesh, regrid_handle_bl, regrid_handle_nn_stod, &
+            regrid_handle_nn_dtos)
        print*, "CREATED LOW-RES GRID"
-       stop "Static Geo File Created, Restart Hydro"
+       stop "Full Resolution File Created, Restart Hydro"
     else if (.not. geo_file_exists .and. np /= 1) then
-       print *, "Error: static geo file ", geo_static_file, " does not exists"
+       print *, "Error: full resolution file ", full_resolution_file, &
+            " does not exists"
        print *, "Rerun with np=1 and hydro will create the geo file"
-       stop "Static Geo File Does Not Exist"
+       stop "Full Resolution File Does Not Exist"
     else
-       print *, "Static geo file exists, continuing"
+       print *, "Full resolution file exists, continuing"
     end if
 
+    ! initialize wrfhydro
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    ! SFCRUNOFF IS 0 AT THIS POINT
 
     ! get hgrid for domain id
     call WRFHYDRO_get_hgrid(is%wrap%did,is%wrap%hgrid,rc=rc)

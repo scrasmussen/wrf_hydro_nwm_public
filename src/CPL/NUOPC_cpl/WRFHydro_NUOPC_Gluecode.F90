@@ -71,13 +71,14 @@ module wrfhydro_nuopc_gluecode
   public :: wrfhydro_get_hgrid
   public :: wrfhydro_get_restart
 
-  public :: wrfhydro_write_geo_file
-  public :: wrfhydro_GridCreate_init
+  public :: wrfhydro_write_full_resolution_file
+  public :: wrfhydro_grid_create_from_fulldom
   public :: regrid_import_mesh_to_grid
   public :: regrid_export_grid_to_mesh
 
-  character(len=*), parameter :: geo_static_file = 'frontrange.d01.nc'
-  public :: geo_static_file
+  character(len=*), parameter :: full_resolution_file = 'hydro.fullres.nc'
+  character(len=:), allocatable :: hires_file
+  public :: full_resolution_file
 
   type(ESMF_RouteHandle) :: route_handle
 
@@ -139,7 +140,6 @@ contains
 
 #undef METHOD
 #define METHOD "wrfhydro_nuopc_ini"
-
   subroutine wrfhydro_nuopc_ini(did,vm,clock,forcingDir,rc)
     integer, intent(in)                     :: did
     type(ESMF_VM),intent(in)                :: vm
@@ -199,10 +199,11 @@ contains
       msg=METHOD//': Allocation of model soil depths memory failed.', &
       file=FILENAME, rcToReturn=rc)) return ! bail out
     nlst(did)%zsoil8(1:4)=(/-0.1,-0.4,-1.0,-2.0/)
-    ! nlst(did)%geo_static_flnm = "geo_em.d01.nc"
+    nlst(did)%geo_static_flnm = full_resolution_file
     ! nlst(did)%geo_static_flnm = "fixed/frontrange.init.fixed.nc"
     ! geo_static_flnm is read in init_namelist_rt_field call
-    nlst(did)%geo_finegrid_flnm = "fulldom_hires_hydrofile.d01.nc"
+
+    nlst(did)%geo_finegrid_flnm = read_hires_filename_from_namelist()
     nlst(did)%sys_cpl = 2
     nlst(did)%sys_cpl = 5 ! added to couple to MPAS
     print *, "---FIX THIS TO NAMELIST OPTION OR SOMETHING ELSE---"
@@ -218,7 +219,8 @@ contains
     endif
 
      ! Read information from hydro.namelist config file
-     call init_namelist_rt_field(did)
+    call init_namelist_rt_field(did)
+    nlst(did)%geo_static_flnm = full_resolution_file
 
     if (debug) then
        call WRFHYDRO_nlstLog(did,MODNAME,rc=rc)
@@ -306,8 +308,6 @@ contains
       rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
     wrfhydro_distgrid_initialized = .true.
-
-
     deallocate(deBlockList)
 
 !   deallocate(connectionList,stat=stat)
@@ -582,11 +582,11 @@ contains
   end subroutine
 
 
-  subroutine write_netcdf_geo_file(dx, dy, hgt, soil_cat, lat, lon, veg, &
-       lu_index, landmask)
+  subroutine write_netcdf_full_resolution_file(dx, dy, hgt, soil_cat, lat, &
+       lon, lu_index, landmask)
     integer, intent(in) :: dx, dy
     real, dimension(:,:), intent(in) :: hgt, lat, lon
-    integer, dimension(:,:), intent(in) :: soil_cat, veg, lu_index, landmask
+    integer, dimension(:,:), intent(in) :: soil_cat, lu_index, landmask
 
     ! Constants
     character(len=*), parameter :: times_value = '0000-00-00_00:00:00'
@@ -597,17 +597,17 @@ contains
     integer :: dim_time, dim_we, dim_sn, dim_dsl
     integer :: dim_soil_cat, dim_land_cat
     integer :: var_times, var_hgt, var_soil_cat, var_lat, var_lon, &
-         var_veg, var_lu_index, var_landmask
+         var_lu_index, var_landmask
 
     ! Local parameters
     character(len=*), parameter :: timestr = "0000-00-00_00:00:00"
     integer, parameter :: soil_cat_n = 16
     integer, parameter :: land_cat_n = 24
 
-    if (io_rank) print *, "=== entering write_netcdf_geo_file ==="
+    if (io_rank) print *, "=== entering write_netcdf_full_resolution_file ==="
     ! Begin work
     ! Create/clobber file
-    call check_nf(nf90_create(geo_static_file, NF90_CLOBBER, ncid))
+    call check_nf(nf90_create(full_resolution_file, NF90_CLOBBER, ncid))
 
     ! Define Dimensions
     call check_nf(nf90_def_dim(ncid, 'Time', NF90_UNLIMITED, dim_time))
@@ -623,7 +623,7 @@ contains
     call check_nf(nf90_def_var(ncid, 'SCT_DOM', NF90_INT, [dim_we, dim_sn, dim_time], var_soil_cat))
     call check_nf(nf90_def_var(ncid, 'XLAT_M', NF90_FLOAT, [dim_we, dim_sn, dim_time], var_lat))
     call check_nf(nf90_def_var(ncid, 'XLONG_M', NF90_FLOAT, [dim_we, dim_sn, dim_time], var_lon))
-    print *, "TOOK OUT VEGTYP, IS THIS CORRECT?"
+    ! print *, "TOOK OUT VEGTYP, IS THIS CORRECT?"
     ! call check_nf(nf90_def_var(ncid, 'VEGTYP', NF90_INT, [dim_we, dim_sn, dim_time], var_veg))
     call check_nf(nf90_def_var(ncid, 'LU_INDEX', NF90_INT, [dim_we, dim_sn, dim_time], var_lu_index))
     call check_nf(nf90_def_var(ncid, 'LANDMASK', NF90_INT, [dim_we, dim_sn, dim_time], var_landmask))
@@ -646,7 +646,7 @@ contains
     call check_nf(nf90_put_var(ncid, var_soil_cat, soil_cat, start=[1,1,1], count=[dx,dy,1]))
     call check_nf(nf90_put_var(ncid, var_lat, lat, start=[1,1,1], count=[dx,dy,1]))
     call check_nf(nf90_put_var(ncid, var_lon, lon, start=[1,1,1], count=[dx,dy,1]))
-    call check_nf(nf90_put_var(ncid, var_veg, veg, start=[1,1,1], count=[dx,dy,1]))
+    ! call check_nf(nf90_put_var(ncid, var_veg, veg, start=[1,1,1], count=[dx,dy,1]))
     call check_nf(nf90_put_var(ncid, var_lu_index, lu_index, start=[1,1,1], count=[dx,dy,1]))
     call check_nf(nf90_put_var(ncid, var_landmask, landmask, start=[1,1,1], count=[dx,dy,1]))
     ! call check_nf(nf90_put_var(ncid, var_, , start=[1,1,1], count=[dx,dy,1]))
@@ -654,8 +654,8 @@ contains
 
 
     call check_nf(nf90_close(ncid))
-    print *, "=== exiting write_netcdf_geo_file ==="
-  end subroutine write_netcdf_geo_file
+    print *, "=== exiting write_netcdf_full_resolution_file ==="
+  end subroutine write_netcdf_full_resolution_file
 
   subroutine read_mesh_var_and_regrid_r(var_name, outvar, &
        ncid, nCells, &
@@ -755,7 +755,7 @@ contains
     print *, "  outvar_i shape =", shape(outvar)
   end subroutine read_mesh_var_and_regrid_i
 
-  subroutine wrfhydro_write_geo_file(wrfhydro_grid, wrfhydro_mesh, &
+  subroutine wrfhydro_write_full_resolution_file(wrfhydro_grid, wrfhydro_mesh, &
        regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
     use netcdf
     type(ESMF_Grid), intent(in) :: wrfhydro_grid
@@ -785,13 +785,13 @@ contains
 
     ! vars to write
     real, dimension(:,:), allocatable :: hgt, lat, lon
-    integer, dimension(:,:), allocatable :: soil_cat, veg, lu_index, landmask
+    integer, dimension(:,:), allocatable :: soil_cat, lu_index, landmask
 
     ! locals
     integer :: nx, ny
     ! type(ESMF_RouteHandle) :: regrid_handle_tmp
 
-    print *, "=== entering wrfhydro_write_geo_file ==="
+    print *, "=== entering wrfhydro_write_full_resolution_file ==="
     ! initialize values
     ! regrid_handle_tmp = regrid_handle
 
@@ -841,8 +841,6 @@ contains
     ! nearest neighbor regridding
     call read_mesh_var_and_regrid('isltyp', soil_cat, ncid, nCells, &
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
-    call read_mesh_var_and_regrid('ivgtyp', veg, ncid, nCells, &
-         regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst) ! this might be overkill
     call read_mesh_var_and_regrid('ivgtyp', lu_index, ncid, nCells, &
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('landmask', landmask, ncid, nCells, &
@@ -854,34 +852,16 @@ contains
          regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('lonCell', lon, ncid, nCells, &
          regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
-    ! try turning off terrain and veg
-    ! bilinear wont work for integer variables/categorical,
-    !  - use nearest neightbor?? Majority would be the best choice if possible
 
     stat = nf90_close(ncid)
     call check_nf(stat)
-
-    ! print *, "ncells =", ncells
-    ! print *, "lat(1:2,1:2) =", lat(1:2,1:2)
-    ! print *, "lon(1:2,1:2) =", lon(1:2,1:2)
-    ! print *, "hgt(1:2,1:2) =", hgt(1:2,1:2)
-    ! print *, "soil_cat(1:2,1:2) =", soil_cat(1:2,1:2)
-    ! print *, "veg(1:2,1:2) =", veg(1:2,1:2)
-    ! print *, "lu_index(1:2,1:2) =", lu_index(1:2,1:2)
-    ! print *, "landmask(1:2,1:2) =", landmask(1:2,1:2)
-    ! print *, "-----------------"
-    ! print *, "writing veg grid"
-    ! call array_write_i(veg, "veg_dtos.nc")
-    ! call array_write_i(lu_index, "veg_stod.nc")
-
-
     nx = size(hgt, dim=1)
     ny = size(hgt, dim=2)
-    call write_netcdf_geo_file(nx, ny, hgt, soil_cat, lat, lon, veg, &
+    call write_netcdf_full_resolution_file(nx, ny, hgt, soil_cat, lat, lon, &
          lu_index, landmask)
 
-    print *, "=== exiting wrfhydro_write_geo_file ==="
-  end subroutine wrfhydro_write_geo_file
+    print *, "=== exiting wrfhydro_write_full_resolution_file ==="
+  end subroutine wrfhydro_write_full_resolution_file
 
   function wrfhydro_open_mesh(rc) result(mesh)
     integer, intent(out) :: rc
@@ -941,7 +921,6 @@ contains
           if (irank == rank) localCount = localCount + 1
        end do
     end if
-
     allocate(gindex(localCount))
 
     print *, rank, "/", np, ": with localCount =", localCount
@@ -1015,120 +994,116 @@ contains
     logical :: realizeImport, connected
     character(:), allocatable :: st_name
 
-    logical :: route_handle_initialized = .false.
+    ! error stop "WRFHYDRO_REGRID_MESH IS ENTERED?"
+    file = __FILE__
+    rc = ESMF_SUCCESS
+    print *, "enter: wrfhydro_regrid_mesh"
+    call ESMF_LogWrite("WRFH: enter wrfhydro_regrid_mesh", &
+         ESMF_LOGMSG_INFO, rc=rc)
 
-    stop "WRFHYDRO_REGRID_MESH IS ENTERED?"
-!     route_handle_initialized = .false.
-!     file = __FILE__
-!     rc = ESMF_SUCCESS
-!     print *, "enter: wrfhydro_regrid_mesh"
-!     call ESMF_LogWrite("WRFH: enter wrfhydro_regrid_mesh", &
-!          ESMF_LOGMSG_INFO, rc=rc)
+    if (regrid_method == ESMF_REGRIDMETHOD_BILINEAR) then
+       st_name = "bilinear"
+    end if
+    if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_STOD) then
+       st_name = "nn_stod"
+       ! stop "GOOOD stod"
+    end if
+    if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_DTOS) then
+       st_name = "nn_dtos"
+       ! stop "GOOOD dtos"
+    end if
+    ! check for import field
 
-!     if (regrid_method == ESMF_REGRIDMETHOD_BILINEAR) then
-!        st_name = "bilinear"
-!     end if
-!     if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_STOD) then
-!        st_name = "nn_stod"
-!        ! stop "GOOOD stod"
-!     end if
-!     if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_DTOS) then
-!        st_name = "nn_dtos"
-!        ! stop "GOOOD dtos"
-!     end if
-!     ! check for import field
+    if (debug) then
+       print *, "========", trim(st_name), "========"
+       call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+       if (ESMF_STDERRORCHECK(rc)) return
+    end if
 
-!     if (debug) then
-!        print *, "========", trim(st_name), "========"
-!        call ESMF_StateLog(importState, logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
-!        if (ESMF_STDERRORCHECK(rc)) return
-!     end if
+    import_field = ESMF_FieldCreate(name=st_name, &
+         mesh=mesh, typekind=ESMF_TYPEKIND_R8, &
+         meshloc=ESMF_MESHLOC_ELEMENT, & ! ESMF_MESHLOC_ELEMENT for cell-center vars
+         rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
+    new_field = ESMF_FieldCreate(name=st_name, &
+         staggerloc=ESMF_STAGGERLOC_CENTER,         &
+         grid=input_grid, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return
 
-!     import_field = ESMF_FieldCreate(name=st_name, &
-!          mesh=mesh, typekind=ESMF_TYPEKIND_R8, &
-!          meshloc=ESMF_MESHLOC_ELEMENT, & ! ESMF_MESHLOC_ELEMENT for cell-center vars
-!          rc=rc)
-!     if(ESMF_STDERRORCHECK(rc)) return
-!     new_field = ESMF_FieldCreate(name=st_name, &
-!          staggerloc=ESMF_STAGGERLOC_CENTER,         &
-!          grid=input_grid, typekind=ESMF_TYPEKIND_R8, rc=rc)
-!     if(ESMF_STDERRORCHECK(rc)) return
+    ! THIS DOESN'T WORK BECAUSE IT IS A REDISTRIBUTION, WHEN AN INTERPOLATION
+    !   IS NEEDED
+    ! call ESMF_FieldRedistStore(srcField=import_field, dstField=new_field, &
+    !      routehandle=route_handle, rc=rc)
 
-!     ! THIS DOESN'T WORK BECAUSE IT IS A REDISTRIBUTION, WHEN AN INTERPOLATION
-!     !   IS NEEDED
-!     ! call ESMF_FieldRedistStore(srcField=import_field, dstField=new_field, &
-!     !      routehandle=route_handle, rc=rc)
+    ! Build the interpolation operator once
+    if (debug) print *, "Initialized route_handle"
+    call ESMF_LogWrite("Initialized route_handle", &
+         ESMF_LOGMSG_INFO, rc=rc)
 
-!     ! Build the interpolation operator once
-!     if (route_handle_initialized .eqv. .false.) then
-!        if (debug) print *, "Initialized route_handle"
-!        call ESMF_LogWrite("Initialized route_handle", &
-!          ESMF_LOGMSG_INFO, rc=rc)
+    ! stop "SHOULD THIS BE REACHED?"
+    ! generate regrid weights file and read in to handle
+    if (.not. allocated(hires_file)) error stop "hires_file variable not defined"
+    call ESMF_RegridWeightGen(&
+         srcFile='frontrange.scrip.nc', &
+         dstFile=hires_file, &
+         weightFile='weights/setup_'//st_name//'.nc', &
+         regridmethod=regrid_method, &
+         rc=rc)
+    ! Precompute Field sparse matrix multiplication with local factors
+    call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
+         filename='weights/setup_'//st_name//'.nc', &
+         routehandle=route_handle, rc=rc)
 
-!        stop "SHOULD THIS BE REACHED?"
-!        ! generate regrid weights file and read in to handle
-!        call ESMF_RegridWeightGen(&
-!             srcFile='frontrange.scrip.nc', &
-!             dstFile='fulldom_hires_hydrofile.d01.nc', &
-!             weightFile='weights/'//st_name//'.nc', &
-!             regridmethod=regrid_method, & ! FOOBAR: THIS SHOULD REGEN EVERYTIME
-! ! ESMF_REGRIDMETHOD_NEAREST_STOD, &
-!             rc=rc)
-!        ! Precompute Field sparse matrix multiplication with local factors
-!        call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
-!             filename='weights/'//st_name//'.nc', &
-!             routehandle=route_handle, rc=rc)
-
-!        ! generate regrid weights in to handle
-!        ! call ESMF_FieldRegridStore(srcfield=import_field, dstfield=new_field, &
-!        !      routehandle=route_handle, rc=rc, &
-!        !      regridmethod=ESMF_REGRIDMETHOD_BILINEAR, & ! or CONSERVE / PATCH
-!        !      lineType=ESMF_LINETYPE_GREAT_CIRCLE, &
-!        !      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE)
-!        ! write handle to binary file
-!        ! call ESMF_RouteHandleWrite(route_handle, fileName="mpas_hydro.RH", rc=rc)
-!        ! if(ESMF_STDERRORCHECK(rc)) return
-!        if(ESMF_STDERRORCHECK(rc)) return
-!        route_handle_initialized = .true.
-
-!     end if
+    ! generate regrid weights in to handle
+    ! call ESMF_FieldRegridStore(srcfield=import_field, dstfield=new_field, &
+    !      routehandle=route_handle, rc=rc, &
+    !      regridmethod=ESMF_REGRIDMETHOD_BILINEAR, & ! or CONSERVE / PATCH
+    !      lineType=ESMF_LINETYPE_GREAT_CIRCLE, &
+    !      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE)
+    ! write handle to binary file
+    ! call ESMF_RouteHandleWrite(route_handle, fileName="mpas_hydro.RH", rc=rc)
+    ! if(ESMF_STDERRORCHECK(rc)) return
+    if(ESMF_STDERRORCHECK(rc)) return
 
 
-!     ! each step (after src has values):
-!     print *, "Regrid field, applying weights"
-!     call ESMF_LogWrite("Regrid field, applying weights", &
-!          ESMF_LOGMSG_INFO, rc=rc)
-!     ! Compute a regridding operation
-!     call ESMF_FieldRegrid(import_field, new_field, route_handle, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return
+    ! each step (after src has values):
+    print *, "Regrid field, applying weights"
+    call ESMF_LogWrite("Regrid field, applying weights", &
+         ESMF_LOGMSG_INFO, rc=rc)
+    ! Compute a regridding operation
+    call ESMF_FieldRegrid(import_field, new_field, route_handle, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return
 
 
 
-!     ! if (ESMF_STDERRORCHECK(rc)) return
-!     ! call NUOPC_Realize(importState, field=field_import, rc=rc)
-!     ! if (ESMF_STDERRORCHECK(rc)) return
-!     ! connected = NUOPC_IsConnected(importState, &
-!     !      fieldName=trim(st_name),rc=rc)
+    ! if (ESMF_STDERRORCHECK(rc)) return
+    ! call NUOPC_Realize(importState, field=field_import, rc=rc)
+    ! if (ESMF_STDERRORCHECK(rc)) return
+    ! connected = NUOPC_IsConnected(importState, &
+    !      fieldName=trim(st_name),rc=rc)
 
 
-!     ! ! get import field
-!     ! ! field_import=field_create(fld_name=fieldList(n)%st_name, &
-!     ! !       mesh=mesh, did=did, memflg=memr_import, rc=rc)
+    ! ! get import field
+    ! ! field_import=field_create(fld_name=fieldList(n)%st_name, &
+    ! !       mesh=mesh, did=did, memflg=memr_import, rc=rc)
 
-!     ! ! field = ESMF_FieldCreate(name="sss", mesh=meshIn, &
-!     ! !   typekind=ESMF_TYPEKIND_R8, rc=rc)
-!     ! ! call NUOPC_Realize(importState, field=field, rc=rc)
+    ! ! field = ESMF_FieldCreate(name="sss", mesh=meshIn, &
+    ! !   typekind=ESMF_TYPEKIND_R8, rc=rc)
+    ! ! call NUOPC_Realize(importState, field=field, rc=rc)
 
-!     ! connected = NUOPC_IsConnected(importState, &
-!     !      fieldName=trim(st_name),rc=rc)
+    ! memory cleanup, only used to create route handle
+    call ESMF_FieldDestroy(import_field, noGarbage=.true., rc=rc)
+    call check(rc, __LINE__, file)
 
-!     ! print *, st_name, " variable connected? ", connected
+    call ESMF_FieldDestroy(new_field, noGarbage=.true., rc=rc)
+    call check(rc, __LINE__, file)
 
-!     handle = route_handle ! return variable
-!     call ESMF_LogWrite("WRFH: exit wrfhydro_regrid_mesh", &
-!          ESMF_LOGMSG_INFO, rc=rc)
-!     print *, "WRFH: exit wrfhydro_regrid_mesh"
-!     ! error stop "where is this being called?"
+
+    handle = route_handle ! return variable
+    call ESMF_LogWrite("WRFH: exit wrfhydro_regrid_mesh", &
+         ESMF_LOGMSG_INFO, rc=rc)
+    print *, "WRFH: exit wrfhydro_regrid_mesh"
+    ! error stop "where is this being called?"
   end function wrfhydro_regrid_mesh
 
   subroutine regrid_import_mesh_to_grid(grid, mesh, state, &
@@ -1222,9 +1197,11 @@ contains
              ! call ESMF_FieldRegridStore(srcField=meshField, &
              call check(rc, __LINE__, file)
 
+             if (.not. allocated(hires_file)) &
+                  hires_file = read_hires_filename_from_namelist()
              call ESMF_RegridWeightGen(&
                   srcFile='frontrange.scrip.nc', &
-                  dstFile='fulldom_hires_hydrofile.d01.nc', &
+                  dstFile=hires_file, &
                   weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
                   rc=rc)
@@ -1414,8 +1391,10 @@ contains
              ! ESMF_REGION_SELECT:
              ! only zero out those elements in the destination Field that
              ! will be updated by the sparse matrix multiplication
+             if (.not. allocated(hires_file)) &
+                  error stop "hires_file variable not defined"
              call ESMF_RegridWeightGen(&
-                  srcFile='fulldom_hires_hydrofile.d01.nc', & ! grid
+                  srcFile=hires_file, & ! grid
                   dstFile='frontrange.scrip.nc', &            ! to mesh
                   weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
@@ -1540,11 +1519,99 @@ contains
     enddo
   end subroutine dump_state
 
-  function wrfhydro_GridCreate_init(vm, did,rc) &
+
+  function read_hires_filename_from_namelist() result(geo_finegrid_flnm)
+    implicit none
+    ! integer :: sys_cpl
+    ! character(len=256) :: geo_finegrid_flnm, geo_static_flnm
+    ! namelist /hydro_nlist/ sys_cpl, geo_static_flnm, geo_finegrid_flnm
+    character(len=256) :: geo_finegrid_flnm
+
+    integer  :: NSOIL
+    real :: ZSOIL8(8)
+    type(crocus_options) :: crocus_opts
+
+    logical            :: dir_e
+    character(len=1024) :: reservoir_obs_dir
+    integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
+         SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, &
+         GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
+         sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
+         gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, &
+         gwsoilcpl, UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj
+    real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, &
+         gwIhShift
+    character(len=256) :: route_topo_f="", route_chan_f="", route_link_f=""
+    integer            :: channel_loss_option = 0, lake_option
+    character(len=256) :: route_lake_f=""
+    character(len=256) :: diversions_file=""
+    character(len=256) :: reservoir_parameter_file=""
+    character(len=256) :: reservoir_usgs_timeslice_path=""
+    character(len=256) :: reservoir_usace_timeslice_path=""
+    integer :: reservoir_observation_lookback_hours = 24, &
+         reservoir_observation_update_time_interval_seconds = 86400, &
+         reservoir_rfc_forecasts_lookback_hours = 28
+    character(len=256) :: reservoir_rfc_forecasts_time_series_path=""
+    character(len=256) :: route_direction_f="", route_order_f="", &
+         gwbasmskfil ="", gwstrmfil ="", udmap_file ="", GWBUCKPARM_file = ""
+    integer :: SOLVEG_INITSWC, reservoir_data_ingest
+    real*8 :: out_dt, rst_dt
+    character(len=256)  :: RESTART_FILE = "", hydrotbl_f   = ""
+    logical            :: GwPreDiag, GwSpinUp, compound_channel, &
+         reservoir_persistence_usgs, reservoir_persistence_usace, &
+         reservoir_rfc_forecasts, reservoir_type_specified
+    integer :: split_output_count, order_to_write, igrid, io_config_outputs, &
+         t0OutputFlag, output_channelBucket_influx
+    character(len=256) :: geo_static_flnm = "", land_spatial_meta_flnm = ""
+    integer  :: DEEPGWSPIN, CHRTOUT_DOMAIN, CHRTOUT_GRID, LSMOUT_DOMAIN, &
+         RTOUT_DOMAIN, output_gw, outlake, frxst_pts_out, CHANOBS_DOMAIN
+
+    namelist /hydro_nlist/ nsoil, zsoil8,&
+         restart_file,split_output_count,igrid,&
+         geo_static_flnm, &
+         land_spatial_meta_flnm, &
+         out_dt, rst_dt, &
+         deepgwspin, solveg_initswc, &
+         rt_option, chanrtswcrt, channel_option, &
+         subrtswcrt,ovrtswcrt,aggfactrt, dtrt_ter,dtrt_ch,dxrt,&
+         gwspincycles, gwprecycles, gwspinup, gwprediag, gwprediaginterval, &
+         gwihshift, &
+         gwbaseswcrt, gwchancondsw, gwchancondconstin, gwchancondconstout , &
+         route_topo_f,route_chan_f,route_link_f, compound_channel, &
+         channel_loss_option, &
+         lake_option, route_lake_f,  diversions_file, &
+         route_direction_f,route_order_f,gwbasmskfil, &
+         geo_finegrid_flnm, gwstrmfil,gw_restart,rstrt_swc,teradj_solar, sys_cpl, &
+         order_to_write , rst_typ, rst_bi_in, rst_bi_out, gwsoilcpl, &
+         chrtout_domain,chanobs_domain,chrtout_grid,lsmout_domain,&
+         rtout_domain, output_gw, outlake, &
+         frxst_pts_out, udmap_file, udmp_opt, gwbuckparm_file, bucket_loss, &
+         io_config_outputs, io_form_outputs, hydrotbl_f, t0outputflag, &
+         output_channelbucket_influx, imperv_adj
+
+
+    integer :: unit, ios
+    character(len=512) :: iomsg
+
+    geo_finegrid_flnm = ""
+
+    open(newunit=unit, file="hydro.namelist", status="old", action="read", &
+         iostat=ios)
+    if (ios /= 0) error stop "Error opening hydro.namelist"
+
+    read(unit, nml=hydro_nlist, iostat=ios, iomsg=iomsg)
+    close(unit)
+
+    if (ios /= 0) then
+       ! print *, "iomsg = ",
+       error stop trim(iomsg)
+    end if
+  end function read_hires_filename_from_namelist
+
+  function wrfhydro_grid_create_from_fulldom(rc) &
        result(grid)
-    type(ESMF_VM), intent(in) :: vm
+    implicit none
     type(ESMF_Grid) :: grid
-    integer, intent(in) :: did
     integer, intent(out) :: rc
     integer :: nx, ny
     real :: lon0, lat0, dlon, dlat
@@ -1556,17 +1623,13 @@ contains
     integer :: ncid, dim_xid, dim_yid
     integer :: var_lat_id, var_lon_id
     integer :: stat
-    character(len=:), allocatable :: hires_file
     real, allocatable :: latitude(:,:), longitude(:,:)
 
-    print *, "enter: TMP WRFHYDRO GRID CREATE, FUTURE REPLACEMENT"
-    call ESMF_LogWrite("enter TMP WRFHYDRO GRID CREATE, FUTURE REPLACEMENT", &
-         ESMF_LOGMSG_INFO)
+    ! read from hydro.namelist
+    hires_file = read_hires_filename_from_namelist()
 
-    hires_file = "Fulldom_hires.nc"
-    ! get lat/lon and nx/ny from Fulldom.nc
+    ! get lat/lon and nx/ny from hires_file
     print *, "WRFH: Opening high-resolution file ", hires_file
-    print *, "move wrfhydro grid file to namelist: ", hires_file
     stat = nf90_open(trim(hires_file), NF90_NOWRITE, ncid)
     call check_nf(stat)
 
@@ -1583,11 +1646,11 @@ contains
 
     if (nx <= 0 .or. ny <= 0) then
        stat = NF90_EBADID ! why: surface a clear failure if dims are invalid
-       error stop "Fulldom.nc nx <=0 or ny <= 0"
+       print *, "Error: ", trim(hires_file), " nx <=0 or ny <= 0"
+       error stop "High resolution file's nx <=0 or ny <= 0"
     end if
 
-    print *, "Fulldom.nc nx, ny:", nx, ny
-
+    print *, trim(hires_file), " nx, ny:", nx, ny
 
     ! Variable IDs
     stat = nf90_inq_varid(ncid, 'LATITUDE', var_lat_id)
@@ -1595,64 +1658,16 @@ contains
     stat = nf90_inq_varid(ncid, 'LONGITUDE', var_lon_id)
     call check_nf(stat)
 
-    ! Allocate outputs [y,x]
-    allocate(latitude(nx, ny), longitude(nx, ny))
     ! Read variables (library converts to real64 as needed)
+    allocate(latitude(nx, ny), longitude(nx, ny))
     stat = nf90_get_var(ncid, var_lat_id, latitude)
     call check_nf(stat)
     stat = nf90_get_var(ncid, var_lon_id, longitude)
     call check_nf(stat)
 
+    ! print *, "lat shape =", shape(latitude)
+    ! print *, "lat(1:2,1:2) =", latitude(1:2,1:2)
 
-    stat = nf90_get_var(ncid, var_lat_id, latitude)
-    call check_nf(stat)
-    stat = nf90_get_var(ncid, var_lon_id, longitude)
-    call check_nf(stat)
-
-    print *, "lat shape =", shape(latitude)
-    print *, "lat(1:2,1:2) =", latitude(1:2,1:2)
-
-
-    ! ! hard-coded from geo_em.d01.nc
-    ! lats = [39.07154, 40.916, 40.916, 39.07154, 39.07148, 40.91594, 40.91594, 39.07148, 39.06692, 40.92064, 40.92064, 39.06692, 39.06685, 40.92057, 40.92057, 39.06685]
-    ! lons = [-106.1862, -106.2224, -103.7776, -103.8138, -106.1921, -106.2285, -103.7715, -103.8079, -106.1861, -106.2225, -103.7775, -103.8139, -106.192, -106.2286, -103.7714, -103.808]
-
-    ! nx=200
-    ! ny=200
-
-    ! lon_start = minval(lons)
-    ! lon_end = maxval(lons)
-    ! lon0 = lon_start
-
-    ! lat_start=minval(lats)
-    ! lat_end = maxval(lats)
-    ! lat0 = lat_start
-
-    ! dlon = (lon_end - lon_start) / nx
-    ! dlat = (lat_end - lat_start) / ny
-    ! ! dlon=0.003
-    ! ! dlat=.00001
-    ! print *, "Coordinates:"
-    ! print *, "  lon:", lon_start, lon_end, dlon
-    ! print *, "  lat:", lat_start, lat_end, dlat
-
-    ! rc = ESMF_SUCCESS
-
-    ! FOO ADD/REMOVE?
-    ! wrfhydro_distgrid = init_distgrid(vm)
-    ! print *, "create distgrid with nx, ny =", nx, ny
-    ! WRFHYDRO_distgrid = ESMF_DistGridCreate( &
-    !      minIndex=[1,1], maxIndex=[nx,ny], &
-    !      deBlockList=deBlockList, &
-    !      rc=rc)
-
-    if (wrfhydro_distgrid_initialized .eqv. .false.) then
-       error stop "Make sure wrfhydro_distgrid_initalized is initialized"
-    end if
-
-
-    ! Single-tile grid (easy for testing); spherical coords in degrees.
-    ! and it works
     grid = ESMF_GridCreate(&
          regDecomp=[1, 1], &
          decompflag=[ESMF_DECOMP_BALANCED, ESMF_DECOMP_BALANCED], &
@@ -1660,17 +1675,8 @@ contains
          rc=rc)
     call check(rc, __LINE__, file)
 
-    ! testing method in other wrfhydro_gridcreate()
-    ! grid = ESMF_GridCreate(name=hires_file, &
-    !      distgrid=wrfhydro_distGrid, &
-    !      coordSys=ESMF_COORDSYS_SPH_DEG, &
-    !      coordTypeKind=ESMF_TYPEKIND_COORD, &
-    !      ! gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
-    !      rc = rc)
-
-    call check(rc, __LINE__, file)
-
-   call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    ! add center coordinates to grid
+    call ESMF_GridAddCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     call check(rc, __LINE__, file)
 
     ! Get writable pointers to the coordinate arrays and fill a regular lat/lon
@@ -1683,22 +1689,10 @@ contains
 
     lat(:,:) = latitude(:,:)
     lon(:,:) = longitude(:,:)
-    ! do j=1,ny
-    !    lat(:,j) = lat0 + (j-1)*dlat
-    ! enddo
-    ! do i=1,nx
-    !    lon(i,:) = lon0 + (i-1)*dlon
-    ! enddo
-
-    call ESMF_LogWrite("exit: TMP WRFHYDRO GRID CREATE, FUTURE REPLACEMENT", &
-         ESMF_LOGMSG_INFO)
-    print *, "exit: TMP WRFHYDRO GRID CREATE, FUTURE REPLACEMENT"
-    ! stop "DON'T WANT TO CALL THIS?"
-  end function wrfhydro_GridCreate_init
+  end function wrfhydro_grid_create_from_fulldom
 
 #undef METHOD
 #define METHOD "wrfhydro_GridCreate"
-
   function wrfhydro_GridCreate(did,rc) result(wrfhydro_grid)
     type(ESMF_Grid) :: wrfhydro_grid
     ! ARGUMENTS
@@ -1731,9 +1725,8 @@ contains
 
     rc = ESMF_SUCCESS
 
-    ! grid_file = 'WRFHYDRO_Grid_'//trim(nlst(did)%hgrid)
-    ! grid_file = 'fulldom_hires_hydrofile.d01.nc'
-    grid_file = 'Fulldom_hires.nc'
+    grid_file = 'WRFHYDRO_Grid_'//trim(nlst(did)%hgrid)
+    ! grid_file = 'Fulldom_hires.nc'
     print *, "move wrfhydro grid file to namelist: ", grid_file
 
     ! print *, "wrfhydro_distGrid =", wrfhydro_distGrid
