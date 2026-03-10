@@ -853,7 +853,6 @@ module WRFHydro_NUOPC
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     call check(rc, __LINE__, file)
-
     call ESMF_VMGet(vm, petCount=np, localPet=rank, mpiCommunicator=comm, &
          rc=rc)
     call check(rc, __LINE__, file)
@@ -865,7 +864,7 @@ module WRFHydro_NUOPC
     inquire(file=full_resolution_file, exist=geo_file_exists)
     if (.not. geo_file_exists .and. np == 1) then
        print *, rank, "entering wrfhydro grid create, mesh regrid section"
-       wrfhydro_mesh = wrfhydro_open_mesh(rc)
+       wrfhydro_mesh = wrfhydro_open_mesh(vm, rc)
        call check(rc, __LINE__, file)
 
        ! wrfhydro_grid_p1 = wrfhydro_GridCreate(is%wrap%did, rc=rc)
@@ -879,7 +878,7 @@ module WRFHydro_NUOPC
             ESMF_REGRIDMETHOD_BILINEAR, &
             is%wrap%did, &
             is%wrap%NStateImp(1), &
-            rc)
+            vm, rc)
        call check(rc, __LINE__, file)
 
        regrid_handle_nn_stod = wrfhydro_regrid_mesh( &
@@ -888,7 +887,7 @@ module WRFHydro_NUOPC
             ESMF_REGRIDMETHOD_NEAREST_STOD, &
             is%wrap%did, &
             is%wrap%NStateImp(1), &
-            rc)
+            vm, rc)
        call check(rc, __LINE__, file)
        regrid_handle_nn_dtos = wrfhydro_regrid_mesh( &
             wrfhydro_grid_p1, &
@@ -896,10 +895,10 @@ module WRFHydro_NUOPC
             ESMF_REGRIDMETHOD_NEAREST_DTOS, &
             is%wrap%did, &
             is%wrap%NStateImp(1), &
-            rc)
+            vm, rc)
        call check(rc, __LINE__, file)
 
-       ! write to frontrange.fulldom
+       ! write to hydro.fullres.nc
        call wrfhydro_write_full_resolution_file(wrfhydro_grid_p1, &
             wrfhydro_mesh, regrid_handle_bl, regrid_handle_nn_stod, &
             regrid_handle_nn_dtos)
@@ -973,6 +972,7 @@ module WRFHydro_NUOPC
     integer, intent(out)        :: rc
 
     ! local variables
+    type(ESMF_VM)               :: vm
     character(32)              :: cname
     character(*), parameter    :: rname="InitializeP3"
     integer                    :: verbosity, diagnostic
@@ -1040,8 +1040,8 @@ module WRFHydro_NUOPC
     !      rc=rc)
     call check(rc, __LINE__, file)
 
-    wrfhydro_mesh = wrfhydro_open_mesh(rc)
-    call check(rc, __LINE__, file)
+    ! wrfhydro_mesh = wrfhydro_open_mesh(vm, rc)
+    ! call check(rc, __LINE__, file)
 
     print *, "TODO: remove this regrid mesh??"
     ! removed it, handle doesn't get used here
@@ -1082,9 +1082,10 @@ module WRFHydro_NUOPC
 
 
 
-    ! mesh = ESMF_MeshCreate(filename="frontrange.scrip.nc", &
-    !      fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
-    mesh = wrfhydro_open_mesh(rc)
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+    mesh = wrfhydro_open_mesh(vm, rc)
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     call ESMF_MeshGet(mesh, nodeCount=ncount, elementCount=nElem,&
@@ -1608,6 +1609,7 @@ subroutine CheckImport(gcomp, rc)
     integer, intent(out) :: rc
 
     ! local variables
+    type(ESMF_VM)               :: vm
     character(32)               :: cname
     character(*), parameter     :: rname="ModelAdvance"
     integer                     :: verbosity, diagnostic
@@ -1729,6 +1731,10 @@ subroutine CheckImport(gcomp, rc)
     call ESMF_ClockGet(is%wrap%clock(1),timeStep=timestep,rc=rc)
     call check(rc, __LINE__, file)
 
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    call check(rc, __LINE__, file)
+    wrfhydro_mesh = wrfhydro_open_mesh(vm, rc)
+
     if (is%wrap%hasImports) then
        ! THIS GRIDCREATE BROKE THINGS IN SERIAL !!
        wrfhydro_grid_l = wrfhydro_grid ! this works
@@ -1741,7 +1747,6 @@ subroutine CheckImport(gcomp, rc)
        ! stop "GRID VALIDATED in advance"
 
        ! Working on the mesh
-       wrfhydro_mesh = wrfhydro_open_mesh(rc)
        call check(rc, __LINE__, file)
        ! not a function call
        ! call ESMF_MeshValidate(wrfhydro_mesh, rc=rc)
@@ -1751,7 +1756,7 @@ subroutine CheckImport(gcomp, rc)
        ! stop "MESH WRITE in advance"
        call regrid_import_mesh_to_grid(wrfhydro_grid_l, wrfhydro_mesh, &
             is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
-       print *, " -- this is where it was breaking in parallel, still? --"
+       ! print *, " -- this is where it was breaking in parallel, still? --"
     end if
 
     ! it is zero here, good!
@@ -1793,8 +1798,6 @@ subroutine CheckImport(gcomp, rc)
 
     if (is%wrap%hasExports) then
        call ESMF_GridValidate(wrfhydro_grid_l, rc=rc)
-       call check(rc, __LINE__, file)
-       wrfhydro_mesh = wrfhydro_open_mesh(rc)
        call check(rc, __LINE__, file)
 
        call regrid_export_grid_to_mesh(wrfhydro_grid_l, wrfhydro_mesh, &
@@ -1883,9 +1886,9 @@ subroutine CheckImport(gcomp, rc)
         "Time Step    = ",trim(nTimestepStr)
       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
 
-    end subroutine
+    end subroutine LogAdvance
 
-  end subroutine
+  end subroutine ModelAdvance
 
   !-----------------------------------------------------------------------------
 
@@ -1908,23 +1911,23 @@ subroutine CheckImport(gcomp, rc)
     rc = ESMF_SUCCESS
 
     ! Query component for name, verbosity, and diagnostic values
-!    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
-!      diagnostic=diagnostic, rc=rc)
+    !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
+    !      diagnostic=diagnostic, rc=rc)
     call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
     call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
-      defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
+         defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     call check(rc, __LINE__, file)
     diagnostic = ESMF_UtilString2Int(value, &
-      specialStringList=specialStringList, &
-      specialValueList=(/0,65535,65536,131071/), rc=rc)
+         specialStringList=specialStringList, &
+         specialValueList=(/0,65535,65536,131071/), rc=rc)
     call check(rc, __LINE__, file)
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, &
-      defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
+         defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     call check(rc, __LINE__, file)
     verbosity = ESMF_UtilString2Int(value, &
-      specialStringList=specialStringList, &
-      specialValueList=(/0,65535,65536,131071/), rc=rc)
+         specialStringList=specialStringList, &
+         specialValueList=(/0,65535,65536,131071/), rc=rc)
     call check(rc, __LINE__, file)
 
     ! query Component for its internal State
@@ -1946,11 +1949,11 @@ subroutine CheckImport(gcomp, rc)
 
     ! Write export file
     if (is%wrap%writeRestart) then
-      call NUOPC_Write(is%wrap%NStateExp(1), &
-        fileNamePrefix=trim(is%wrap%dirOutput)//"/restart_"//trim(cname)// &
-          "_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
-          overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-      call check(rc, __LINE__, file)
+       call NUOPC_Write(is%wrap%NStateExp(1), &
+            fileNamePrefix=trim(is%wrap%dirOutput)//"/restart_"//trim(cname)// &
+            "_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+            overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+       call check(rc, __LINE__, file)
     endif
 
     call wrfhydro_nuopc_fin(is%wrap%did,rc)
@@ -1958,10 +1961,10 @@ subroutine CheckImport(gcomp, rc)
 
     deallocate(is%wrap, stat=stat)
     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-      msg='WRFHYDRO: Deallocation of internal state memory failed.', &
-      file=FILENAME,rcToReturn=rc)) return ! bail out
+         msg='WRFHYDRO: Deallocation of internal state memory failed.', &
+         file=FILENAME,rcToReturn=rc)) return ! bail out
 
-  end subroutine
+  end subroutine ModelFinalize
   !-----------------------------------------------------------------------------
 
   subroutine print_wrap(wrap)

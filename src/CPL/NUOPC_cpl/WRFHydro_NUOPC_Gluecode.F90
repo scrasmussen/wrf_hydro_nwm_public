@@ -869,17 +869,16 @@ contains
     print *, "=== exiting wrfhydro_write_full_resolution_file ==="
   end subroutine wrfhydro_write_full_resolution_file
 
-  function wrfhydro_open_mesh(rc) result(mesh)
+  function wrfhydro_open_mesh(vm, rc) result(mesh)
+    type(ESMF_VM), intent(inout) :: vm
     integer, intent(out) :: rc
     type(ESMF_Mesh) :: mesh
     type(ESMF_DistGrid) :: distgrid
-    type(ESMF_VM)       :: vm
     integer, allocatable :: gindex(:)
-    character(:), allocatable :: mesh_file
-    character(len=256) :: iomsg, mpas_graph_file
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
     integer :: unit, iostat, irank, localCount, tmp, ierr
-    integer :: rank, np
     integer :: idx, inode
+    logical :: exists
 
     rc = ESMF_SUCCESS
 
@@ -889,89 +888,16 @@ contains
     end if
 
 
-    ! add the following to make generic
-    call ESMF_VMGetGlobal(vm, rc=rc)
-    call check(rc, __LINE__, file)
-    call ESMF_VMGet(vm, localPet=rank, petCount=np, rc=rc)
-    call check(rc, __LINE__, file)
+    mpas_grid_file = get_mpas_grid_filename()
+    scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
 
-
-    if (rank == 0) then
-       io_rank = .true.
+    inquire(file=trim(scrip_mesh_file), exist=exists)
+    if (.not. exists) then
+       call mpas_to_scrip_mesh(mpas_grid_file, scrip_mesh_file)
     end if
 
-    ! read
-    if (np == 1) then
-       mpas_graph_file = 'frontrange.graph.info'
-       open(newunit=unit, file=mpas_graph_file, status="old", &
-            action="read", iostat=ierr)
-       if (ierr /= 0) error stop "Failed to open frontrange.graph.info"
-
-       read(unit, *, iostat=ierr) localCount, tmp   ! reads: first_int second_int
-       if (ierr /= 0) error stop &
-            "Failed to read first line of frontrange.graph.info"
-       close(unit)
-    else
-       write(mpas_graph_file, '(A,I0)') 'frontrange.graph.info.part.', np
-       open(newunit=unit, file=mpas_graph_file, &
-            status='old', action='read', iostat=iostat, iomsg=iomsg)
-       if (iostat /= 0) then
-          print *, trim(iomsg)
-          stop "Error opening [casename].graph.info.part.[np]"
-       end if
-
-       localCount = 0
-       do
-          read(unit, *, iostat=iostat) irank
-          if (iostat /= 0) exit
-          if (irank == rank) localCount = localCount + 1
-       end do
-    end if
-    allocate(gindex(localCount))
-
-    print *, rank, "/", np, ": with localCount =", localCount
-    ! stop "CHECKING"
-    ! setup grid distribution
-    if (np == 1) then
-       inode = 1
-       do inode = 1, localCount
-          gindex(inode) = inode
-       end do
-    else
-       rewind(unit)
-       idx   = 0
-       inode = 0
-
-       do
-          read(unit, *, iostat=iostat) irank
-          if (iostat /= 0) exit
-
-          inode = inode + 1 ! inode = line number
-          if (irank == rank) then
-             idx = idx + 1
-             gindex(idx) = inode ! seqIndex = global node id
-          end if
-       end do
-       close(unit)
-    end if
-
-    distgrid = ESMF_DistGridCreate(arbSeqIndexList=gindex, rc=rc)
-    call check(rc, __LINE__, file)
-
-    ! if (rank == 1) then
-    !    call ESMF_DistGridPrint(distgrid, rc=rc)
-    !    call check(rc, __LINE__, file)
-    ! end if
-    ! call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    ! ! if (rank == 1) then
-    ! !    call ESMF_DistGridPrint(distgrid, rc=rc)
-    ! !    call check(rc, __LINE__, file)
-    ! ! end if
-    ! stop "hi"
-
-    mesh_file = "frontrange.scrip.nc"
-    print *, "todo: read mesh_file name from namelist, currently ", trim(mesh_file)
-    mesh = ESMF_MeshCreate(filename=mesh_file, &
+    distgrid  = get_mpas_dist_grid(vm, rc)
+    mesh = ESMF_MeshCreate(filename=scrip_mesh_file, &
          elementDistgrid=distgrid, &
          ! convertToDual=.false., & ! didn't do anything
          fileformat=ESMF_FILEFORMAT_SCRIP, rc=rc)
@@ -983,18 +909,22 @@ contains
   end function wrfhydro_open_mesh
 
   function wrfhydro_regrid_mesh(input_grid, mesh, regrid_method, &
-       did, importState, rc) result(handle)
+       did, importState, vm, rc) result(handle)
     type(ESMF_Grid), intent(in) :: input_grid
     type(ESMF_Mesh), intent(in) :: mesh
+    type(ESMF_RegridMethod_Flag), intent(in) :: regrid_method
     integer, intent(in) :: did
     type(ESMF_State), intent(inout) :: importState
-    type(ESMF_RegridMethod_Flag), intent(in) :: regrid_method
+    type(ESMF_VM), intent(inout) :: vm
     integer, intent(out) :: rc
     type(ESMF_RouteHandle) :: handle
     type(ESMF_Grid) :: grid
 
     type(ESMF_Field) :: import_field, new_field
     character(:), allocatable :: file
+
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
+
 
     ! testing variables
     logical :: realizeImport, connected
@@ -1048,9 +978,13 @@ contains
 
     ! stop "SHOULD THIS BE REACHED?"
     ! generate regrid weights file and read in to handle
-    if (.not. allocated(hires_file)) error stop "hires_file variable not defined"
+    if (.not. allocated(hires_file)) &
+         error stop "hires_file variable not defined"
+
+    mpas_grid_file = get_mpas_grid_filename()
+    scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
     call ESMF_RegridWeightGen(&
-         srcFile='frontrange.scrip.nc', &
+         srcFile=scrip_mesh_file, &
          dstFile=hires_file, &
          weightFile='weights/setup_'//st_name//'.nc', &
          regridmethod=regrid_method, &
@@ -1123,6 +1057,7 @@ contains
     integer :: n, rc, itemCount
     character(len=64), allocatable :: itemNameList(:)
     logical :: imported
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
 
     ! debugging
     integer :: unit, i
@@ -1205,8 +1140,10 @@ contains
 
              if (.not. allocated(hires_file)) &
                   hires_file = read_hires_filename_from_namelist()
+             mpas_grid_file = get_mpas_grid_filename()
+             scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
              call ESMF_RegridWeightGen(&
-                  srcFile='frontrange.scrip.nc', &
+                  srcFile=scrip_mesh_file, &
                   dstFile=hires_file, &
                   weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
@@ -1274,6 +1211,9 @@ contains
     real(ESMF_KIND_R8), pointer :: r82d(:,:) => null()
     real(ESMF_KIND_R4), pointer :: r42d(:,:) => null()
     real(ESMF_KIND_FIELD), pointer :: farrayPtr2d(:,:)
+
+
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
 
     ! debugging
     integer :: unit
@@ -1399,9 +1339,12 @@ contains
              ! will be updated by the sparse matrix multiplication
              if (.not. allocated(hires_file)) &
                   error stop "hires_file variable not defined"
+
+             mpas_grid_file = get_mpas_grid_filename()
+             scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
              call ESMF_RegridWeightGen(&
                   srcFile=hires_file, & ! grid
-                  dstFile='frontrange.scrip.nc', &            ! to mesh
+                  dstFile=scrip_mesh_file, &            ! to mesh
                   weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
@@ -2515,6 +2458,455 @@ contains
     if (rank == 1) rank_s = "1"
   end subroutine handle_rank_string
 
+  function get_config_block_decomp_file_prefix() &
+       result(decomp_filename)
+    character(len=:), allocatable :: decomp_filename
+    ! copied from mpas/src/core_atmosphere/inc/namelist_defines.inc
+    character (len=512) :: config_block_decomp_file_prefix = &
+         'x1.40962.graph.info.part.'
+    integer :: config_number_of_blocks = 0
+    logical :: config_explicit_proc_decomp = .false.
+    character (len=512) :: config_proc_decomp_file_prefix = &
+         'graph.info.part.'
+    integer :: unit, stat
+    namelist /decomposition/ &
+         config_block_decomp_file_prefix, &
+         config_number_of_blocks, &
+         config_explicit_proc_decomp, &
+         config_proc_decomp_file_prefix
+
+    open(newunit=unit, file='namelist.atmosphere', status='old', &
+         action='read', iostat=stat)
+    if (stat /= 0) stop 'Could not open namelist.atmosphere'
+    read(unit, decomposition, iostat=stat)
+    if (stat /= 0) stop 'Error reading namelist.atmosphere'
+    decomp_filename = config_block_decomp_file_prefix
+  end function get_config_block_decomp_file_prefix
+
+  function get_mpas_grid_filename() &
+       result(mpas_grid_file)
+    character(len=:), allocatable :: mpas_grid_file, &
+         config_block_decomp_file_prefix
+    integer :: i
+
+    config_block_decomp_file_prefix = get_config_block_decomp_file_prefix()
+
+    i = index(trim(config_block_decomp_file_prefix), 'graph.info.part', &
+         back=.true.)
+    if (i == 0) then
+       print *, "config_block_decomp_file_prefix =", &
+            config_block_decomp_file_prefix
+       error stop &
+            "Error: graph.info.part not in config_block_decomp_file_prefix"
+    end if
+    mpas_grid_file = config_block_decomp_file_prefix(:i-1) // "grid.nc"
+  end function get_mpas_grid_filename
+
+  function get_mpas_dist_grid(vm, rc) &
+       result(dist_grid)
+    type(ESMF_VM), intent(inout) :: vm
+    integer, intent(inout) :: rc
+    type(ESMF_DistGrid) :: dist_grid
+    character(len=:), allocatable :: mpas_grid_file, iomsg
+    character(len=:), allocatable :: config_block_decomp_file_prefix
+    character(len=512) :: mpas_graph_file
+    integer :: unit, iostat, irank, localCount, ierr, tmp
+    integer :: i, rank, np, idx, inode
+    integer, allocatable :: gindex(:)
+    rc = ESMF_SUCCESS
+
+    call ESMF_VMGetGlobal(vm, rc=rc)
+    call check(rc, __LINE__, file)
+    call ESMF_VMGet(vm, localPet=rank, petCount=np, rc=rc)
+    call check(rc, __LINE__, file)
+
+    config_block_decomp_file_prefix = get_config_block_decomp_file_prefix()
+
+    print *, "np =", np
+    print *, "config_block_decomp_file_prefix=", config_block_decomp_file_prefix
+    ! open .graph.info when np==1 or .graph.info.np when np>1
+    if (np == 1) then
+       i = index(trim(config_block_decomp_file_prefix), '.part', back=.true.)
+       mpas_graph_file = config_block_decomp_file_prefix(:i-1)
+       print *, "MPAS: opening mpas_graph_file =", mpas_graph_file
+       open(newunit=unit, file=mpas_graph_file, status="old", &
+            action="read", iostat=ierr)
+       if (ierr /= 0) error stop "Failed to open frontrange.graph.info"
+
+       read(unit, *, iostat=ierr) localCount, tmp   ! reads: first_int second_int
+       if (ierr /= 0) error stop &
+            "Failed to read first line of frontrange.graph.info"
+       close(unit)
+    else
+       write(mpas_graph_file, '(A,I0)') &
+            trim(config_block_decomp_file_prefix), np
+       print *, "MPAS: opening mpas_graph_file =", mpas_graph_file
+       open(newunit=unit, file=mpas_graph_file, &
+            status='old', action='read', iostat=iostat, iomsg=iomsg)
+       if (iostat /= 0) then
+          print *, trim(iomsg)
+          stop "Error opening [casename].graph.info.part.[np]"
+       end if
+       localCount = 0
+       do
+          read(unit, *, iostat=iostat) irank
+          if (iostat /= 0) exit
+          if (irank == rank) localCount = localCount + 1
+       end do
+    end if
+
+    allocate(gindex(localCount))
+    print *, rank, "/", np, ": with localCount =", localCount
+
+    ! setup grid distribution
+    if (np == 1) then
+       inode = 1
+       do inode = 1, localCount
+          gindex(inode) = inode
+       end do
+    else
+       rewind(unit)
+       idx   = 0
+       inode = 0
+
+       do
+          read(unit, *, iostat=iostat) irank
+          if (iostat /= 0) exit
+
+          inode = inode + 1 ! inode = line number
+          if (irank == rank) then
+             idx = idx + 1
+             gindex(idx) = inode ! seqIndex = global node id
+          end if
+       end do
+    end if
+    close(unit)
+
+    print *, rank,":gindex=", gindex(1:10)
+    ! stop "here"
+    dist_grid = ESMF_DistGridCreate(arbSeqIndexList=gindex, rc=rc)
+  end function get_mpas_dist_grid
+
+
+  function mpas_to_scrip_filename(mpas_grid_file) result(scrip_mesh_file)
+    character(len=*), intent(in) :: mpas_grid_file
+    character(len=:), allocatable :: scrip_mesh_file
+    integer :: i
+    i = index(trim(mpas_grid_file), '.grid.nc', back=.true.)
+    if (i == 0) then
+       print *, "Error: mpas_grid_file ", trim(mpas_grid_file), &
+            " does not have .grid.nc suffix"
+       error stop "Error: mpas_grid_file in incorrect format"
+    end if
+    scrip_mesh_file = mpas_grid_file(:i-1) // ".tmp.scrip.nc"
+  end function mpas_to_scrip_filename
+
+
+  ! Convert MPAS mesh to scrip format. Based on
+  ! mpas-dev.github.io/MPAS-Tools/0.24.0/_modules/mpas_tools/scrip/from_mpas.html
+  subroutine mpas_to_scrip_mesh(mpasFile, scripFile, useLandIceMask)
+    use netcdf
+    use iso_fortran_env, only : real64, int32
+    implicit none
+
+    character(len=*), intent(in) :: mpasFile
+    character(len=*), intent(in) :: scripFile
+    logical, intent(in), optional :: useLandIceMask
+
+    logical :: doLandIceMask
+    integer :: stat
+    integer :: fin, fout
+    integer :: dimid, nCells, nVertices, maxVertices
+    integer :: varid
+
+    real(ESMF_KIND_R8), parameter :: SHR_CONST_REARTH = 6.37122e6
+
+    ! input arrays
+    real(ESMF_KIND_R8), allocatable :: latCell(:), lonCell(:)
+    real(ESMF_KIND_R8), allocatable :: latVertex(:), lonVertex(:)
+    real(ESMF_KIND_R8), allocatable :: areaCell(:)
+    integer(ESMF_KIND_I4), allocatable :: verticesOnCell(:,:)
+    integer(ESMF_KIND_I4), allocatable :: nEdgesOnCell(:)
+    integer(ESMF_KIND_I4), allocatable :: landIceMask1d(:)
+    integer(ESMF_KIND_I4), allocatable :: landIceMask2d(:,:)
+
+    ! output arrays
+    real(ESMF_KIND_R8), allocatable :: grid_corner_lat(:,:), grid_corner_lon(:,:)
+    real(ESMF_KIND_R8), allocatable :: grid_area(:)
+    integer(ESMF_KIND_I4), allocatable :: grid_imask(:)
+    integer(ESMF_KIND_I4) :: grid_dims(1)
+
+    ! output variable ids
+    integer :: dim_grid_size, dim_grid_corners, dim_grid_rank
+    integer :: var_grid_center_lat, var_grid_center_lon
+    integer :: var_grid_corner_lat, var_grid_corner_lon
+    integer :: var_grid_area, var_grid_imask, var_grid_dims
+
+    ! helpers
+    real(ESMF_KIND_R8) :: sphereRadius
+    real(ESMF_KIND_R8) :: pi
+    character(len=:), allocatable :: on_a_sphere
+    integer :: attlen
+    integer :: iCell, iVertex, lastValidVertex
+    integer :: ndims_landIceMask, dimids_landIceMask(NF90_MAX_VAR_DIMS)
+
+    doLandIceMask = .false.
+    if (present(useLandIceMask)) doLandIceMask = useLandIceMask
+
+    if (doLandIceMask) then
+       write(*,'(A)') ' -- Landice Masks are enabled'
+    else
+       write(*,'(A)') ' -- Landice Masks are disabled'
+    end if
+    write(*,*)
+
+    pi = acos(-1.0)
+
+    stat = nf90_open(trim(mpasFile), nf90_nowrite, fin)
+    call check_nc(stat, 'nf90_open('//trim(mpasFile)//')')
+
+    stat = nf90_inq_dimid(fin, 'nCells', dimid)
+    call check_nc(stat, 'nf90_inq_dimid(nCells)')
+    stat = nf90_inquire_dimension(fin, dimid, len=nCells)
+    call check_nc(stat, 'nf90_inquire_dimension(nCells)')
+
+    stat = nf90_inq_dimid(fin, 'nVertices', dimid)
+    call check_nc(stat, 'nf90_inq_dimid(nVertices)')
+    stat = nf90_inquire_dimension(fin, dimid, len=nVertices)
+    call check_nc(stat, 'nf90_inquire_dimension(nVertices)')
+
+    stat = nf90_inq_dimid(fin, 'maxEdges', dimid)
+    call check_nc(stat, 'nf90_inq_dimid(maxEdges)')
+    stat = nf90_inquire_dimension(fin, dimid, len=maxVertices)
+    call check_nc(stat, 'nf90_inquire_dimension(maxEdges)')
+
+    allocate(latCell(nCells), lonCell(nCells))
+    allocate(latVertex(nVertices), lonVertex(nVertices))
+    allocate(areaCell(nCells))
+    allocate(verticesOnCell(maxVertices, nCells))
+    allocate(nEdgesOnCell(nCells))
+
+    stat = nf90_inq_varid(fin, 'latCell', varid)
+    call check_nc(stat, 'nf90_inq_varid(latCell)')
+    stat = nf90_get_var(fin, varid, latCell)
+    call check_nc(stat, 'nf90_get_var(latCell)')
+
+    stat = nf90_inq_varid(fin, 'lonCell', varid)
+    call check_nc(stat, 'nf90_inq_varid(lonCell)')
+    stat = nf90_get_var(fin, varid, lonCell)
+    call check_nc(stat, 'nf90_get_var(lonCell)')
+
+    stat = nf90_inq_varid(fin, 'latVertex', varid)
+    call check_nc(stat, 'nf90_inq_varid(latVertex)')
+    stat = nf90_get_var(fin, varid, latVertex)
+    call check_nc(stat, 'nf90_get_var(latVertex)')
+
+    stat = nf90_inq_varid(fin, 'lonVertex', varid)
+    call check_nc(stat, 'nf90_inq_varid(lonVertex)')
+    stat = nf90_get_var(fin, varid, lonVertex)
+    call check_nc(stat, 'nf90_get_var(lonVertex)')
+
+    stat = nf90_inq_varid(fin, 'verticesOnCell', varid)
+    call check_nc(stat, 'nf90_inq_varid(verticesOnCell)')
+    stat = nf90_get_var(fin, varid, verticesOnCell)
+    call check_nc(stat, 'nf90_get_var(verticesOnCell)')
+
+    stat = nf90_inq_varid(fin, 'nEdgesOnCell', varid)
+    call check_nc(stat, 'nf90_inq_varid(nEdgesOnCell)')
+    stat = nf90_get_var(fin, varid, nEdgesOnCell)
+    call check_nc(stat, 'nf90_get_var(nEdgesOnCell)')
+
+    stat = nf90_inq_varid(fin, 'areaCell', varid)
+    call check_nc(stat, 'nf90_inq_varid(areaCell)')
+    stat = nf90_get_var(fin, varid, areaCell)
+    call check_nc(stat, 'nf90_get_var(areaCell)')
+
+    stat = nf90_get_att(fin, nf90_global, 'sphere_radius', sphereRadius)
+    call check_nc(stat, 'nf90_get_att(sphere_radius)')
+
+    stat = nf90_inquire_attribute(fin, nf90_global, 'on_a_sphere', len=attlen)
+    call check_nc(stat, 'nf90_inquire_attribute(on_a_sphere)')
+    allocate(character(len=attlen) :: on_a_sphere)
+    stat = nf90_get_att(fin, nf90_global, 'on_a_sphere', on_a_sphere)
+    call check_nc(stat, 'nf90_get_att(on_a_sphere)')
+
+    if (any(lonCell < 0.0 .or. lonCell > 2.0*pi)) then
+       error stop 'lonCell is not in the desired range (0, 2pi)'
+    end if
+
+    if (any(lonVertex < 0.0 .or. lonVertex > 2.0*pi)) then
+       error stop 'lonVertex is not in the desired range (0, 2pi)'
+    end if
+
+    if (sphereRadius <= 0.0) then
+       sphereRadius = SHR_CONST_REARTH
+       write(*,'(A,ES24.16)') ' -- WARNING: sphereRadius<=0 so setting sphereRadius = ', &
+            SHR_CONST_REARTH
+    end if
+
+    if (trim(on_a_sphere) == 'NO') then
+       write(*,'(A)') " -- WARNING: 'on_a_sphere' attribute is 'NO', which means there may be some disagreement regarding area between the planar (source) and spherical (target) mesh"
+    end if
+
+    if (doLandIceMask) then
+       stat = nf90_inq_varid(fin, 'landIceMask', varid)
+       call check_nc(stat, 'nf90_inq_varid(landIceMask)')
+
+       stat = nf90_inquire_variable(fin, varid, ndims=ndims_landIceMask, dimids=dimids_landIceMask)
+       call check_nc(stat, 'nf90_inquire_variable(landIceMask)')
+
+       if (ndims_landIceMask == 1) then
+          allocate(landIceMask1d(nCells))
+          stat = nf90_get_var(fin, varid, landIceMask1d)
+          call check_nc(stat, 'nf90_get_var(landIceMask 1D)')
+       else if (ndims_landIceMask == 2) then
+          allocate(landIceMask2d(1, nCells))
+          stat = nf90_get_var(fin, varid, landIceMask2d, start=(/1,1/), count=(/1,nCells/))
+          call check_nc(stat, 'nf90_get_var(landIceMask 2D first slice)')
+       else
+          error stop 'landIceMask has unsupported rank'
+       end if
+    end if
+
+    ! allocate(grid_corner_lat(nCells, maxVertices))
+    ! allocate(grid_corner_lon(nCells, maxVertices))
+    allocate(grid_area(nCells))
+    allocate(grid_imask(nCells))
+
+    ! grid_corner_lat = 0.0
+    ! grid_corner_lon = 0.0
+    grid_area = areaCell / (sphereRadius*sphereRadius)
+    grid_dims(1) = nCells
+
+
+    allocate(grid_corner_lat(maxVertices, nCells))
+    allocate(grid_corner_lon(maxVertices, nCells))
+
+    grid_corner_lat = 0.0
+    grid_corner_lon = 0.0
+
+    do iCell = 1, nCells
+       lastValidVertex = verticesOnCell(nEdgesOnCell(iCell), iCell)
+
+       do iVertex = 1, maxVertices
+          if (iVertex <= nEdgesOnCell(iCell)) then
+             grid_corner_lat(iVertex, iCell) = latVertex(verticesOnCell(iVertex, iCell))
+             grid_corner_lon(iVertex, iCell) = lonVertex(verticesOnCell(iVertex, iCell))
+          else
+             grid_corner_lat(iVertex, iCell) = latVertex(lastValidVertex)
+             grid_corner_lon(iVertex, iCell) = lonVertex(lastValidVertex)
+          end if
+       end do
+    end do
+
+
+    ! do iCell = 1, nCells
+    !   lastValidVertex = verticesOnCell(nEdgesOnCell(iCell), iCell)
+
+    !   do iVertex = 1, maxVertices
+    !     if (iVertex <= nEdgesOnCell(iCell)) then
+    !       grid_corner_lat(iCell, iVertex) = latVertex(verticesOnCell(iVertex, iCell))
+    !       grid_corner_lon(iCell, iVertex) = lonVertex(verticesOnCell(iVertex, iCell))
+    !     else
+    !       grid_corner_lat(iCell, iVertex) = latVertex(lastValidVertex)
+    !       grid_corner_lon(iCell, iVertex) = lonVertex(lastValidVertex)
+    !     end if
+    !   end do
+    ! end do
+
+    if (doLandIceMask) then
+       if (allocated(landIceMask1d)) then
+          grid_imask = 1 - landIceMask1d
+       else
+          grid_imask = 1 - landIceMask2d(1,:)
+       end if
+    else
+       grid_imask = 1
+    end if
+
+    stat = nf90_create(trim(scripFile), ior(nf90_clobber, nf90_netcdf4), &
+         fout, &
+         comm=MPI_COMM_WORLD,                                      &
+         info=MPI_INFO_NULL)
+    call check_nc(stat, 'nf90_create('//trim(scripFile)//', NETCDF4)')
+
+    stat = nf90_def_dim(fout, 'grid_size',    nCells,      dim_grid_size)
+    call check_nc(stat, 'nf90_def_dim(grid_size)')
+    stat = nf90_def_dim(fout, 'grid_corners', maxVertices, dim_grid_corners)
+    call check_nc(stat, 'nf90_def_dim(grid_corners)')
+    stat = nf90_def_dim(fout, 'grid_rank',    1,           dim_grid_rank)
+    call check_nc(stat, 'nf90_def_dim(grid_rank)')
+
+    stat = nf90_def_var(fout, 'grid_center_lat', nf90_double, (/dim_grid_size/), var_grid_center_lat)
+    call check_nc(stat, 'nf90_def_var(grid_center_lat)')
+    stat = nf90_put_att(fout, var_grid_center_lat, 'units', 'radians')
+    call check_nc(stat, 'nf90_put_att(grid_center_lat:units)')
+
+    stat = nf90_def_var(fout, 'grid_center_lon', nf90_double, (/dim_grid_size/), var_grid_center_lon)
+    call check_nc(stat, 'nf90_def_var(grid_center_lon)')
+    stat = nf90_put_att(fout, var_grid_center_lon, 'units', 'radians')
+    call check_nc(stat, 'nf90_put_att(grid_center_lon:units)')
+
+    stat = nf90_def_var(fout, 'grid_corner_lat', nf90_double, &
+         &(/dim_grid_corners,dim_grid_size /), var_grid_corner_lat)
+    call check_nc(stat, 'nf90_def_var(grid_corner_lat)')
+    stat = nf90_put_att(fout, var_grid_corner_lat, 'units', 'radians')
+    call check_nc(stat, 'nf90_put_att(grid_corner_lat:units)')
+
+    stat = nf90_def_var(fout, 'grid_corner_lon', nf90_double, &
+         &(/dim_grid_corners,dim_grid_size/), var_grid_corner_lon)
+    call check_nc(stat, 'nf90_def_var(grid_corner_lon)')
+    stat = nf90_put_att(fout, var_grid_corner_lon, 'units', 'radians')
+    call check_nc(stat, 'nf90_put_att(grid_corner_lon:units)')
+
+    stat = nf90_def_var(fout, 'grid_area', nf90_double, (/dim_grid_size/), var_grid_area)
+    call check_nc(stat, 'nf90_def_var(grid_area)')
+    stat = nf90_put_att(fout, var_grid_area, 'units', 'radian^2')
+    call check_nc(stat, 'nf90_put_att(grid_area:units)')
+
+    stat = nf90_def_var(fout, 'grid_imask', nf90_int, (/dim_grid_size/), var_grid_imask)
+    call check_nc(stat, 'nf90_def_var(grid_imask)')
+    stat = nf90_put_att(fout, var_grid_imask, 'units', 'unitless')
+    call check_nc(stat, 'nf90_put_att(grid_imask:units)')
+
+    stat = nf90_def_var(fout, 'grid_dims', nf90_int, (/dim_grid_rank/), var_grid_dims)
+    call check_nc(stat, 'nf90_def_var(grid_dims)')
+
+    stat = nf90_enddef(fout)
+    call check_nc(stat, 'nf90_enddef')
+
+    stat = nf90_put_var(fout, var_grid_center_lat, latCell)
+    call check_nc(stat, 'nf90_put_var(grid_center_lat)')
+    stat = nf90_put_var(fout, var_grid_center_lon, lonCell)
+    call check_nc(stat, 'nf90_put_var(grid_center_lon)')
+    stat = nf90_put_var(fout, var_grid_corner_lat, grid_corner_lat)
+    call check_nc(stat, 'nf90_put_var(grid_corner_lat)')
+    stat = nf90_put_var(fout, var_grid_corner_lon, grid_corner_lon)
+    call check_nc(stat, 'nf90_put_var(grid_corner_lon)')
+    stat = nf90_put_var(fout, var_grid_area, grid_area)
+    call check_nc(stat, 'nf90_put_var(grid_area)')
+    stat = nf90_put_var(fout, var_grid_imask, grid_imask)
+    call check_nc(stat, 'nf90_put_var(grid_imask)')
+    stat = nf90_put_var(fout, var_grid_dims, grid_dims)
+    call check_nc(stat, 'nf90_put_var(grid_dims)')
+
+    stat = nf90_close(fin)
+    call check_nc(stat, 'nf90_close(input)')
+    stat = nf90_close(fout)
+    call check_nc(stat, 'nf90_close(output)')
+
+  contains
+
+    subroutine check_nc(status, where)
+      integer, intent(in) :: status
+      character(len=*), intent(in) :: where
+      if (status /= nf90_noerr) then
+         write(*,'(A)') 'NetCDF error in '//trim(where)//': '//trim(nf90_strerror(status))
+         error stop 1
+      end if
+    end subroutine check_nc
+
+  end subroutine mpas_to_scrip_mesh
 
 !-----------------------------------------------------------------------------
 
