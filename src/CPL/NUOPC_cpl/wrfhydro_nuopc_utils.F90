@@ -132,21 +132,14 @@ contains
     type(ESMF_ArrayBundle) :: arrayBundle
     integer                :: tileCount
     logical                :: isPresent
-
-    integer :: rank, ierr
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
 
     ! Check that the grid has tiles or not
     ! Currently only supports single tile
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    print  *, "rank =", rank, "trying to write to ", trim(filename)
-
     call ESMF_GridGet(grid, tileCount=tileCount, rc=rc)
     call check(rc, __LINE__, file)
-    print *, rank, "tileCount =", tileCount
-
 
     if (tileCount .eq. 1) then
       ! Create arraybundle to store grid information

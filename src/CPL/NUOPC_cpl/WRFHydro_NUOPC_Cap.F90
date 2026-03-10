@@ -966,6 +966,7 @@ module WRFHydro_NUOPC
   !-----------------------------------------------------------------------------
 
   subroutine InitializeP3(gcomp, importState, exportState, clock, rc)
+    use module_mpp_land, only: HYDRO_COMM_WORLD
     type(ESMF_GridComp)         :: gcomp
     type(ESMF_State)            :: importState, exportState
     type(ESMF_Clock)            :: clock
@@ -1080,14 +1081,13 @@ module WRFHydro_NUOPC
     ! call check(rc, __LINE__, file)
     ! stop "WRFH: in realize printing states"
 
-
-
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if(ESMF_STDERRORCHECK(rc)) return ! bail out
+    call ESMF_VMGet(vm, localPet=rank, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
     mesh = wrfhydro_open_mesh(vm, rc)
 
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     call ESMF_MeshGet(mesh, nodeCount=ncount, elementCount=nElem,&
          & rc=rc)
     call ESMF_MeshGet(mesh, spatialDim=sDim, rc=rc)

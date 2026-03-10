@@ -520,9 +520,6 @@ contains
     !      rt_domain(1)%overland%control%surface_water_head_lsm(40:50,40:50)
     ! stop "IT IS non-0 here??, but how big?!"
 
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    rank = rank + 1
-
     ! rt_domain(did)%smc(:,:,:) = 0.333 * rank
     ! rt_domain(did)%overland%control%surface_water_head_lsm = 0.555 * rank
 
@@ -1082,8 +1079,6 @@ contains
        call ESMF_LogWrite("WRFH: import itemnamelist: "// itemNameList(i), ESMF_LOGMSG_INFO, rc=rc)
     end do
 
-    call handle_rank_string(rank, rank_s)
-
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_import) then
           imported = NUOPC_IsConnected(state, &
@@ -1121,7 +1116,6 @@ contains
           if (show_import_once) then
              call ESMF_FieldWrite(gridField, &
                   "vars_in/"//trim(cap_fld_list(n)%st_name)//&
-                                ! "_grid_pre_"//trim(rank_s)//".nc", &
                   "_grid_pre.nc", &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
@@ -1129,7 +1123,6 @@ contains
                   "vars_in/"//trim(cap_fld_list(n)%st_name)//&
                   "_mesh_pre.nc", &
                   overwrite=.true., &
-                                ! "_mesh_pre_"//trim(rank_s)//".nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
@@ -1173,14 +1166,12 @@ contains
                   "vars_in/"//trim(cap_fld_list(n)%st_name)// &
                   "_mesh_post.nc", &
                   overwrite=.true., &
-                                ! "_mesh_post_"//trim(rank_s)//".nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
              call ESMF_FieldWrite(gridField, &
                   "vars_in/"//trim(cap_fld_list(n)%st_name)// &
                   "_grid_post.nc", &
                   overwrite=.true., &
-                                ! "_grid_post_"//trim(rank_s)//".nc", &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
@@ -1718,11 +1709,6 @@ contains
       latitude(1,1),":",latitude(nx_local,ny_local),")"
     call ESMF_LogWrite(trim(logMsg), ESMF_LOGMSG_INFO)
 ! #endif
-
-    ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! print *, rank, ": nx_local, ny_local =", nx_local, ny_local
-    ! print *, rank, ": max/min lat = ", maxval(latitude), minval(latitude)
-    ! print *, rank, ": max/min lon = ", maxval(longitude), minval(longitude)
 
     ! Add Center Coordinates to Grid
     call ESMF_GridAddCoord(wrfhydro_grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
@@ -2446,18 +2432,6 @@ contains
 !     if(ESMF_STDERRORCHECK(rc)) return ! bail out
   end function init_distgrid
 
-  subroutine handle_rank_string(rank, rank_s)
-    use mpi
-    integer, intent(inout) :: rank
-    character(len=3), intent(inout) :: rank_s
-    integer :: ierr
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! print *, "rank =", rank
-    ! write(rank_s, '(I0)') rank
-    if (rank == 0) rank_s = "0"
-    if (rank == 1) rank_s = "1"
-  end subroutine handle_rank_string
-
   function get_config_block_decomp_file_prefix() &
        result(decomp_filename)
     character(len=:), allocatable :: decomp_filename
@@ -2825,9 +2799,7 @@ contains
     end if
 
     stat = nf90_create(trim(scripFile), ior(nf90_clobber, nf90_netcdf4), &
-         fout, &
-         comm=MPI_COMM_WORLD,                                      &
-         info=MPI_INFO_NULL)
+         fout, comm=HYDRO_COMM_WORLD, info=MPI_INFO_NULL)
     call check_nc(stat, 'nf90_create('//trim(scripFile)//', NETCDF4)')
 
     stat = nf90_def_dim(fout, 'grid_size',    nCells,      dim_grid_size)
