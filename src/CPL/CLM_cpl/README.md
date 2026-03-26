@@ -78,26 +78,7 @@ Variables are members of `rt\_domain(did)`
 # CTSM and WRF-Hydro ESMF Coupling
 This coupling will use ESMF and NUOPC
 ## CTSM Exports
-The following table matches the CLM field WRF-Hydro needs with the current
-fields being exported by CTSM ESMF.
-
-| CLM Field   | Export Fields?                     | Full or Partial Analog |
-|-------------|------------------------------------|------------------------|
-| qflx\_surf  | Flrl\_rofsur - qflx\_over          | Partial                |
-| qflx\_drain | Flrl\_rofsub - qflx\_perched_drain | Partial                |
-| t\_soisno   | Sl\_soilw is only the first layer  | None                   |
-| h2osoi\_vol | Sl\_soilw                          | Partial                |
-| h2osoi\_liq | None                               | None                   |
-
-| CTSM Field   | Variable Definition                                         | Export Issue                             |
-|--------------|-------------------------------------------------------------|------------------------------------------|
-| FLrl\_rofsur | waterlnd2atmbulk\_inst%qflx\_rofliq\_qsur\_grc(begg:)       | sum of qflx\_over and qflx\_h2osfc\_surf |
-| Flrl\_rofsub | waterlnd2atmbulk\_inst%qflx\_rofliq\_qsub\_grc(g) + &       | sum of qsub\_grc and drain\_perched\_grc |
-|              | waterlnd2atmbulk\_inst%qflx\_rofliq\_drain\_perched\_grc(g) |                                          |
-| Sl\_soilw    | waterlnd2atmbulk\_inst%h2osoi\_vol\_grc(begin:, 1)          | only first layer                         |
-|              |                                                             |                                          |
-|              |                                                             |                                          |
-|              |                                                             |                                          |
+Following table matches WRF-Hydro variables with CTSM variables.
 
 | Hydro Var | CTSM Var                            | CTSM Type         | description                                                                      |
 |-----------|-------------------------------------|-------------------|----------------------------------------------------------------------------------|
@@ -109,3 +90,23 @@ fields being exported by CTSM ESMF.
 |           | h2osoi\_ice\_col                    | waterstate\_type  | col ice lens (kg/m2) (new) (-nlevsno+1:nlevgrnd)                                 |
 | sh2ox     | h2osoi\_vol\_col ?                  | waterstate\_type  | col volumetric soil water (0<=h2osoi\_vol<=watsat) [m3/m3]  (nlevgrnd)           |
 | sh2ox     | h2osoi\_vol\_prs\_grc ?             | waterstate\_type  | grc volumetric soil water prescribed (0<=h2osoi_vol<=watsat) [m3/m3]  (nlevgrnd) |
+
+The following table matches the CLM field WRF-Hydro needs with the current
+fields being exported by CTSM ESMF.
+
+| CLM Field   | Export Fields?                     | Full or Partial Analog |
+|-------------|------------------------------------|------------------------|
+| qflx\_surf  | Flrl\_rofsur - qflx\_over          | Partial                |
+| qflx\_drain | Flrl\_rofsub - qflx\_perched_drain | Partial                |
+| t\_soisno   | Sl\_soilw is only the first layer  | None                   |
+| h2osoi\_vol | Sl\_soilw                          | Partial                |
+| h2osoi\_liq | None                               | None                   |
+
+Is this table needed?
+
+| CTSM Field   | Variable Definition                                         | Export Issue                             |
+|--------------|-------------------------------------------------------------|------------------------------------------|
+| FLrl\_rofsur | waterlnd2atmbulk\_inst%qflx\_rofliq\_qsur\_grc(begg:)       | sum of qflx\_over and qflx\_h2osfc\_surf |
+| Flrl\_rofsub | waterlnd2atmbulk\_inst%qflx\_rofliq\_qsub\_grc(g) + &       | sum of qsub\_grc and drain\_perched\_grc |
+|              | waterlnd2atmbulk\_inst%qflx\_rofliq\_drain\_perched\_grc(g) |                                          |
+| Sl\_soilw    | waterlnd2atmbulk\_inst%h2osoi\_vol\_grc(begin:, 1)          | only first layer                         |
