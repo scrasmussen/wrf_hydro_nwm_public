@@ -5,7 +5,7 @@ This build follows the [ctsm build instructions](https://escomp.github.io/CTSM/l
 $ git clone https://github.com/ESCOMP/CTSM.git ctsm
 $ cd ctsm
 $ ./bin/git-fleximod update
-$ ./lilac/build_ctsm --machine derecho --compiler gnu /glade/scratch/${USER}/ctsm_build_dir
+$ ./lilac/build_ctsm --machine derecho --compiler gnu /glade/derecho/scratch/${USER}/ctsm_build_dir
 ...
 clm built in 65.982331 seconds
 
