@@ -74,13 +74,13 @@ CAP_LIB       := libwrfhydro_nuopc.a
 CAP_DEP_FRONT := wrfhydro_nuopc
 CAP_VERS      := VERSION
 
-CAP_OBJS      := wrfhydro_nuopc_cap.o
+CAP_OBJS      := rof_comp_nuopc.o
 CAP_OBJS      += wrfhydro_nuopc_gluecode.o
 CAP_OBJS      += wrfhydro_nuopc_fields.o
 CAP_OBJS      += wrfhydro_nuopc_flags.o
 CAP_OBJS      += wrfhydro_esmf_extensions.o
 
-CAP_MODS      := wrfhydro_nuopc.mod
+CAP_MODS      := rof_comp_nuopc.mod
 CAP_MODS      += wrfhydro_nuopc_gluecode.mod
 CAP_MODS      += wrfhydro_nuopc_fields.mod
 CAP_MODS      += wrfhydro_nuopc_flags.mod
@@ -114,7 +114,7 @@ nuopcinstall: $(CAP_LIB) $(CAP_MODS) \
 # Dependencies
 # ############
 
-wrfhydro_nuopc_cap.o: wrfhydro_nuopc_macros.o \
+rof_comp_nuopc.o: wrfhydro_nuopc_macros.o \
  wrfhydro_nuopc_gluecode.o wrfhydro_nuopc_fields.o \
  wrfhydro_nuopc_flags.o wrfhydro_esmf_extensions.o
 
@@ -127,14 +127,18 @@ wrfhydro_nuopc_fields.o: wrfhydro_nuopc_macros.o \
 
 wrfhydro_nuopc_macros.o:
 
-wrfhydro_nuopc.mod: wrfhydro_nuopc_cap.o
+rof_comp_nuopc.mod: rof_comp_nuopc.o
 wrfhydro_nuopc_gluecode.mod: wrfhydro_nuopc_gluecode.o
 wrfhydro_nuopc_fields.mod: wrfhydro_nuopc_fields.o
 wrfhydro_nuopc_flags.mod: wrfhydro_nuopc_flags.o
 wrfhydro_esmf_extensions.mod: wrfhydro_esmf_extensions.o
 
-libwrfhydro_nuopc.a: $(CAP_OBJS)
+libwrfhydro_nuopc.a: $(CAP_OBJS) librof.a
 	ar rcs $@ $(CAP_OBJS)
+librof.a:
+	ar rcs $@ $(CAP_OBJS)
+	cp librof.a /glade/derecho/scratch/soren/hydro-test-wrfh/bld/lib
+	cp *.mod /glade/derecho/scratch/soren/cases/hydro-test-wrfh/SourceMods/src.drv/
 
 fflags= \
   -I/glade/u/apps/derecho/25.10/spack/opt/spack/esmf/8.9.1/cray-mpich/8.1.32/gcc/14.3.0/zri7/include \
