@@ -49,7 +49,8 @@ MODEL_MPPDIR := $(abspath $(MODEL_DIR)/MPP)
 MODEL_RTGDIR := $(abspath $(MODEL_DIR)/Routing)
 
 MODEL_MK     := $(abspath $(MODEL_MKDIR)/Makefile.comm)
-MODEL_MKINC  := $(abspath $(MODEL_DIR)/macros)
+#$(abspath $(MODEL_DIR)/macros)
+MODEL_MKINC  :=
 MODEL_LIB    := $(abspath $(MODEL_LIBDIR)/libHYDRO.a)
 
 MODEL_MODS   := $(abspath $(MODEL_MPPDIR)/module_mpp_land.mod)

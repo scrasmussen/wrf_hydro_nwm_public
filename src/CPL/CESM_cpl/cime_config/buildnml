@@ -23,7 +23,7 @@ sys.path.append(_LIBDIR)
 # well as a CESM checkout
 sys.path.append(os.path.join(CIMEROOT, "./"))
 search_path = ("../components/wrfhydro/"
-               "src/CPL/CTSM_cpl/route/settings")
+               "src/CPL/CESM_cpl/route/settings")
 sys.path.append(os.path.join(CIMEROOT, search_path))
 
 from standard_script_setup import *
