@@ -135,10 +135,9 @@ wrfhydro_esmf_extensions.mod: wrfhydro_esmf_extensions.o
 
 libwrfhydro_nuopc.a: $(CAP_OBJS) librof.a
 	ar rcs $@ $(CAP_OBJS)
-librof.a:
+
+librof.a: $(CAP_OBJS)
 	ar rcs $@ $(CAP_OBJS)
-	cp librof.a /glade/derecho/scratch/soren/hydro-test-wrfh/bld/lib
-	cp *.mod /glade/derecho/scratch/soren/cases/hydro-test-wrfh/SourceMods/src.drv/
 
 fflags= \
   -I/glade/u/apps/derecho/25.10/spack/opt/spack/esmf/8.9.1/cray-mpich/8.1.32/gcc/14.3.0/zri7/include \

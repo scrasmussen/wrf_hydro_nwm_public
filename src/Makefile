@@ -21,6 +21,10 @@ $(CMD):
 		(cd Rapid_routing; make -f makefile.cpl rapid); \
 	fi
 
+	if [ $(WRF_HYDRO_CESM) -eq 1 ]; then \
+		(cd CPL/CESM_cpl; make cesm_nuopc); \
+	fi
+
 	@if [ -d "LandModel" ]; then \
 	(cd LandModel; make ) \
 	fi

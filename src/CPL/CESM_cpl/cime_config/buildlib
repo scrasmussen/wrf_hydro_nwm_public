@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # modified from mizuRoute/cime_config/buildlib
-
 """
 build wrfhydro library
 """
@@ -9,60 +8,62 @@ from pathlib import Path
 import sys
 import traceback
 
-
 _CIMEROOT = os.environ.get("CIMEROOT")
 if _CIMEROOT is None:
     raise SystemExit("ERROR: must set CIMEROOT environment variable")
-
 _LIBDIR = os.path.join(_CIMEROOT, "scripts", "Tools")
 sys.path.append(_LIBDIR)
-
 from standard_script_setup import *
 from CIME.buildlib import parse_input
 from CIME.build import get_standard_makefile_args
 from CIME.case import Case
 from CIME.utils import run_cmd, expect
 
-logger = logging.getLogger(__name__)
-
 debug = True
-
 sources = [
     "wrfhydro_nuopc_macros.F90",
     "wrfhydro_nuopc_flags.F90",
-     "wrfhydro_esmf_extensions.F90"
+    "wrfhydro_esmf_extensions.F90"
     "wrfhydro_nuopc_fields.F90",
     "wrfhydro_nuopc_gluecode.F90",
     "wrfhydro_nuopc_cap.F90",
  ]
+logger = logging.getLogger(__name__)
 
 
+def print_and_run(cmd):
+    print(f'$ {cmd}')
+    rc, out, err = run_cmd(cmd)
+    logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
 
-###############################################################################
+
 def _main_func():
-###############################################################################
+    case_root, lib_root, bld_root = parse_input(sys.argv)
+    case_mod_dir = Path(case_root, 'SourceMods/src.wrfhydro/')
 
-    caseroot, libroot, bldroot = parse_input(sys.argv)
-
-    with Case(caseroot) as case:
+    with Case(case_root) as case:
         casetools = case.get_value("CASETOOLS")
         rof_root = case.get_value("COMP_ROOT_DIR_ROF")
+        rof_lib = Path(rof_root, 'nuopc')
+        wrfh_lib = rof_lib
         wrfh_root = Path(rof_root).parents[1]
+
         gmake_j = case.get_value("GMAKE_J")
         gmake = case.get_value("GMAKE")
         driver = case.get_value("COMP_INTERFACE").lower()
+        expect( driver == "nuopc", "wrfhydro only has a nuopc COMP_INTERFACE" )
 
         compiler = case.get_value("COMPILER")
         mpilib = case.get_value("MPILIB")
         mach = case.get_value("MACH")
 
-
         if debug:
-            print(f'caseroot = {caseroot}')
-            print(f'libroot = {libroot}')
-            print(f'bldroot = {bldroot}')
+            print(f'case_root = {case_root}')
+            print(f'lib_root = {lib_root}')
+            print(f'bld_root = {bld_root}')
             print(f'casetools = {casetools}')
             print(f'rof_root = {rof_root}')
+            print(f'rof_lib = {rof_lib}')
             print(f'gmake_j = {gmake_j}')
             print(f'gmake = {gmake}')
             print(f'driver = {driver}')
@@ -71,97 +72,34 @@ def _main_func():
             print("MACH     =", mach)
 
             cmd = f"which mpif90"
-            print(f'$ {cmd}')
-            rc, out, err = run_cmd(cmd)
-            logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
+            print_and_run(cmd)
 
             cmd = f"mpif90 --version"
-            print(f'$ {cmd}')
-            rc, out, err = run_cmd(cmd)
-            logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
-            # sys.exit('---debugging---')
+            print_and_run(cmd)
+            # sys.exit()
 
-        # build WRF-Hydro
+        # get variables for WRF-Hydro configuration
         if 'intel' in compiler.lower():
             compiler_choice = '3'
         elif 'gnu' in compiler.lower():
             compiler_choice = '2'
 
+        # configure WRF-Hydro
         cmd = f"cd {wrfh_root} && ./configure {compiler_choice}"
-        print(f'$ {cmd}')
-        rc, out, err = run_cmd(cmd)
-        logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
+        print_and_run(cmd)
 
+        # build WRF-Hydro
         cmd = f"cd {wrfh_root} && make -j {gmake_j} WRF_HYDRO_CESM=1"
-        print(f'$ {cmd}')
-        rc, out, err = run_cmd(cmd)
-        logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
+        print_and_run(cmd)
 
+        # Copy library to case directory
+        cmd = f"cp {wrfh_lib}/librof.a {lib_root}"
+        print_and_run(cmd)
 
-        # sys.exit("--- did wrhf build? ---")
+        # Copy modules to case directory
+        cmd = f"cp {wrfh_lib}/*.mod {case_mod_dir}"
+        print_and_run(cmd)
 
-
-
-        # CIME_ESMFMKFILE = os.environ.get("CIME_ESMFMKFILE")
-        # print(f'CIME_ESMFMKFILE = {CIME_ESMFMKFILE}')
-
-        # print(f'get_standard_makefile_args(case)={get_standard_makefile_args(case)}')
-        # for name in [
-        #         "USE_ESMF_LIB",
-        #         "ESMF_LIBDIR",
-        #         "ESMF_LIBS",
-        #         "ESMF_MODDIR",
-        #         "ESMF_INCDIR",
-        #         "ESMF_PATH",
-        # ]:
-        #     try:
-        #         print(f"art: {name} = {case.get_env(name)}")
-        #     except Exception:
-        #         print(f"art: {name} = failed")
-        #         pass
-        # print(help(case))
-
-
-
-        sys.exit("--- building WRF-H ---")
-
-        expect( driver == "nuopc", "wrfhydro only has a nuopc COMP_INTERFACE" )
-        #-------------------------------------------------------
-        # create Filepath file
-        #-------------------------------------------------------
-        filepath_file = os.path.join(bldroot,"Filepath")
-        if not os.path.isfile(filepath_file):
-            caseroot = case.get_value("CASEROOT")
-            paths = [os.path.join(caseroot,"SourceMods","src.wrfhydro"),
-                     os.path.join(rof_root,driver),] # should be src/CPL/CESM_cpl/nuopc
-            with open(filepath_file, "w") as filepath:
-                filepath.write("\n".join(paths))
-                filepath.write("\n")
-
-        #-------------------------------------------------------
-        # create the library in libroot
-        #-------------------------------------------------------
-
-        complib = os.path.join(libroot,"librof.a")
-
-        makefile = os.path.join(casetools, "Makefile")
-
-        if debug:
-            print(f'complib = {complib}')
-            print(f'makefile = {makefile}')
-            # sys.exit('---debug---')
-
-
-        cmd = "{} complib -j {} COMP_NAME=wrfhydro COMPLIB={} -f {} {}" \
-              .format(gmake, gmake_j, complib, makefile, get_standard_makefile_args(case))
-
-        print(f'$ {cmd}')
-        print(f'--- pre run_cmd(cmd) ---')
-        rc, out, err = run_cmd(cmd)
-        logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
-        expect(rc == 0, "Command %s failed with rc=%s" % (cmd, rc))
-
-###############################################################################
 
 if __name__ == "__main__":
     _main_func()
