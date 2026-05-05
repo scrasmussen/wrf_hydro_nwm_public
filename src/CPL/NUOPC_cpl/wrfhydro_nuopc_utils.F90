@@ -32,10 +32,18 @@ contains
     end if
   end subroutine check_nf
 
-  subroutine printa(msg)
+
+  subroutine printa(msg, debug)
     character(len=*), intent(in) :: msg
+    logical, intent(in), optional :: debug
+    logical :: print_to_terminal
     integer :: rc
-    print *, "WRFH: ", trim(msg)
+    if (present(debug)) then
+       print_to_terminal = debug
+    else
+       print_to_terminal = .false.
+    end if
+    if (print_to_terminal) print *, "WRFH: ", trim(msg)
     call ESMF_LogWrite("WRFH: "//trim(msg), ESMF_LOGMSG_INFO, rc=rc)
     call check(rc, __LINE__, file)
   end subroutine printa

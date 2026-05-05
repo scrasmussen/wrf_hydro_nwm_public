@@ -90,7 +90,10 @@ contains
         call mpp_land_bcast_int1(rst_out)
 #endif
         if(rst_out .gt. 0) then
-            write(6,*) "yw check output restart at ",nlst(did)%olddate(1:16)
+           if(my_id == io_id) then
+              print *, "HYDRO_rst_out: check output restart at ", &
+                   nlst(did)%olddate(1:16)
+           end if
 #ifdef MPP_LAND
             if(nlst(did)%rst_bi_out .eq. 1) then
                 if(my_id .lt. 10) then

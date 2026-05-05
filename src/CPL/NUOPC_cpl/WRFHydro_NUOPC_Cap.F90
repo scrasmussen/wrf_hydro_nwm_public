@@ -1,10 +1,5 @@
 !>
 !! @mainpage NCAR's WRF-Hydro NUOPC Cap
-!! @author Daniel Rosen (daniel.rosen@noaa.gov)
-!! @author ESMF Support (esmf_support@ucar.edu)
-!! @date 03/14/2017 WRF-Hydro NUOPC Cap Added to GitHub
-!! @date 03/17/2017 Documentation Added
-!!
 !! @tableofcontents
 !!
 !! @section Overview Overview
@@ -19,7 +14,6 @@
 !! This page documents the technical design of the specialized NUOPC model and
 !! the WRF-Hydro gluecode. For generic NUOPC model documentation please see
 !! the NUOPC reference manual: https://www.earthsystemcog.org/projects/nuopc/refmans.
-!!
 !!
 !! @section NuopcSpecialization NUOPC Model Specialized Entry Points
 !!
@@ -858,8 +852,8 @@ module WRFHydro_NUOPC
     call check(rc, __LINE__, file)
 
     ! print *, rank, ": nx=", nx, "ny=",ny
-    print *, rank, ": np=", np
-    print *, rank, ": did =", is%wrap%did
+    ! print *, rank, ": np=", np
+    ! print *, rank, ": did =", is%wrap%did
 
     inquire(file=full_resolution_file, exist=geo_file_exists)
     if (.not. geo_file_exists .and. np == 1) then
@@ -995,7 +989,7 @@ module WRFHydro_NUOPC
 
     rc = ESMF_SUCCESS
 
-    print *, "WRFH: entering Initializep3: realize"
+    call printa("WRFH: entering Initializep3: realize")
     call ESMF_LogWrite("WRFH: entering Initializep3: realize", ESMF_LOGMSG_INFO, rc=rc)
 
     ! Query component for name, verbosity, and diagnostic values
@@ -1092,8 +1086,10 @@ module WRFHydro_NUOPC
          & rc=rc)
     call ESMF_MeshGet(mesh, spatialDim=sDim, rc=rc)
     call check(rc, __LINE__, file, is%wrap%did)
-    print *, rank, ": hydro : frontrange mesh ncount=", ncount, &
-         "nelem=", nelem, "sdim=", sdim
+    if (rank == 0) then
+       print *, rank, ": hydro : frontrange mesh ncount=", ncount, &
+            "nelem=", nelem, "sdim=", sdim
+    end if
 
     ! call field_realize(fieldList=cap_fld_list, &
     !   importState=is%wrap%NStateImp(1), &
@@ -1419,16 +1415,22 @@ module WRFHydro_NUOPC
     type(ESMF_Clock)           :: modelClock
     type(ESMF_TimeInterval)    :: timeStep
 
-
-   character(len=64) :: s
+    type(ESMF_VM)               :: vm
+    integer :: np, rank
+    character(len=64) :: s
 
     rc = ESMF_SUCCESS
     call ESMF_LogWrite("WRFH: entering SetClock", ESMF_LOGMSG_INFO, rc=rc)
     ! Query component for name, verbosity, and diagnostic values
 !    call NUOPC_CompGet(gcomp, name=name, verbosity=verbosity, &
 !      diagnostic=diagnostic, rc=rc)
-    call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+    call ESMF_GridCompGet(gcomp, vm=vm, name=cname, rc=rc)
     call check(rc, __LINE__, file)
+
+    call ESMF_VMGet(vm, petCount=np, localPet=rank, rc=rc)
+    call check(rc, __LINE__, file)
+
+
     call ESMF_AttributeGet(gcomp, name="Diagnostic", value=value, &
       defaultValue="0", convention="NUOPC", purpose="Instance", rc=rc)
     call check(rc, __LINE__, file)
@@ -1460,16 +1462,16 @@ module WRFHydro_NUOPC
     ! query the timestep for seconds
     call ESMF_TimeIntervalGet(timestep,s=dt,rc=rc)
     call check(rc, __LINE__, file)
-    print *, "WRFH: dt = ", dt
+    if (rank == 0) print *, "WRFH: dt = ", dt
 
     call ESMF_TimeIntervalGet(timeStep, timeString=s, rc=rc)
     call check(rc, __LINE__, file)
-    print *, "WRFH: timestep = ", trim(s)
+    if (rank == 0) print *, "WRFH: timestep = ", trim(s)
 
     ! is%wrap%timeStepInt = 60
     ! is%wrap%timeStepInt = 1
     ! print *, "WRFH: Manually setting timeStepInt"
-    print *, "is%wrap%timeStepInt = ", is%wrap%timeStepInt
+    if (rank == 0) print *, "is%wrap%timeStepInt = ", is%wrap%timeStepInt
     ! s = "P0Y0M0DT0H1M0S"
     ! stop "INVESTIGATING TIME"
     ! override timestep
@@ -1777,7 +1779,6 @@ subroutine CheckImport(gcomp, rc)
         call check(rc, __LINE__, file)
       is%wrap%stepTimer(1) = &
            is%wrap%stepTimer(1) - timestep
-      print *, "timestep taken!"
     end do
       ! it is non-zero here, big
       ! print *, "sfchead=",&

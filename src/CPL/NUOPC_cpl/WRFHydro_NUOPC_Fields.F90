@@ -589,10 +589,12 @@ contains
           name=fieldList(n)%st_name, &
           rc=rc)
         call check(rc, __LINE__, file)
-        print *, "WRFH: advertise import ", trim(fieldList(n)%sd_name), &
+        if (debug_esmf) then
+           print *, "WRFH: advertise import ", trim(fieldList(n)%sd_name), &
              trim(fieldList(n)%st_name), &
              trim(fieldList(n)%units), &
              trim(transferOffer)
+        end if
 
       end if
       if (fieldList(n)%ad_export) then
@@ -603,7 +605,7 @@ contains
           name=fieldList(n)%st_name, &
           rc=rc)
         call check(rc, __LINE__, file)
-        print *, "WRFH: advertise export ", fieldList(n)%st_name
+        if (debug_esmf) print *, "WRFH: advertise export ", fieldList(n)%st_name
       end if
     end do
 
