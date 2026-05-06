@@ -264,6 +264,7 @@ module WRFHydro_NUOPC
   public SetServices
   public SetVM
 
+  logical, parameter :: cap_debug = .false.
   character(len=ESMF_MAXSTR), parameter :: file = __FILE__
   character(len=*), PARAMETER :: label_InternalState = 'InternalState'
   character(len=8), dimension(4) :: specialStringList = &
@@ -897,14 +898,15 @@ module WRFHydro_NUOPC
             wrfhydro_mesh, regrid_handle_bl, regrid_handle_nn_stod, &
             regrid_handle_nn_dtos)
        print*, "CREATED LOW-RES GRID"
-       stop "Full Resolution File Created, Restart Hydro"
+       stop "Full Resolution File Created, Restart Hydro With Any NP"
     else if (.not. geo_file_exists .and. np /= 1) then
        print *, "Error: full resolution file ", full_resolution_file, &
             " does not exists"
        print *, "Rerun with np=1 and hydro will create the geo file"
        stop "Full Resolution File Does Not Exist"
     else
-       print *, "Full resolution file exists, continuing"
+       print *, trim(full_resolution_file), &
+            " full resolution file exists, continuing"
     end if
 
     ! initialize wrfhydro
@@ -1753,9 +1755,11 @@ subroutine CheckImport(gcomp, rc)
        ! not a function call
        ! call ESMF_MeshValidate(wrfhydro_mesh, rc=rc)
 
-       call ESMF_MeshWrite(wrfhydro_mesh, "foo_mesh", rc=rc)
-       call check(rc, __LINE__, file)
-       ! stop "MESH WRITE in advance"
+       if (cap_debug) then
+          call ESMF_MeshWrite(wrfhydro_mesh, "wrfhydro_mesh", rc=rc)
+          call check(rc, __LINE__, file)
+       end if
+
        call regrid_import_mesh_to_grid(wrfhydro_grid_l, wrfhydro_mesh, &
             is%wrap%NStateImp(1), did=is%wrap%did, memflg=is%wrap%memr_import)
        ! print *, " -- this is where it was breaking in parallel, still? --"

@@ -54,7 +54,7 @@ module wrfhydro_nuopc_gluecode
   use orchestrator_base
   use wrfhydro_nuopc_fields
   use wrfhydro_nuopc_flags
-  use wrfhydro_nuopc_utils, only: check, check_nf, printa
+  use wrfhydro_nuopc_utils, only: check, check_nf, printa, create_dir_if_needed
 
   implicit none
 
@@ -79,6 +79,9 @@ module wrfhydro_nuopc_gluecode
   character(len=*), parameter :: full_resolution_file = 'hydro.fullres.nc'
   character(len=:), allocatable :: hires_file
   public :: full_resolution_file
+  character(len=*), parameter :: vars_out_dir = "vars_out/"
+  character(len=*), parameter :: vars_in_dir = "vars_in/"
+  character(len=*), parameter :: weights_dir = "weights/"
 
   type(ESMF_RouteHandle) :: route_handle
 
@@ -888,6 +891,9 @@ contains
     mpas_grid_file = get_mpas_grid_filename()
     scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
 
+    print *, "mpas_grid_file=", mpas_grid_file
+    print *, "scrip_mesh_file=", scrip_mesh_file
+
     inquire(file=trim(scrip_mesh_file), exist=exists)
     if (.not. exists) then
        call mpas_to_scrip_mesh(mpas_grid_file, scrip_mesh_file)
@@ -922,10 +928,11 @@ contains
 
     character(:), allocatable :: mpas_grid_file, scrip_mesh_file
 
-
     ! testing variables
     logical :: realizeImport, connected
     character(:), allocatable :: st_name
+
+
 
     ! error stop "WRFHYDRO_REGRID_MESH IS ENTERED?"
     file = __FILE__
@@ -977,18 +984,19 @@ contains
     ! generate regrid weights file and read in to handle
     if (.not. allocated(hires_file)) &
          error stop "hires_file variable not defined"
+    call create_dir_if_needed(weights_dir)
 
     mpas_grid_file = get_mpas_grid_filename()
     scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
     call ESMF_RegridWeightGen(&
          srcFile=scrip_mesh_file, &
          dstFile=hires_file, &
-         weightFile='weights/setup_'//st_name//'.nc', &
+         weightFile=weights_dir//'setup_'//st_name//'.nc', &
          regridmethod=regrid_method, &
          rc=rc)
     ! Precompute Field sparse matrix multiplication with local factors
     call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
-         filename='weights/setup_'//st_name//'.nc', &
+         filename=weights_dir//'setup_'//st_name//'.nc', &
          routehandle=route_handle, rc=rc)
 
     ! generate regrid weights in to handle
@@ -1114,13 +1122,14 @@ contains
           ! --- Debugging: write import mesh before regrid
           ! if (debug) then
           if (show_import_once) then
+                 call create_dir_if_needed(vars_in_dir)
              call ESMF_FieldWrite(gridField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)//&
+                  vars_in_dir//trim(cap_fld_list(n)%st_name)//&
                   "_grid_pre.nc", &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call ESMF_FieldWrite(meshField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)//&
+                  vars_in_dir//trim(cap_fld_list(n)%st_name)//&
                   "_mesh_pre.nc", &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
@@ -1135,16 +1144,18 @@ contains
                   hires_file = read_hires_filename_from_namelist()
              mpas_grid_file = get_mpas_grid_filename()
              scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
+
+             call create_dir_if_needed(weights_dir)
              call ESMF_RegridWeightGen(&
                   srcFile=scrip_mesh_file, &
                   dstFile=hires_file, &
-                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
+                  weightFile=weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
              call ESMF_FieldSMMStore(srcField=meshfield, dstField=gridfield, &
-                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_import.nc', &
+                  filename=weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   routehandle=cap_fld_list(n)%import_handle, &
                   ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
@@ -1162,14 +1173,15 @@ contains
 
           ! --- Debugging: write import mesh after regrid
           if (show_import_once) then
+             call create_dir_if_needed(vars_in_dir)
              call ESMF_FieldWrite(meshField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)// &
+                  vars_in_dir//trim(cap_fld_list(n)%st_name)// &
                   "_mesh_post.nc", &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
              call ESMF_FieldWrite(gridField, &
-                  "vars_in/"//trim(cap_fld_list(n)%st_name)// &
+                  vars_in_dir//trim(cap_fld_list(n)%st_name)// &
                   "_grid_post.nc", &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
@@ -1285,7 +1297,9 @@ contains
           ! Debugging: write export mesh before regrid
           ! if (debug_importexport_vars) then
           if (show_export_once) then
-             fname = "vars_out/" &
+             call create_dir_if_needed(vars_out_dir)
+
+             fname = vars_out_dir &
                   //trim(cap_fld_list(n)%st_name) &
                   // "_mesh_pre" &
                   ! //trim(scount) &
@@ -1296,7 +1310,7 @@ contains
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
-             fname = "vars_out/" &
+             fname = vars_out_dir &
                   //trim(cap_fld_list(n)%st_name) &
                   // "_grid_pre" &
                   ! //trim(scount) &
@@ -1336,14 +1350,14 @@ contains
              call ESMF_RegridWeightGen(&
                   srcFile=hires_file, & ! grid
                   dstFile=scrip_mesh_file, &            ! to mesh
-                  weightFile='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
+                  weightFile=weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
              call ESMF_FieldSMMStore(srcField=gridfield, dstField=meshfield, &
-                  filename='weights/'//trim(cap_fld_list(n)%st_name)//'_export.nc', &
+                  filename=weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   routehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
              call check(rc, __LINE__, file)
@@ -1360,7 +1374,7 @@ contains
 
 
           if (show_export_once) then
-             fname = "vars_out/" &
+             fname = vars_out_dir &
                   //trim(cap_fld_list(n)%st_name) &
                   // "_mesh_post" &
                   ! //trim(scount) &
@@ -1372,7 +1386,7 @@ contains
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
 
-             fname = "vars_out/" &
+             fname = vars_out_dir &
                   //trim(cap_fld_list(n)%st_name) &
                   // "_grid_post" &
                   ! //trim(scount) &
@@ -2798,8 +2812,7 @@ contains
        grid_imask = 1
     end if
 
-    stat = nf90_create(trim(scripFile), ior(nf90_clobber, nf90_netcdf4), &
-         fout, comm=HYDRO_COMM_WORLD, info=MPI_INFO_NULL)
+    stat = nf90_create(trim(scripFile), ior(nf90_clobber, nf90_netcdf4), fout)
     call check_nc(stat, 'nf90_create('//trim(scripFile)//', NETCDF4)')
 
     stat = nf90_def_dim(fout, 'grid_size',    nCells,      dim_grid_size)

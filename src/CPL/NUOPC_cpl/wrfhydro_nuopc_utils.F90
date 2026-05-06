@@ -32,7 +32,6 @@ contains
     end if
   end subroutine check_nf
 
-
   subroutine printa(msg, debug)
     character(len=*), intent(in) :: msg
     logical, intent(in), optional :: debug
@@ -44,10 +43,25 @@ contains
        print_to_terminal = .false.
     end if
     if (print_to_terminal) print *, "WRFH: ", trim(msg)
-    call ESMF_LogWrite("WRFH: "//trim(msg), ESMF_LOGMSG_INFO, rc=rc)
-    call check(rc, __LINE__, file)
+    ! call ESMF_LogWrite("WRFH: "//trim(msg), ESMF_LOGMSG_INFO, rc=rc)
+    ! call check(rc, __LINE__, file)
   end subroutine printa
 
+  subroutine create_dir_if_needed(dir)
+    character(*), intent(in) :: dir
+    logical :: exists
+    integer :: stat
+
+    inquire(file=dir, exist=exists)
+
+    if (.not. exists) then
+       call execute_command_line("mkdir -p " // dir, exitstat=stat)
+       if (stat /= 0) error stop "Failed to create directory: " // dir
+    end if
+  end subroutine create_dir_if_needed
+
+
+  ! TODO: cleanup? does this get called?
   subroutine probe_connected_pair(expState, impState, name, rc)
     type(ESMF_State), intent(inout) :: expState, impState
     character(*), intent(in) :: name
@@ -116,10 +130,6 @@ contains
   call check_nf(status)
 
   end subroutine array_write_i
-
-
-
-
 
   subroutine grid_write(grid, fileName, rc)
     use MPI
