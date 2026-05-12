@@ -160,11 +160,6 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 add_dependencies(wrfhydro hydro_nudging)
                 add_dependencies(wrfhydro hydro_routing_diversions)
         endif()
-        add_dependencies(wrf_hydro_bmi hydro_driver)
-        add_dependencies(wrfhydro wrf_hydro_bmi)
-        add_dependencies(wrfhydro modflow_hello_world)
-        add_dependencies(wrfhydro wrf_hydro-modflow-driver)
-        # add_dependencies(wrfhydro wrf_hydro_bmi_cpp)
 
         target_link_libraries(module_NoahMP_hrldas
           wrfhydro_lib)
@@ -173,10 +168,14 @@ if (HYDRO_LSM MATCHES "NoahMP")
           wrfhydro_lib
           module_NoahMP_hrldas)
 
-        add_dependencies(wrfhydro wrf_hydro_bmi)
-        # add_dependencies(wrfhydro wrf_hydro_modflow)
-        add_dependencies(wrfhydro modflow_hello_world)
-        add_dependencies(wrfhydro wrf_hydro-modflow-driver)
+	if (BMI)
+		add_dependencies(wrf_hydro_bmi hydro_driver)
+		add_dependencies(wrfhydro wrf_hydro_bmi)
+		# add_dependencies(wrfhydro wrf_hydro_bmi_cpp)
+	elseif (MODFLOW)
+	        add_dependencies(wrfhydro modflow_hello_world)
+		add_dependencies(wrfhydro wrf_hydro-modflow-driver)
+	endif()
 
         target_link_libraries(module_NoahMP_hrldas
                 wrfhydro_lib)
@@ -205,12 +204,20 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro
                 COMMAND ln -sf ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
                 COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro
-                COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
-	        # COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi_cpp ${CMAKE_BINARY_DIR}/Run/
-	        # COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro_modflow ${CMAKE_BINARY_DIR}/Run/
-	        COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/modflow_hello_world ${CMAKE_BINARY_DIR}/Run/
-                COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro-modflow-driver ${CMAKE_BINARY_DIR}/Run/
         )
+	if (BMI)
+	        add_custom_command(TARGET wrfhydro POST_BUILD
+		        COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi ${CMAKE_BINARY_DIR}/Run/
+			# COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/BMI_cpl/wrf_hydro_bmi_cpp ${CMAKE_BINARY_DIR}/Run/
+		)
+	endif()
+	if (MODFLOW)
+	        add_custom_command(TARGET wrfhydro POST_BUILD
+			# COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro_modflow ${CMAKE_BINARY_DIR}/Run/
+			COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/modflow_hello_world ${CMAKE_BINARY_DIR}/Run/
+			COMMAND cp ${PROJECT_BINARY_DIR}/src/CPL/MODFLOW_cpl/wrf_hydro-modflow-driver ${CMAKE_BINARY_DIR}/Run/
+		)
+	endif()
         if(WRF_HYDRO_CREATE_EXE_SYMLINK)
                 add_custom_command(TARGET wrfhydro POST_BUILD
                         COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
