@@ -1528,6 +1528,61 @@ CONTAINS
          noahmp_col%water%param%SoilMatPotentialSat     = PSISAT_3D(I,1:NSOIL,J)
          noahmp_col%energy%param%SoilQuartzFrac         = QUARTZ_3D(I,1:NSOIL,J)
 
+         ! Recompute SoilInfilMaxCoeff (=KDT in legacy) using the spatial DKSAT(1),
+         ! REFKDT, REFDK we just set. WaterVarInTransfer computes this at line
+         ! ~203 from TABLE values BEFORE our spatial overrides above, so without this
+         ! recomputation KDT is built from table DKSAT(soil_type) instead of the
+         ! per-cell spatial DKSAT_3D. Mirrors legacy noahmpdrv line 1757:
+         !   parameters%KDT = parameters%REFKDT * parameters%DKSAT(1) / parameters%REFDK
+         noahmp_col%water%param%SoilInfilMaxCoeff = &
+              noahmp_col%water%param%SoilInfilFacRef * &
+              noahmp_col%water%param%SoilWatConductivitySat(1) / &
+              noahmp_col%water%param%SoilConductivityRef
+
+         ! Legacy urban-soil override (matches reference noahmpdrv lines 1759-1767):
+         ! when IOPT_IMPERV=9 + urban cell, SMCMAX/SMCREF/SMCWLT/SMCDRY are set
+         ! to fixed values. The refactor's WaterVarInTransfer applies these BEFORE
+         ! the per-cell spatial overrides above, so without this re-application the
+         ! urban cells re-read their spatial SMCMAX (e.g. 0.374 for clay) and the
+         ! initial SH2O (~0.444) becomes supersaturated -> step-0 SatExc dump.
+         !
+         ! Urban predicate also needs to match legacy here: legacy treats VEGTYPE in
+         ! {ISURBAN_TABLE, LOW_DENSITY_RES, HIGH_DENSITY_RES, HIGH_INTENSITY_IND} as
+         ! urban (USGS values 1,31,32,33). The refactor's FlagUrban only covers
+         ! ISURBAN_TABLE plus VEGTYPE > URBTYPE_beg (=40), so 31/32/33 cells are
+         ! missed. Replicate the legacy set explicitly using VEGTYP from the driver.
+         if ( IOPT_IMPERV == 9 ) then
+            if ( noahmp_col%config%domain%FlagUrban .or. &
+                 VEGTYP == 31 .or. VEGTYP == 32 .or. VEGTYP == 33 ) then
+               noahmp_col%water%param%SoilMoistureSat      = 0.45
+               noahmp_col%water%param%SoilMoistureFieldCap = 0.42
+               noahmp_col%water%param%SoilMoistureWilt     = 0.40
+               noahmp_col%water%param%SoilMoistureDry      = 0.40
+               ! Also extend FlagUrban so SoilWaterMain's SoilImpervFrac(1)=0.95
+               ! override (line 144) fires for these cells, matching legacy's
+               ! FCR(1)=0.95 set in SOILWATER line 7002 (which scales WDFCND1's
+               ! top-layer WDF/WCND by (1-0.95)=0.05, sharply reducing infiltration
+               ! and bumping surface runoff at urban cells under IOPT_INF=1).
+               noahmp_col%config%domain%FlagUrban = .true.
+            endif
+         endif
+
+         ! Recompute SoilImpervFracCoeff (=FRZX in legacy) using spatial-/urban-
+         ! updated SMCMAX(1) and SMCREF(1). WaterVarInTransfer computes this at
+         ! line ~214 from TABLE SMCMAX/SMCREF BEFORE the bridge's spatial overrides
+         ! and BEFORE our urban re-override, so without this recomputation FRZX is
+         ! stale at all spatial-overridden cells (the legacy reference computes it
+         ! AFTER both spatial and urban overrides at noahmpdrv line 1772). FRZX
+         ! drives the frozen-soil FCR adjustment inside INFIL (active when
+         ! SICEMAX > 0.01) and feeds the Richards solver via WDFCND1's (1-FCR)
+         ! scaling, so this matters at any cold-season / high-elevation cell.
+         if ( SOILTYP /= 14 ) then
+            noahmp_col%water%param%SoilImpervFracCoeff = &
+                 noahmp_col%water%param%GroundFrzCoeff * &
+                 ((noahmp_col%water%param%SoilMoistureSat(1) / &
+                   noahmp_col%water%param%SoilMoistureFieldCap(1)) * (0.412/0.468))
+         endif
+
 #ifdef NOAHMP_LEGACY_PHYSICS
          ! LEGACY-REPRODUCTION OVERRIDES -- artificial adjustments to bit-reproduce
          ! the legacy NWM NoahMP results under the bridge. Drop these when adopting
@@ -1564,30 +1619,6 @@ CONTAINS
 #endif
 
          call NoahmpMain(noahmp_col)
-
-         ! >>> SNOWDIAG: per-step dump at melt-timing outlier cell to localize
-         ! where the residual snow refactor drift originates.
-         if ( I == 931 .and. J == 2936 ) then
-            write(*,'(A,2I6,16(1X,A,ES13.5))') &
-              'SNOWDIAG_HYB I,J=', I, J, &
-              'TG=',    noahmp_col%energy%state%TemperatureGrd, &
-              'STC0=',  noahmp_col%energy%state%TemperatureSoilSnow(0), &
-              'STCm1=', noahmp_col%energy%state%TemperatureSoilSnow(-1), &
-              'STCm2=', noahmp_col%energy%state%TemperatureSoilSnow(-2), &
-              'STCs1=', noahmp_col%energy%state%TemperatureSoilSnow(1), &
-              'SAG=',   noahmp_col%energy%flux%RadSwAbsGrd, &
-              'GHV=',   noahmp_col%energy%flux%HeatGroundVegGrd, &
-              'GHB=',   noahmp_col%energy%flux%HeatGroundBareGrd, &
-              'SNICE0=', noahmp_col%water%state%SnowIce(0), &
-              'SNLIQ0=', noahmp_col%water%state%SnowLiqWater(0), &
-              'SNEQV=',  noahmp_col%water%state%SnowWaterEquiv, &
-              'SNEQVO=', noahmp_col%water%state%SnowWaterEquivPrev, &
-              'SNOWH=',  noahmp_col%water%state%SnowDepth, &
-              'FSNO=',   noahmp_col%water%state%SnowCoverFrac, &
-              'ISNOW=',  real(noahmp_col%config%domain%NumSnowLayerNeg), &
-              'QMELT=',  noahmp_col%water%flux%MeltGroundSnow
-         endif
-         ! <<< SNOWDIAG
 
          ! ---- Extract outputs from noahmp_col ----
          ! Energy fluxes
