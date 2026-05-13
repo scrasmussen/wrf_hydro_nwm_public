@@ -28,6 +28,7 @@ module config_base
      integer            :: canopy_stomatal_resistance_option
      integer            :: btr_option
      integer            :: runoff_option
+     integer            :: subsurface_runoff_option
      integer            :: surface_drag_option
      integer            :: supercooled_water_option
      integer            :: frozen_soil_option
@@ -1002,7 +1003,8 @@ contains
      integer            :: dynamic_veg_option
      integer            :: canopy_stomatal_resistance_option
      integer            :: btr_option
-     integer            :: runoff_option
+     integer            :: runoff_option = 3
+     integer            :: subsurface_runoff_option = 3
      integer            :: surface_drag_option
      integer            :: supercooled_water_option
      integer            :: frozen_soil_option
@@ -1047,7 +1049,7 @@ contains
          forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN,forcing_name_LF, &
 
          dynamic_veg_option, canopy_stomatal_resistance_option, &
-         btr_option, runoff_option, surface_drag_option, supercooled_water_option, &
+         btr_option, runoff_option, subsurface_runoff_option, surface_drag_option, supercooled_water_option, &
          frozen_soil_option, radiative_transfer_option, snow_albedo_option, &
          pcp_partition_option, tbot_option, temp_time_scheme_option, &
          glacier_option, surface_resistance_option, &
@@ -1158,6 +1160,7 @@ contains
     noah_lsm%canopy_stomatal_resistance_option = canopy_stomatal_resistance_option
     noah_lsm%btr_option = btr_option
     noah_lsm%runoff_option = runoff_option
+    noah_lsm%subsurface_runoff_option = subsurface_runoff_option
     noah_lsm%surface_drag_option = surface_drag_option
     noah_lsm%supercooled_water_option = supercooled_water_option
     noah_lsm%frozen_soil_option = frozen_soil_option
