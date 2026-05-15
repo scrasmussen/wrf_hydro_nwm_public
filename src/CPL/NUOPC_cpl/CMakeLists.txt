@@ -58,13 +58,21 @@ endif (WRF_HYDRO_NUDGING STREQUAL "1")
 #   list(APPEND wrfhydro_nuopc_files
 #     mpas_hydro.F90)
 # else()
- set(hydro_nuopc_library "wrfhydro_nuopc")
+set(hydro_nuopc_library "wrfhydro_nuopc")
 # endif()
 
 add_library(wrfhydro_nuopc_obj
   OBJECT
   ${wrfhydro_nuopc_files})
+target_include_directories(wrfhydro_nuopc_obj PRIVATE ${CMAKE_INSTALL_PREFIX})
+target_link_libraries(wrfhydro_nuopc_obj PUBLIC esmf)
 add_dependencies(wrfhydro_nuopc_obj ${wrfhydro_nuopc_deps})
+
+set(WRFHYDRO_NUOPC_MOD_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(wrfhydro_nuopc_obj PROPERTIES
+    Fortran_MODULE_DIRECTORY ${WRFHYDRO_NUOPC_MOD_DIR})
+target_include_directories(wrfhydro_nuopc_obj PUBLIC ${WRFHYDRO_NUOPC_MOD_DIR})
+
 add_library(${hydro_nuopc_library}
   STATIC
   $<TARGET_OBJECTS:hydro_utils>
@@ -98,24 +106,23 @@ target_link_libraries(${hydro_nuopc_library}
   ${NETCDF_LIBRARIES}
   )
 
+target_include_directories(${hydro_nuopc_library}
+  PUBLIC
+    $<BUILD_INTERFACE:${WRFHYDRO_NUOPC_MOD_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+
 
 ### Library Installation
 install(TARGETS ${hydro_nuopc_library} ${wrfhydro_nuopc_linklibs}
   EXPORT  wrfhydro-config
   LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
 )
-if (MPAS_HYDRO)
-  # set(CMAKE_Fortran_MODULE_DIRECTORY} ${CMAKE_INSTALL_PREFIX})
-
-  # # install(FILES ${mod_files}
-  # install( ${CMAKE_Fortran_MODULE_DIRECTORY}/*
-  #   DESTINATION ${CMAKE_INSTALL_PREFIX}
-  # )
-else()
-  install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/WRFHYDRO
-  )
-endif()
+install(DIRECTORY ${WRFHYDRO_NUOPC_MOD_DIR}/
+  DESTINATION .
+  FILES_MATCHING PATTERN "*.mod"
+)
 
 install(EXPORT wrfhydro-config
   DESTINATION lib/cmake
