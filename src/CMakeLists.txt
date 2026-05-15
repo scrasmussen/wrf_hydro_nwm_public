@@ -171,27 +171,29 @@ if (HYDRO_LSM MATCHES "NoahMP")
         set(BASH_CP_HRLDAS_NML "if [[ ! -f ${CMAKE_BINARY_DIR}/Run/namelist.hrldas ]]\; then cp ${PROJECT_SOURCE_DIR}/src/template/NoahMP/namelist.hrldas ${CMAKE_BINARY_DIR}/Run \; fi\;")
         set(BASH_CP_HYDRO_NML "if [[ ! -f ${CMAKE_BINARY_DIR}/Run/hydro.namelist ]]\; then cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/hydro.namelist ${CMAKE_BINARY_DIR}/Run \; fi\;")
 
-        add_custom_command(TARGET wrfhydro POST_BUILD
-                COMMAND mkdir -p ${CMAKE_BINARY_DIR}/Run
-                COMMAND cp ${PROJECT_SOURCE_DIR}/tests/ctests/run_dir_makefile.mk ${CMAKE_BINARY_DIR}/Run/Makefile
-                # copy tables
-                COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
-                COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
-                COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
-                # copy namelists
-                COMMAND bash -c "${BASH_CP_HRLDAS_NML}"
-                COMMAND bash -c "${BASH_CP_HYDRO_NML}"
-                # copy and setup executables
-                COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/wrf_hydro
-                COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
-                COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro
-                COMMAND ln -sf ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
-                COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro
-        )
-        if(WRF_HYDRO_CREATE_EXE_SYMLINK)
-                add_custom_command(TARGET wrfhydro POST_BUILD
-                        COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
-                )
+        if (NOT MPAS_HYDRO)
+          add_custom_command(TARGET wrfhydro POST_BUILD
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/Run
+            COMMAND cp ${PROJECT_SOURCE_DIR}/tests/ctests/run_dir_makefile.mk ${CMAKE_BINARY_DIR}/Run/Makefile
+            # copy tables
+            COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/CHANPARM.TBL ${CMAKE_BINARY_DIR}/Run
+            COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
+            COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
+            # copy namelists
+            COMMAND bash -c "${BASH_CP_HRLDAS_NML}"
+            COMMAND bash -c "${BASH_CP_HYDRO_NML}"
+            # copy and setup executables
+            COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/wrf_hydro
+            COMMAND rm -f ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
+            COMMAND cp ${PROJECT_BINARY_DIR}/src/wrfhydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro
+            COMMAND ln -sf ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro_NoahMP
+            COMMAND rm ${PROJECT_BINARY_DIR}/src/wrfhydro
+          )
+          if(WRF_HYDRO_CREATE_EXE_SYMLINK)
+            add_custom_command(TARGET wrfhydro POST_BUILD
+              COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/Run/wrf_hydro ${CMAKE_BINARY_DIR}/Run/wrf_hydro.exe
+            )
+          endif()
         endif()
 
 elseif (HYDRO_LSM MATCHES "Noah")
