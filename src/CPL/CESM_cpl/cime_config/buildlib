@@ -97,8 +97,11 @@ def _main_func():
         print_and_run(cmd)
 
         # Copy modules to case directory
-        cmd = f"cp {wrfh_lib}/*.mod {case_mod_dir}"
+        cmd = f"cp {wrfh_lib}/*.mod {lib_root}/include"
         print_and_run(cmd)
+
+        if debug:
+            print(f'wrfhydro buildlib finished')
 
 
 if __name__ == "__main__":
