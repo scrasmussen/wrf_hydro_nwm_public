@@ -1798,8 +1798,9 @@ subroutine CheckImport(gcomp, rc)
 
     ! call print_wrap(is%wrap)
 
-
-    call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    if (cap_debug) then
+       call ESMF_StateLog(is%wrap%NStateExp(1), logMsgFlag=ESMF_LOGMSG_INFO, rc=rc)
+    end if
 
     if (is%wrap%hasExports) then
        call ESMF_GridValidate(wrfhydro_grid_l, rc=rc)

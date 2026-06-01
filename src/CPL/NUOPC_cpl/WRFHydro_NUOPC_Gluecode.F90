@@ -93,6 +93,8 @@ module wrfhydro_nuopc_gluecode
   logical, parameter :: debug = .FALSE.
   logical :: show_import_once = .true.
   logical :: show_export_once = .true.
+  logical :: print_import_statelog_once = .true.
+  logical :: print_export_statelog_once = .true.
   logical :: debug_importexport_vars = .TRUE.
   character(len=:), allocatable :: fname
   character(len=32) :: scount
@@ -1070,11 +1072,15 @@ contains
     integer :: rank, ierr
     character(len=3) :: rank_s
 
-    if (io_rank) print *, 'WRFH: enter regrid_import_mesh_to_grid'
-    call ESMF_LogWrite('WRFH: enter regrid_import_mesh_to_grid', ESMF_LOGMSG_INFO)
-    call ESMF_LogWrite('--- WRFH: IMPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
-    call ESMF_StateLog(state, rc=rc)
-    call ESMF_LogWrite('--- WRFH: POST STATE PRINT: ', ESMF_LOGMSG_INFO)
+    if (print_import_statelog_once) then
+       if (io_rank) print *, 'WRFH: enter regrid_import_mesh_to_grid'
+       call ESMF_LogWrite('WRFH: enter regrid_import_mesh_to_grid', ESMF_LOGMSG_INFO)
+       call ESMF_LogWrite('--- WRFH: IMPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+       call ESMF_StateLog(state, rc=rc)
+       call ESMF_LogWrite('--- WRFH: POST STATE PRINT: ', ESMF_LOGMSG_INFO)
+       print_import_statelog_once = .false.
+    end if
+
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
     call check(rc, __LINE__, file)
@@ -1082,10 +1088,12 @@ contains
 
     call ESMF_StateGet(state,itemNameList=itemNameList, rc=rc)
     call check(rc, __LINE__, file)
-    do i=1,itemCount
-       if (debug) print *, "WRFH: import itemnamelist: ", itemNameList(i)
-       call ESMF_LogWrite("WRFH: import itemnamelist: "// itemNameList(i), ESMF_LOGMSG_INFO, rc=rc)
-    end do
+    if (debug) then
+       do i=1,itemCount
+          print *, "WRFH: import itemnamelist: ", itemNameList(i)
+          call ESMF_LogWrite("WRFH: import itemnamelist: "// itemNameList(i), ESMF_LOGMSG_INFO, rc=rc)
+       end do
+    end if
 
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_import) then
@@ -1188,6 +1196,8 @@ contains
              call check(rc, __LINE__, file)
           end if
           ! --- end debug ---
+          call ESMF_FieldDestroy(gridField, rc=rc)
+          call check(rc, __LINE__, file)
        end if
     end do
     show_import_once = .false.
@@ -1231,10 +1241,13 @@ contains
 
     integer :: ierr
 
-    if (io_rank) print *, 'WRFH: enter regrid_export_grid_to_mesh'
-    if (io_rank) call ESMF_LogWrite('--- WRFH: EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
-    if (debug) call ESMF_LogWrite('___ EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
-    if (debug) call ESMF_StatePrint(state, rc=rc)
+    if (print_export_statelog_once) then
+       if (io_rank) print *, 'WRFH: enter regrid_export_grid_to_mesh'
+       if (io_rank) call ESMF_LogWrite('--- WRFH: EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+       if (debug) call ESMF_LogWrite('___ EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+       if (debug) call ESMF_StatePrint(state, rc=rc)
+       print_export_statelog_once = .false.
+    end if
 
     call ESMF_StateGet(state,itemCount=itemCount, rc=rc)
     call check(rc, __LINE__, file)
