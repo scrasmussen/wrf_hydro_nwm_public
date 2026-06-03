@@ -100,6 +100,9 @@ def _main_func():
         cmd = f"cp {wrfh_lib}/*.mod {lib_root}/include"
         print_and_run(cmd)
 
+        # Setup namelist
+
+
         if debug:
             print(f'wrfhydro buildlib finished')
 

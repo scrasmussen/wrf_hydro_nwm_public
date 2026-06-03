@@ -11,8 +11,11 @@
 # pylint: disable=wildcard-import,unused-wildcard-import,wrong-import-position
 # pylint: disable=multiple-imports
 import os
+from pathlib import Path
 import shutil
 import sys
+import tarfile
+import urllib.request
 
 CIMEROOT = os.environ.get("CIMEROOT")
 if CIMEROOT is None:
@@ -43,17 +46,64 @@ def buildnml(case, caseroot, compname):
     if compname != "wrfhydro":
         raise AttributeError
 
-    srcroot = case.get_value("COMP_ROOT_DIR_ROF")
-    rundir = case.get_value("RUNDIR")
+    src_root = case.get_value("COMP_ROOT_DIR_ROF")
+    run_dir = case.get_value("RUNDIR")
 
-    nmltemplate = "hydro.namelist.template"
-    nmlsrc = os.path.join(srcroot+'/cime_config', nmltemplate)
+    nml_template = "hydro.namelist.template"
+    nml_src = os.path.join(src_root+'/cime_config', nml_template)
 
-    nmlfile = "hydro.namelist"
-    nmldestination = os.path.join(rundir, nmlfile)
+    nml_file = "hydro.namelist"
+    nml_destination = os.path.join(run_dir, nml_file)
 
-    print(f"   - copying namelist {nmltemplate} to {nmldestination}")
-    shutil.copy(nmlsrc, nmldestination)
+    print(f"   - copying namelist {nml_template} to {nml_destination}")
+    shutil.copy(nml_src, nml_destination)
+
+    tarball_url = "https://github.com/NCAR/wrf-hydro_cesm/releases/download/0.0.1/ctsm_100m_routing_stack.tar.gz"
+    download_and_extract_tarball(tarball_url, run_dir)
+
+def download_and_extract_tarball(tarball_url, run_dir):
+    """
+    Download a tar.gz file, extract it, and move its contents to run_dir/DOMAIN.
+    """
+
+    run_dir = Path(run_dir)
+    domain_dir = run_dir / "DOMAIN"
+    tarball = run_dir / Path(tarball_url).name
+    extract_tmp = run_dir / "_tarball_extract_tmp"
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Download
+    urllib.request.urlretrieve(tarball_url, tarball)
+
+    # Clean old temporary extract directory
+    if extract_tmp.exists():
+        shutil.rmtree(extract_tmp)
+    extract_tmp.mkdir(parents=True)
+
+    # Extract
+    with tarfile.open(tarball, "r:gz") as tf:
+        tf.extractall(extract_tmp)
+
+    # Replace run_dir/DOMAIN
+    if domain_dir.exists():
+        shutil.rmtree(domain_dir)
+
+    # If the tarball contains one top-level directory, move it to DOMAIN.
+    # Otherwise, put all extracted contents inside DOMAIN.
+    items = list(extract_tmp.iterdir())
+    if len(items) == 1 and items[0].is_dir():
+        shutil.move(str(items[0]), str(domain_dir))
+    else:
+        domain_dir.mkdir(parents=True)
+        for item in items:
+            shutil.move(str(item), str(domain_dir / item.name))
+
+    # Cleanup
+    tarball.unlink()
+    shutil.rmtree(extract_tmp)
+
+    return domain_dir
 
 def _main_func():
     caseroot = parse_input(sys.argv)
