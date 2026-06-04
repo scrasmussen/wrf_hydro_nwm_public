@@ -10,6 +10,10 @@ add_library(crocus_surfex STATIC
   tridiag_ground_snowcro.F
 )
 
+set_target_properties(crocus_surfex PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
+
 if (BUILD_CROCUS)
   add_library(snowcro
     module_snowcro.F
