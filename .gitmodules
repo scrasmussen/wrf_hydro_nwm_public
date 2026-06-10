@@ -1,3 +1,4 @@
 [submodule "src/Land_models/NoahMP/noahmp"]
 	path = src/Land_models/NoahMP/noahmp
-	url = https://github.com/NCAR/noahmp.git
+	branch = feature/hybrid-noahmp-submodule
+	url = https://github.com/rcabell/noahmp.git
