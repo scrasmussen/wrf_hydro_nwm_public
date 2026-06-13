@@ -395,9 +395,11 @@ module WRFHydro_NUOPC
 
     call ESMF_LogWrite("WRFH: entering Initializep0", ESMF_LOGMSG_INFO, rc=rc)
     ! crank up verbosity + flush every write
-    call ESMF_LogSet(logmsgList=ESMF_LOGMSG_ALL, trace=.false., &
-         maxElements=1, flush=.true., &
-         highResTimestampFlag=.true., rc=rc)
+    if (cap_debug) then
+       call ESMF_LogSet(logmsgList=ESMF_LOGMSG_ALL, trace=.false., &
+            maxElements=1, flush=.true., &
+            highResTimestampFlag=.true., rc=rc)
+    end if
 
 
     ! Query component for name, verbosity, and diagnostic values
@@ -1632,7 +1634,9 @@ subroutine CheckImport(gcomp, rc)
 
     rc = ESMF_SUCCESS
 
-    call printa("entering advance")
+    if (cap_debug) then
+       call printa("entering advance")
+    end if
 
     ! 0 here
     ! print *, "sfchead=",&
@@ -1829,13 +1833,16 @@ subroutine CheckImport(gcomp, rc)
 
     ! Write export files
     if (btest(diagnostic,16)) then
-      call NUOPC_Write(is%wrap%NStateExp(1), &
-        fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-          rname//"_exp_D"//trim(nStr)//"_"//trim(advEndTimeStr)//"_", &
-        overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-      call check(rc, __LINE__, file)
+       call NUOPC_Write(is%wrap%NStateExp(1), &
+            fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+            rname//"_exp_D"//trim(nStr)//"_"//trim(advEndTimeStr)//"_", &
+            overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+       call check(rc, __LINE__, file)
     endif
-    call ESMF_LogWrite("WRFH: exiting Advance", ESMF_LOGMSG_INFO, rc=rc)
+
+    if (cap_debug) then
+       call ESMF_LogWrite("WRFH: exiting Advance", ESMF_LOGMSG_INFO, rc=rc)
+    end if
 
     ! print *, "sfchead=",&
     !      rt_domain(1)%overland%control%surface_water_head_lsm(45:50,45:50)

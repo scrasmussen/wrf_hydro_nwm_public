@@ -32,16 +32,20 @@ module wrfhydro_nuopc_fields
     character(len=64)      :: st_name   = "dummy" ! state name
     character(len=64)      :: units     = "-"     ! units
     type(ESMF_RegridMethod_Flag) :: regrid_method = ESMF_REGRIDMETHOD_BILINEAR
-    logical                :: ad_import = .FALSE. ! advertise import
-    logical                :: ad_export = .FALSE. ! advertise export
+    logical                :: ad_import = .false. ! advertise import
+    logical                :: ad_export = .false. ! advertise export
     real(ESMF_KIND_R8)     :: vl_fillv  = ESMF_MISSING_VALUE ! default
     integer                :: num_dims  = 2
-    logical                :: rl_import = .FALSE. ! realize import
-    logical                :: rl_export = .FALSE. ! realize export
+    logical                :: rl_import = .false. ! realize import
+    logical                :: rl_export = .false. ! realize export
     type(ESMF_RouteHandle) :: import_handle
-    logical                :: import_handle_init = .FALSE. ! realize export
+    logical                :: import_handle_init = .false.
     type(ESMF_RouteHandle) :: export_handle
-    logical                :: export_handle_init = .FALSE. ! realize export
+    logical                :: export_handle_init = .false.
+    type(ESMF_Field)       :: import_field
+    logical                :: import_field_init = .false.
+    type(ESMF_Field)       :: export_field
+    logical                :: export_field_init = .false.
   end type cap_fld_type
 
   character(len=ESMF_MAXSTR), parameter :: file = __FILE__

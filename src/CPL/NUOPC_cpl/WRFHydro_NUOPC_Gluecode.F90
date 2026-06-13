@@ -1060,7 +1060,7 @@ contains
     type(ESMF_State),intent(in) :: state
     integer, intent(in) :: did
     type(memory_flag), intent(in) :: memflg
-    type(ESMF_Field) :: meshField, gridField
+    type(ESMF_Field) :: meshField !, gridField
     integer :: n, rc, itemCount
     character(len=64), allocatable :: itemNameList(:)
     logical :: imported
@@ -1115,8 +1115,14 @@ contains
           call ESMF_GridValidate(grid, rc=rc)
           call check(rc, __LINE__, file)
 
-          gridField = field_create(cap_fld_list(n)%st_name, grid, did, &
-               memflg, rc)
+
+          ! new way to handle gridField
+          if (cap_fld_list(n)%import_field_init .eqv. .false.) then
+             cap_fld_list(n)%import_field = field_create(cap_fld_list(n)%st_name, grid, did, &
+                  memflg, rc)
+             cap_fld_list(n)%import_field_init = .true.
+          end if
+
           ! CREAT LOCAL COPY, NOT CONNECTED TO WRF-H MODEL MEMORY
           ! gridField = ESMF_FieldCreate(grid=grid, &
           !      typekind=ESMF_TYPEKIND_R8, &
@@ -1131,7 +1137,7 @@ contains
           ! if (debug) then
           if (show_import_once) then
                  call create_dir_if_needed(vars_in_dir)
-             call ESMF_FieldWrite(gridField, &
+             call ESMF_FieldWrite(cap_fld_list(n)%import_field, &
                   vars_in_dir//trim(cap_fld_list(n)%st_name)//&
                   "_grid_pre.nc", &
                   overwrite=.true., &
@@ -1162,7 +1168,7 @@ contains
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
-             call ESMF_FieldSMMStore(srcField=meshfield, dstField=gridfield, &
+             call ESMF_FieldSMMStore(srcField=meshfield, dstField=cap_fld_list(n)%import_field, &
                   filename=weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   routehandle=cap_fld_list(n)%import_handle, &
                   ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
@@ -1175,7 +1181,7 @@ contains
 
           if (debug) print*, "DEBUGGING: using var's handle to regrid field ", &
                trim(cap_fld_list(n)%st_name)
-          call ESMF_FieldRegrid(meshField, gridField, &
+          call ESMF_FieldRegrid(meshField, cap_fld_list(n)%import_field, &
                cap_fld_list(n)%import_handle, rc=rc)
           call check(rc, __LINE__, file)
 
@@ -1188,7 +1194,7 @@ contains
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
-             call ESMF_FieldWrite(gridField, &
+             call ESMF_FieldWrite(cap_fld_list(n)%import_field, &
                   vars_in_dir//trim(cap_fld_list(n)%st_name)// &
                   "_grid_post.nc", &
                   overwrite=.true., &
@@ -1196,7 +1202,7 @@ contains
              call check(rc, __LINE__, file)
           end if
           ! --- end debug ---
-          call ESMF_FieldDestroy(gridField, rc=rc)
+          ! call ESMF_FieldDestroy(gridField, rc=rc)
           call check(rc, __LINE__, file)
        end if
     end do
@@ -1213,7 +1219,7 @@ contains
     type(ESMF_State),intent(in) :: saved_import_state
     integer, intent(in) :: did
     type(memory_flag), intent(in) :: memflg
-    type(ESMF_Field) :: meshField, gridField
+    type(ESMF_Field) :: meshField!, gridField
     type(ESMF_Field) :: importMeshField
     integer :: n, rc, itemCount
     character(len=64), allocatable :: itemNameList(:)
@@ -1301,11 +1307,13 @@ contains
              call check(rc, __LINE__, file)
           end if
 
-          ! should probably be called field_get?
-          ! print *, "==============================="
-          gridField = field_create(cap_fld_list(n)%st_name, grid, did, &
-               memflg, rc)
-          call check(rc, __LINE__, file)
+          ! new way to handle gridField
+          if (cap_fld_list(n)%export_field_init .eqv. .false.) then
+             cap_fld_list(n)%export_field = field_create(cap_fld_list(n)%st_name, grid, did, &
+                  memflg, rc)
+             call check(rc, __LINE__, file)
+             cap_fld_list(n)%export_field_init = .true.
+          end if
 
           ! Debugging: write export mesh before regrid
           ! if (debug_importexport_vars) then
@@ -1328,7 +1336,7 @@ contains
                   // "_grid_pre" &
                   ! //trim(scount) &
                   //".nc"
-             call ESMF_FieldWrite(gridField, &
+             call ESMF_FieldWrite(cap_fld_list(n)%export_field, &
                   fname, &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
@@ -1369,7 +1377,7 @@ contains
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
-             call ESMF_FieldSMMStore(srcField=gridfield, dstField=meshfield, &
+             call ESMF_FieldSMMStore(srcField=cap_fld_list(n)%export_field, dstField=meshfield, &
                   filename=weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   routehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
@@ -1380,7 +1388,7 @@ contains
 
           if (debug) print*, "DEBUGGING: using var's handle to regrid field ", &
                trim(cap_fld_list(n)%st_name)
-          call ESMF_FieldRegrid(gridField, meshField, &
+          call ESMF_FieldRegrid(cap_fld_list(n)%export_field, meshField, &
                cap_fld_list(n)%export_handle, &
                zeroregion=ESMF_REGION_SELECT, rc=rc)
           call check(rc, __LINE__, file)
@@ -1404,14 +1412,14 @@ contains
                   // "_grid_post" &
                   ! //trim(scount) &
                   //".nc"
-             call ESMF_FieldWrite(gridField, &
+             call ESMF_FieldWrite(cap_fld_list(n)%export_field, &
                   fname, &
                   overwrite=.true., &
                   variableName=trim(cap_fld_list(n)%st_name), rc=rc)
              call check(rc, __LINE__, file)
           end if
 
-          call ESMF_FieldDestroy(gridField, rc=rc)
+          ! call ESMF_FieldDestroy(gridField, rc=rc)
           call check(rc, __LINE__, file)
        end if
     end do
