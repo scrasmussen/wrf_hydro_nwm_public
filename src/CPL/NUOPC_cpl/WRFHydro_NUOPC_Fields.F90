@@ -120,13 +120,16 @@ module wrfhydro_nuopc_fields
                  "1     ", ESMF_REGRIDMETHOD_NEAREST_STOD, &
                  IMPORT_F, EXPORT_F, 16.0d0),                 & !FIX
     cap_fld_type("surface_water_depth","sfchead", &
-                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+                 ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
     cap_fld_type("time_step_infiltration_excess","infxsrt", &
-                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+                 ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_T, EXPORT_F, 0.00d0),             &
     cap_fld_type("soil_column_drainage","soldrain", &
-                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+                 ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
                  IMPORT_T, EXPORT_F, 0.00d0),             &
     ! FOOBAR: double check this is ok
     ! these two accumulated variables break during runtime

@@ -1064,7 +1064,7 @@ contains
     integer :: n, rc, itemCount
     character(len=64), allocatable :: itemNameList(:)
     logical :: imported
-    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file, hires_scrip_file
 
     ! debugging
     integer :: unit, i
@@ -1156,15 +1156,21 @@ contains
 
              if (.not. allocated(hires_file)) &
                   hires_file = read_hires_filename_from_namelist()
+             hires_scrip_file = fulldom_to_scrip_filename(hires_file)
              mpas_grid_file = get_mpas_grid_filename()
              scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
 
              call create_dir_if_needed(weights_dir)
+             ! center, dims and imask
              call ESMF_RegridWeightGen(&
                   srcFile=scrip_mesh_file, &
-                  dstFile=hires_file, &
+                  dstFile=hires_scrip_file, &
                   weightFile=weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
+                  srcFileType=ESMF_FILEFORMAT_SCRIP, &
+                  dstFileType=ESMF_FILEFORMAT_SCRIP, &
+                  srcRegionalFlag=.true., &
+                  dstRegionalFlag=.true., &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
@@ -1232,7 +1238,7 @@ contains
     real(ESMF_KIND_FIELD), pointer :: farrayPtr2d(:,:)
 
 
-    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file, hires_scrip_file
 
     ! debugging
     integer :: unit
@@ -1365,15 +1371,24 @@ contains
              ! will be updated by the sparse matrix multiplication
              if (.not. allocated(hires_file)) &
                   error stop "hires_file variable not defined"
+             hires_scrip_file = fulldom_to_scrip_filename(hires_file)
+
+             ! ARTLESS : hires_scrip_file needs grid corner, grid
+             ! center, dims and imask
 
              mpas_grid_file = get_mpas_grid_filename()
              scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
+
              call ESMF_RegridWeightGen(&
-                  srcFile=hires_file, & ! grid
+                  srcFile=hires_scrip_file, & ! grid
                   dstFile=scrip_mesh_file, &            ! to mesh
                   weightFile=weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc', &
                   regridmethod=cap_fld_list(n)%regrid_method, &
                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
+                  srcFileType=ESMF_FILEFORMAT_SCRIP, &
+                  dstFileType=ESMF_FILEFORMAT_SCRIP, &
+                  srcRegionalFlag=.true., &
+                  dstRegionalFlag=.true., &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
@@ -2609,6 +2624,20 @@ contains
     end if
     scrip_mesh_file = mpas_grid_file(:i-1) // ".tmp.scrip.nc"
   end function mpas_to_scrip_filename
+
+
+  function fulldom_to_scrip_filename(fulldom_file) result(scrip_file)
+    character(len=*), intent(in) :: fulldom_file
+    character(len=:), allocatable :: scrip_file
+    integer :: i
+    i = index(trim(fulldom_file), '.nc', back=.true.)
+    if (i == 0) then
+       print *, "Error: fulldom_file ", trim(fulldom_file), &
+            " does not have .nc suffix"
+       error stop "Error: fulldom_file in incorrect format"
+    end if
+    scrip_file = fulldom_file(:i-1) // ".tmp.scrip.nc"
+  end function fulldom_to_scrip_filename
 
 
   ! Convert MPAS mesh to scrip format. Based on
