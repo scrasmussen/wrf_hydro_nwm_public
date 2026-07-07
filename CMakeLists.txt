@@ -205,6 +205,20 @@ option(BUILD_CROCUS "Build Crocus" ON)
 option(WRF_HYDRO_CREATE_EXE_SYMLINK "Create symlink wrfhydro.exe -> wrfhydro" ON)
 message("WRF_HYDRO_CREATE_EXE_SYMLINK = " ${WRF_HYDRO_CREATE_EXE_SYMLINK} )
 
+option(LINARO_PROFILE "Link Linaro Forge MAP profiler sampler libraries" OFF)
+if (LINARO_PROFILE)
+  if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    message (FATAL_ERROR "CMAKE_BUILD_TYPE needs to be set to Debug because \
+                          LINARO_PROFILE is turned on")
+  endif()
+  execute_process(
+    COMMAND make-profiler-libraries --platform=cray --lib-type=shared
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMAND_ERROR_IS_FATAL ANY
+  )
+  # libraries linked after wrfhydro target is created
+endif()
+
 message("=============================================================")
 
 #set compile flags based on compiler id
@@ -232,7 +246,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "Cray*"))
         message("-- Using Cray")
         set(CMAKE_Fortran_FLAGS "-eZ -ffree -ef -h alias=none -h fp1 -hbyteswapio")
         set(CMAKE_Fortran_FLAGS_RELEASE "-O2 -g")
-        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g") # -traceback")
+        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
 else()
         message("CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
         message("Fortran compiler: " ${Fortran_COMPILER_NAME})
