@@ -217,7 +217,7 @@ subroutine ov_rtng( &
 #ifdef MPP_LAND
     use module_mpp_land, only: left_id,down_id,right_id, &
         up_id,mpp_land_com_real, my_id, &
-        mpp_land_sync
+        mpp_land_sync, numprocs
 #endif
     use overland_data
     IMPLICIT NONE
@@ -253,7 +253,8 @@ subroutine ov_rtng( &
     INTEGER :: KRT,I,J,ct
 
     REAL, DIMENSION(IXRT,JXRT)	:: INFXS_FRAC
-    REAL	:: DT_FRAC,SUM_INFXS,sum_head
+    INTEGER :: DT_FRAC
+    REAL	:: SUM_INFXS,sum_head
     REAL    :: acc_channel, acc_lake
     !INTEGER SO8RT_D(IXRT,JXRT,3), rt_option
 
@@ -276,20 +277,42 @@ subroutine ov_rtng( &
     !DJG debug
 
 
-    !DJG Assign all infiltration excess to surface head...
-    ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
-
     !DJG Divide infiltration excess over all routing time-steps
     !	     INFXS_FRAC=INFXSUBRT/(DT/DTRT_TER)
+
+    !DJG Execute routing time-step loop...
+
+
+#ifdef MPP_LAND
+    if (rt_option .eq. 1 .and. numprocs .eq. 1) then
+#else
+    if (rt_option .eq. 1) then
+#endif
+        CALL OV_RTNG_ROUTE1_ACC(DTRT_TER, DT_FRAC, IXRT, JXRT, &
+            ovrt_data%control%infiltration_excess, &
+            ovrt_data%control%surface_water_head_routing, &
+            ovrt_data%properties%distance_to_neighbor, &
+            ovrt_data%properties%retention_depth, &
+            ovrt_data%properties%roughness, &
+            ovrt_data%control%boundary_flux, &
+            ovrt_data%control%boundary_flux_total, &
+            ovrt_data%properties%surface_slope, &
+            ovrt_data%properties%max_surface_slope_index, &
+            ovrt_data%streams_and_lakes%CH_NETRT, &
+            ovrt_data%streams_and_lakes%lake_mask, &
+            ovrt_data%streams_and_lakes%surface_water_to_channel, &
+            ovrt_data%streams_and_lakes%surface_water_to_lake, &
+            ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel, &
+            ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake, &
+            q_sfcflx_x, q_sfcflx_y)
+    else
+    !DJG Assign all infiltration excess to surface head...
+    ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
 
     !DJG Set flux accumulation fields to 0. before each loop...
     q_sfcflx_x = 0.
     q_sfcflx_y = 0.
     ct =0
-
-
-    !DJG Execute routing time-step loop...
-
 
     DO KRT=1,DT_FRAC
 
@@ -413,6 +436,8 @@ subroutine ov_rtng( &
 
     END DO          ! END routing time steps
 
+    end if
+
 #ifdef HYDRO_D
     print *, "End of OV_routing call..."
 #endif
@@ -426,6 +451,292 @@ subroutine ov_rtng( &
 END SUBROUTINE OV_RTNG
 
 !DJG ----------------------------------------------------------------
+
+SUBROUTINE OV_RTNG_ROUTE1_ACC(dt, dt_frac, XX, YY, &
+        infiltration_excess, h, gsize, retent_dep, dist_rough, &
+        QBDRY, QBDRYT, SO8RT, SO8RT_D, CH_NETRT, lake_mask, &
+        surface_water_to_channel, surface_water_to_lake, &
+        accumulated_surface_water_to_channel, accumulated_surface_water_to_lake, &
+        q_sfcflx_x, q_sfcflx_y)
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: XX, YY, dt_frac
+    REAL, INTENT(IN) :: dt
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: infiltration_excess
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: dist_rough
+    REAL, INTENT(IN), DIMENSION(XX,YY,9) :: gsize
+    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
+    INTEGER, INTENT(IN), DIMENSION(XX,YY,3) :: SO8RT_D
+    INTEGER, INTENT(IN), DIMENSION(XX,YY) :: CH_NETRT, lake_mask
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: h
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: retent_dep
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: QBDRY
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: surface_water_to_channel
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: surface_water_to_lake
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: q_sfcflx_x, q_sfcflx_y
+    REAL, INTENT(INOUT) :: QBDRYT
+    REAL, INTENT(INOUT) :: accumulated_surface_water_to_channel
+    REAL, INTENT(INOUT) :: accumulated_surface_water_to_lake
+
+    INTEGER :: i, j, krt
+    REAL :: acc_channel, acc_lake
+    REAL*8, DIMENSION(XX,YY) :: QBDRY_tmp, DH
+    REAL*8, DIMENSION(XX,YY) :: DH_tmp
+    REAL, DIMENSION(XX,YY) :: edge_adjust
+
+!$acc data copyin(infiltration_excess, gsize, dist_rough, SO8RT, SO8RT_D, CH_NETRT, lake_mask) &
+!$acc&     copy(retent_dep, QBDRY, surface_water_to_channel, surface_water_to_lake) &
+!$acc&     copyout(h, q_sfcflx_x, q_sfcflx_y) &
+!$acc&     create(QBDRY_tmp, DH, DH_tmp, edge_adjust)
+
+!$acc parallel loop collapse(2) private(i,j)
+    do j=1,YY
+        do i=1,XX
+            h(i,j) = infiltration_excess(i,j)
+            q_sfcflx_x(i,j) = 0.0
+            q_sfcflx_y(i,j) = 0.0
+        end do
+    end do
+
+    DO KRT=1,dt_frac
+
+        acc_channel = 0.0
+        acc_lake = 0.0
+
+!$acc parallel loop collapse(2) private(i,j) reduction(+:acc_channel,acc_lake)
+        DO J=1,YY
+            DO I=1,XX
+                IF (CH_NETRT(I,J).ge.0) THEN
+                    retent_dep(I,J) = 5.0
+
+                    IF (h(I,J) .GT. retent_dep(I,J)) THEN
+                        acc_channel = acc_channel + (h(I,J) - retent_dep(I,J))
+                        surface_water_to_channel(I,J) = surface_water_to_channel(I,J) + (h(I,J) - retent_dep(I,J))
+                        h(I,J) = retent_dep(I,J)
+                    END IF
+                END IF
+
+                IF (lake_mask(I,J) .gt. 0) THEN
+                    IF (h(I,J) .GT. retent_dep(I,J)) THEN
+                        acc_lake = acc_lake + (h(I,J) - retent_dep(I,J))
+                        surface_water_to_lake(I,J) = surface_water_to_lake(I,J) + (h(I,J) - retent_dep(I,J))
+                        h(I,J) = retent_dep(I,J)
+                    END IF
+                END IF
+            END DO
+        END DO
+
+        accumulated_surface_water_to_channel = accumulated_surface_water_to_channel + acc_channel
+        accumulated_surface_water_to_lake = accumulated_surface_water_to_lake + acc_lake
+
+        CALL ROUTE_OVERLAND1_ACC(dt, gsize, h, retent_dep, dist_rough, XX, YY, &
+            QBDRY, QBDRYT, SO8RT, SO8RT_D, q_sfcflx_x, q_sfcflx_y, &
+            QBDRY_tmp, DH, DH_tmp, edge_adjust)
+
+    END DO
+
+!$acc end data
+
+END SUBROUTINE OV_RTNG_ROUTE1_ACC
+
+!DJG ----------------------------------------------------------------
+
+SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize, h, retent_dep, dist_rough, &
+        XX, YY, QBDRY, QBDRYT, SO8RT, SO8RT_D, q_sfcflx_x, q_sfcflx_y, &
+        QBDRY_tmp, DH, DH_tmp, edge_adjust)
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: XX,YY
+    REAL, INTENT(IN) :: dt, gsize(xx,yy,9)
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: h
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: retent_dep
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: dist_rough
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: QBDRY
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: q_sfcflx_x, q_sfcflx_y
+    REAL, INTENT(INOUT) :: QBDRYT
+    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
+    INTEGER, INTENT(IN), DIMENSION(XX,YY,3) :: SO8RT_D
+    REAL*8, INTENT(INOUT), DIMENSION(XX,YY) :: QBDRY_tmp, DH
+    REAL*8, INTENT(INOUT), DIMENSION(XX,YY) :: DH_tmp
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: edge_adjust
+
+    REAL :: alfax
+    REAL :: hh53,qqsfc,hh,hh13,hmax
+    REAL :: sfx
+    REAL :: tmp_adjust
+    REAL :: qbdryt_delta
+
+    INTEGER :: i,j
+    INTEGER :: IXX0,JYY0,index
+    REAL :: tmp_gsize, tmp_sfx
+
+!$acc parallel loop collapse(2) private(i,j)
+    do j=1,YY
+        do i=1,XX
+            DH(i,j) = 0.0
+            DH_tmp(i,j) = 0.0
+            QBDRY_tmp(i,j) = 0.0
+            edge_adjust(i,j) = 0.0
+        end do
+    end do
+
+    qbdryt_delta = 0.0
+
+!$acc parallel loop collapse(2) &
+!$acc&     private(IXX0,JYY0,index,tmp_gsize,sfx,tmp_sfx,hmax,alfax,hh,hh13,hh53,qqsfc,tmp_adjust) &
+!$acc&     reduction(+:qbdryt_delta)
+    do j=2,YY-1
+        do i=2,XX-1
+            if (h(I,J).GT.retent_dep(I,J)) then
+                IXX0 = SO8RT_D(i,j,1)
+                JYY0 = SO8RT_D(i,j,2)
+                index = SO8RT_D(i,j,3)
+                tmp_gsize = 1.0/gsize(i,j,index)
+                sfx = so8RT(i,j,index)-(h(IXX0,JYY0)-h(i,j))*0.001*tmp_gsize
+                hmax = h(i,j)*0.001
+                if(sfx .lt. 1E-20) then
+                    IXX0 = -1
+                    JYY0 = -1
+                    sfx = 0.0
+
+                    tmp_sfx = so8RT(i,j,1)-(h(i,j+1)-h(i,j))*0.001/gsize(i,j,1)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I
+                        JYY0 = J+1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,2)-(h(i+1,j+1)-h(i,j))*0.001/gsize(i,j,2)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I+1
+                        JYY0 = J+1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,3)-(h(i+1,j)-h(i,j))*0.001/gsize(i,j,3)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I+1
+                        JYY0 = J
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,4)-(h(i+1,j-1)-h(i,j))*0.001/gsize(i,j,4)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I+1
+                        JYY0 = J-1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,5)-(h(i,j-1)-h(i,j))*0.001/gsize(i,j,5)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I
+                        JYY0 = J-1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,6)-(h(i-1,j-1)-h(i,j))*0.001/gsize(i,j,6)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I-1
+                        JYY0 = J-1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,7)-(h(i-1,j)-h(i,j))*0.001/gsize(i,j,7)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I-1
+                        JYY0 = J
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,8)-(h(i-1,j+1)-h(i,j))*0.001/gsize(i,j,8)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I-1
+                        JYY0 = J+1
+                        sfx = tmp_sfx
+                    end if
+                end if
+                if(IXX0 > 0) then
+                    if(sfx .lt. 1E-20) sfx = 1E-20
+                    alfax = sqrt(sfx) / dist_rough(i,j)
+                    hh=(h(i,j)-retent_dep(i,j)) * 0.001
+                    hh13 = sqrt(sqrt(hh))
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh53 = hh*hh13*hh13
+
+                    qqsfc = alfax*hh53*dt * tmp_gsize
+
+                    if (qqsfc.ge.(hmax*dt*tmp_gsize)) qqsfc = hmax*dt*tmp_gsize
+
+                    if (IXX0.gt.i) then
+                        q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + qqsfc * &
+                            (1.0 - 0.5 * (ABS(j-JYY0)))
+                    else if (IXX0.lt.i) then
+                        q_sfcflx_x(I,J) = q_sfcflx_x(I,J) - 1.0 * &
+                            qqsfc * (1.0 - 0.5 * (ABS(j-JYY0)))
+                    end if
+                    if (JYY0.gt.j) then
+                        q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + qqsfc * &
+                            (1.0 - 0.5 * (ABS(i-IXX0)))
+                    elseif (JYY0.lt.j) then
+                        q_sfcflx_y(I,J) = q_sfcflx_y(I,J) - 1.0 * &
+                            qqsfc * (1.0 - 0.5 * (ABS(i-IXX0)))
+                    end if
+
+                    tmp_adjust=qqsfc*1000
+
+                    if((h(i,j) - tmp_adjust) <0 ) tmp_adjust = h(i,j)
+                    DH(i,j) = DH(i,j)-tmp_adjust
+!$acc atomic update
+                    DH_tmp(ixx0,jyy0) = DH_tmp(ixx0,jyy0) + tmp_adjust
+
+                    if ((ixx0.eq.XX).or.(ixx0.eq.1).or.(jyy0.eq.1) .or.(JYY0.eq.YY )) then
+!$acc atomic update
+                        QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
+                        qbdryt_delta = qbdryt_delta - qqsfc
+!$acc atomic update
+                        DH_tmp(IXX0,JYY0)= DH_tmp(IXX0,JYY0)-tmp_adjust
+                    end if
+                end if
+            end if
+        end do
+    end do
+
+    QBDRYT = QBDRYT + qbdryt_delta
+
+!$acc parallel loop collapse(2) private(i,j)
+    do j=1,YY
+        do i=1,XX
+            QBDRY(i,j) = QBDRY(i,j) + QBDRY_tmp(i,j)
+            DH(i,j) = DH(i,j)+DH_tmp(i,j)
+            H(i,j) = H(i,j) + DH(i,j)
+        end do
+    end do
+
+!$acc parallel loop collapse(2) private(i,j)
+    do i=1,XX
+        do j=1,YY
+            if ((i.eq.XX).or.(i.eq.1).or.(j.eq.1).or.(j.eq.YY)) then
+                if (h(i,j) .GT. retent_dep(i,j)) then
+                    edge_adjust(i,j) = h(i,j) - retent_dep(i,j)
+                end if
+            end if
+        end do
+    end do
+
+!$acc parallel loop collapse(2) private(i,j)
+    do j=1,YY
+        do i=1,XX
+            QBDRY(i,j) = QBDRY(i,j) - edge_adjust(i,j)
+            H(i,j) = H(i,j) - edge_adjust(i,j)
+        end do
+    end do
+
+END SUBROUTINE ROUTE_OVERLAND1_ACC
 
 !DJG     SUBROUTINE ROUTE_OVERLAND1
 !DJG ----------------------------------------------------------------
@@ -651,6 +962,7 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                                 .or.(JYY0.eq.YY )) then
                             !QBDRY(IXX0,JYY0)=QBDRY(IXX0,JYY0) - qqsfc*1000.
 #endif
+!$acc atomic update
                             QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
 !$acc atomic update
                             QBDRYT=QBDRYT - qqsfc
