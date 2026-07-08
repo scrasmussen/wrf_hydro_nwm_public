@@ -254,6 +254,7 @@ subroutine ov_rtng( &
 
     REAL, DIMENSION(IXRT,JXRT)	:: INFXS_FRAC
     REAL	:: DT_FRAC,SUM_INFXS,sum_head
+    REAL    :: acc_channel, acc_lake
     !INTEGER SO8RT_D(IXRT,JXRT,3), rt_option
 
     !DJG ----------------------------------------------------------------------
@@ -292,6 +293,9 @@ subroutine ov_rtng( &
 
     DO KRT=1,DT_FRAC
 
+        acc_channel = 0.0
+        acc_lake = 0.0
+
         DO J=1,JXRT
             DO I=1,IXRT
 
@@ -303,7 +307,7 @@ subroutine ov_rtng( &
                 !DJG ERROR Check...
 
                 IF (ovrt_data%control%surface_water_head_routing(I,J).lt.0.) THEN
-#ifdef HYDRO_D
+#if defined(HYDRO_D) && !defined(_OPENACC)
                     print *, "ywcheck 2 ERROR!!!: Neg. Surface Head Value at (i,j):",    &
                         i,j,ovrt_data%control%surface_water_head_routing(I,J)
                     print *, "RETDEPRT(I,J) = ",ovrt_data%properties%retention_depth(I,J), "KRT=",KRT
@@ -333,7 +337,7 @@ subroutine ov_rtng( &
 
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
                         !!               QINFLO(CH_NET(I,J)=QINFLO(CH_NET(I,J)+SFCHEAD(I,J) - RETDEPRT(I,J)
-                        ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel = ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel + &
+                        acc_channel = acc_channel + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
                         ovrt_data%streams_and_lakes%surface_water_to_channel(I,J) = ovrt_data%streams_and_lakes%surface_water_to_channel(I,J) + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
@@ -351,7 +355,7 @@ subroutine ov_rtng( &
 
                 IF (ovrt_data%streams_and_lakes%lake_mask(I,J) .gt. 0) THEN
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
-                        ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake = ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake + &
+                        acc_lake = acc_lake + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
                         ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) = ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) + &
                             (ovrt_data%control%surface_water_head_routing(I,J)- ovrt_data%properties%retention_depth(I,J))
@@ -363,6 +367,11 @@ subroutine ov_rtng( &
 
             END DO
         END DO
+
+        ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel = &
+            ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel + acc_channel
+        ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake = &
+            ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake + acc_lake
 
         !yw check         call MPP_LAND_COM_REAL(QSTRMVOLRT,IXRT,JXRT,99)
         !DJG----------------------------------------------------------------------
@@ -475,14 +484,13 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     !!! Declare Local Variables
 
     REAL :: dhdx,dhdy,alfax,alfay
-    REAL :: hh53,qqsfc,hh,dt_new,hmax
+    REAL :: hh53,qqsfc,hh,hh13,dt_new,hmax
     REAL :: sfx,sfy
     REAL :: tmp_adjust
 
     INTEGER :: i,j
-    REAL IXX8,IYY8
     INTEGER  IXX0,JYY0,index, SO8RT_D(XX,YY,3)
-    REAL :: tmp_gsize, hsum, tmp_gsize_arr(9)
+    REAL :: tmp_gsize, hsum, tmp_sfx
 
     !!! Initialize variables
 
@@ -495,6 +503,9 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     QBDRY_tmp =0.
 
     !!! Loop to route water
+!$acc parallel loop collapse(2) private(IXX0,JYY0,index,tmp_gsize,sfx,tmp_sfx,hmax,alfax,hh,hh13,hh53,qqsfc,tmp_adjust) &
+!$acc&     copyin(h, retent_dep, gsize, so8RT, SO8RT_D, dist_rough) &
+!$acc&     copy(q_sfcflx_x, q_sfcflx_y, DH, DH_tmp, QBDRY_tmp, QBDRYT)
     do j=2,YY-1
         do i=2,XX-1
             if (h(I,J).GT.retent_dep(I,J)) then
@@ -505,12 +516,69 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                 sfx = so8RT(i,j,index)-(h(IXX0,JYY0)-h(i,j))*0.001*tmp_gsize
                 hmax = h(i,j)*0.001  !Specify max head for mass flux limit...
                 if(sfx .lt. 1E-20) then
-                    tmp_gsize_arr = gsize(i,j,:)
-                    call GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,so8rt,tmp_gsize_arr,sfx,XX,YY)
+                    IXX0 = -1
+                    JYY0 = -1
+                    sfx = 0.0
+
+                    tmp_sfx = so8RT(i,j,1)-(h(i,j+1)-h(i,j))*0.001/gsize(i,j,1)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I
+                        JYY0 = J+1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,2)-(h(i+1,j+1)-h(i,j))*0.001/gsize(i,j,2)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I+1
+                        JYY0 = J+1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,3)-(h(i+1,j)-h(i,j))*0.001/gsize(i,j,3)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I+1
+                        JYY0 = J
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,4)-(h(i+1,j-1)-h(i,j))*0.001/gsize(i,j,4)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I+1
+                        JYY0 = J-1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,5)-(h(i,j-1)-h(i,j))*0.001/gsize(i,j,5)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I
+                        JYY0 = J-1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,6)-(h(i-1,j-1)-h(i,j))*0.001/gsize(i,j,6)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I-1
+                        JYY0 = J-1
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,7)-(h(i-1,j)-h(i,j))*0.001/gsize(i,j,7)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I-1
+                        JYY0 = J
+                        sfx = tmp_sfx
+                    end if
+
+                    tmp_sfx = so8RT(i,j,8)-(h(i-1,j+1)-h(i,j))*0.001/gsize(i,j,8)
+                    if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
+                        IXX0 = I-1
+                        JYY0 = J+1
+                        sfx = tmp_sfx
+                    end if
                 end if
                 if(IXX0 > 0) then  ! do the rest if the lowest grid can be found.
                     if(sfx .lt. 1E-20) then
-#ifdef HYDRO_D
+#if defined(HYDRO_D) && !defined(_OPENACC)
                         print*, "Message: sfx reset to 1E-20. sfx =",sfx
                         print*, "i,j,index,IXX0,JYY0",i,j,index,IXX0,JYY0
                         print*, "so8RT(i,j,index), h(IXX0,JYY0), h(i,j), gsize(i,j,index) ", &
@@ -520,7 +588,12 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                     end if
                     alfax = sqrt(sfx) / dist_rough(i,j)
                     hh=(h(i,j)-retent_dep(i,j)) * 0.001
-                    hh53=hh**(5./3.)
+                    hh13 = sqrt(sqrt(hh))
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh13 = (2.0*hh13 + hh/(hh13*hh13))/3.0
+                    hh53 = hh*hh13*hh13
 
                     ! Calculate q-flux...
                     qqsfc = alfax*hh53*dt * tmp_gsize
@@ -554,13 +627,14 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                     tmp_adjust=qqsfc*1000
 
                     if((h(i,j) - tmp_adjust) <0 )  then
-#ifdef HYDRO_D
+#if defined(HYDRO_D) && !defined(_OPENACC)
                         print*, "Error Warning: surface head is negative:  ",i,j,ixx0,jyy0, &
                             h(i,j) - tmp_adjust
 #endif
                         tmp_adjust = h(i,j)
                     end if
                     DH(i,j) = DH(i,j)-tmp_adjust
+!$acc atomic update
                     DH_tmp(ixx0,jyy0) = DH_tmp(ixx0,jyy0) + tmp_adjust
                     !yw end change
 
@@ -578,7 +652,9 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                             !QBDRY(IXX0,JYY0)=QBDRY(IXX0,JYY0) - qqsfc*1000.
 #endif
                             QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
+!$acc atomic update
                             QBDRYT=QBDRYT - qqsfc
+!$acc atomic update
                             DH_tmp(IXX0,JYY0)= DH_tmp(IXX0,JYY0)-tmp_adjust
 
                         end if
