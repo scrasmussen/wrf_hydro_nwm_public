@@ -519,6 +519,395 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
 END SUBROUTINE SUBMUSKINGCUNGE
 ! ----------------------------------------------------------------
 
+real function cbrt_pos_acc(x)
+!$acc routine seq
+implicit none
+real, intent(in) :: x
+real :: r
+integer :: iter
+
+if (x .le. 0.0) then
+   cbrt_pos_acc = 0.0
+else
+   r = max(sqrt(sqrt(x)), 1.0e-12)
+   do iter = 1, 4
+      r = (2.0*r + x/(r*r))/3.0
+   end do
+   cbrt_pos_acc = r
+endif
+
+end function cbrt_pos_acc
+
+real function pow23_pos_acc(x)
+!$acc routine seq
+implicit none
+real, intent(in) :: x
+real :: cbrt
+
+cbrt = cbrt_pos_acc(x)
+pow23_pos_acc = cbrt*cbrt
+
+end function pow23_pos_acc
+
+real function pow53_pos_acc(x)
+!$acc routine seq
+implicit none
+real, intent(in) :: x
+real :: cbrt
+
+cbrt = cbrt_pos_acc(x)
+pow53_pos_acc = x*cbrt*cbrt
+
+end function pow53_pos_acc
+
+subroutine SUBMUSKINGCUNGE_ACC(    &
+     qdc, vel, qloss, idx, qup,  quc, &
+     qdp, ql,   dt,  So,   dx, &
+     n,   Cs,   Bw,  Tw, TwCC, &
+     nCC, depth, ChannK        )
+!$acc routine seq
+
+        IMPLICIT NONE
+
+        REAL, intent(IN)       :: dt
+        REAL, intent(IN)       :: qup
+        REAL, intent(IN)       :: quc
+        REAL, intent(IN)       :: qdp
+        REAL, intent(INOUT)    :: qdc
+        REAL, intent(IN)       :: ql
+        REAL, intent(IN)       :: Bw
+        REAL, intent(IN)       :: Tw
+        REAL, intent(IN)       :: TwCC
+        REAL, intent(IN)       :: nCC
+        REAL, intent(IN)       :: ChannK
+        REAL, intent(IN)       :: Cs
+        REAL, intent(IN)       :: So
+        REAL, intent(IN)       :: dx
+        REAL, intent(IN)       :: n
+        REAL, intent(INOUT)    :: vel
+        REAL, intent(INOUT)    :: qloss
+        integer(kind=int64), intent(IN)    :: idx
+        REAL, intent(INOUT)    :: depth
+
+        REAL    :: C1, C2, C3, C4
+        REAL    :: Km
+        REAL    :: X
+        REAL    :: Ck
+        REAL    :: Twl
+        REAL    :: AREA,AREAC
+        REAL    :: Z
+        REAL    :: R
+        REAL    :: WP,WPC
+        REAL    :: h
+        REAL    :: h_0,h_1
+        REAL    :: bfd
+        REAL    :: Qj_0
+        REAL    :: Qj
+        REAL    :: D
+        REAL    :: aerror,rerror
+        INTEGER :: iter, maxiter
+        REAL    :: WPk
+        REAL    :: modK
+        REAL    :: a,b,c
+        REAL    :: mindepth
+        INTEGER :: tries
+        REAL    :: sqrt_z, r23, r53, hb23
+
+        modK = 0.15
+        c = 0.52
+        b = 1.15
+        a = 0.0
+        maxiter  = 100
+        mindepth = 0.01
+        aerror = 0.01
+        rerror = 1.0
+        tries = 0
+        WPk = 0.0
+        D = dt
+        C1 = 0.0
+        C2 = 0.0
+        C3 = 0.0
+        C4 = 0.0
+        Km = dt
+        X = 0.5
+        Ck = 0.0
+
+        if(Cs .eq. 0.00000000) then
+         z = 1.0
+        else
+         z = 1.0/Cs
+        endif
+
+        if(Bw .gt. Tw) then
+           bfd = Bw/0.00001
+        elseif (Bw .eq. Tw) then
+          bfd =  Bw/(2.0*z)
+        else
+          bfd =  (Tw - Bw)/(2.0*z)
+        endif
+
+        if (n .le. 0.0 .or. So .le. 0.0 .or. z .le. 0.0 .or. Bw .le. 0.0) then
+          qdc = 0.0
+          vel = 0.0
+          qloss = 0.0
+          depth = 0.0
+          return
+        end if
+
+        depth = max(depth, 0.0)
+        h     = (depth * 1.33) + mindepth
+        h_0   = (depth * 0.67)
+
+        if(ql .gt. 0.0 .or. qup .gt. 0.0 .or. qdp .gt. 0.0) then
+
+110     continue
+
+        Qj_0  = 0.0
+        iter   = 0
+
+        do while (rerror .gt. 0.01 .and. aerror .ge. mindepth .and. iter .le. maxiter)
+
+           WPC    = 0.0
+           AREAC  = 0.0
+           sqrt_z = sqrt(1.0 + z*z)
+           Twl = Bw + 2.0*z*h_0
+
+            if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then
+             AREA =  (Bw + bfd * z) * bfd
+             AREAC = (TwCC * (h_0 -bfd))
+             WP = (Bw + 2.0 * bfd * sqrt_z)
+             WPC = TwCC + (2.0 * (h_0-bfd))
+             WPk = WP + WPC*MIN((h_0/(modK*SQRT(Bw))),1.0)
+             R   = (AREA + AREAC)/(WP +WPC)
+            else
+              AREA = (Bw + h_0 * z ) * h_0
+              WP = (Bw + 2.0 * h_0 * sqrt_z)
+              WPk = WP*MIN((h_0/(modK*SQRT(Bw))),1.0)
+              if(WP .gt. 0.0) then
+               R = AREA/ WP
+              else
+               R = 0.0
+              endif
+
+            endif
+
+          if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then
+                r23 = pow23_pos_acc(R)
+                r53 = pow53_pos_acc(R)
+                hb23 = pow23_pos_acc(h_0-bfd)
+                Ck = max(0.0,((sqrt(So)/n)*((5./3.)*r23 - &
+                ((2./3.)*r53*(2.0*sqrt_z/(Bw+2.0*bfd*z))))*AREA &
+                + ((sqrt(So)/(nCC))*(5./3.)*hb23)*AREAC)/(AREA+AREAC))
+          else
+               if(h_0 .gt. 0.0) then
+                 r23 = pow23_pos_acc(R)
+                 r53 = pow53_pos_acc(R)
+                 Ck = max(0.0,(sqrt(So)/n)*((5./3.)*r23 - &
+                 ((2./3.)*r53*(2.0*sqrt_z/(Bw+2.0*h_0*z)))))
+                else
+                 Ck = 0.0
+                endif
+          endif
+
+          if(Ck .gt. 0.000000) then
+            Km = max(dt,dx/Ck)
+          else
+            Km = dt
+          endif
+
+          if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) .and. (Ck .gt. 0.0) ) then
+             X = min(0.5,max(0.0,0.5*(1-(Qj_0/(2.0*TwCC*So*Ck*dx)))))
+          else
+            if(Ck .gt. 0.0) then
+              X = min(0.5,max(0.0,0.5*(1-(Qj_0/(2.0*Twl*So*Ck*dx)))))
+            else
+              X = 0.5
+            endif
+          endif
+
+           D = (Km*(1.000 - X) + dt/2.0000)
+           if(D .eq. 0.0) then
+              qdc = 0.0
+              vel = 0.0
+              qloss = 0.0
+              depth = h
+              return
+           endif
+
+           C1 =  (Km*X + dt/2.000000)/D
+           C2 =  (dt/2.0000 - Km*X)/D
+           C3 =  (Km*(1.00000000-X)-dt/2.000000)/D
+           if(ChannK .le. 0.0) then
+             C4 =  (ql*dt)/D
+           else
+             C4 =  ((ql - (ChannK * dx * WPk))*dt)/D
+           endif
+
+           if((WP+WPC) .gt. 0.0) then
+             if( (C4 .lt. 0.0) .and. (abs(C4) .gt. (C1*qup)+(C2*quc)+(C3*qdp)) )  then
+              C4 = -((C1*qup)+(C2*quc)+(C3*qdp))
+             endif
+             r23 = pow23_pos_acc(R)
+             Qj_0 =  ((C1*qup)+(C2*quc)+(C3*qdp) + C4) - ((1/(((WP*n)+(WPC*nCC))/(WP+WPC))) * &
+                    (AREA+AREAC) * r23 * sqrt(So))
+           endif
+
+           WPC    = 0.0
+           AREAC  = 0.0
+
+           Twl = Bw + 2.0*z*h
+
+           if ( (h .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then
+             AREA =  (Bw + bfd * z) * bfd
+             AREAC = (TwCC * (h-bfd))
+             WP = (Bw + 2.0 * bfd * sqrt_z)
+             WPC = TwCC + (2.0*(h-bfd))
+             WPk = WP + WPC*MIN((h/(modK*SQRT(Bw))),1.0)
+             R   = (AREA + AREAC)/(WP +WPC)
+           else
+              AREA = (Bw + h * z ) * h
+              WP = (Bw + 2.0 * h * sqrt_z)
+              WPk = WP*MIN((h/(modK*SQRT(Bw))),1.0)
+              if(WP .gt. 0.0) then
+               R = AREA/WP
+              else
+               R = 0.0
+              endif
+           endif
+
+          if ( (h .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) ) then
+                r23 = pow23_pos_acc(R)
+                r53 = pow53_pos_acc(R)
+                hb23 = pow23_pos_acc(h-bfd)
+                Ck = max(0.0,((sqrt(So)/n)*((5./3.)*r23 - &
+                ((2./3.)*r53*(2.0*sqrt_z/(Bw + 2.0*bfd*z))))*AREA &
+                + ((sqrt(So)/(nCC))*(5./3.)*hb23)*AREAC)/(AREA+AREAC))
+          else
+               if(h .gt. 0.0) then
+                 r23 = pow23_pos_acc(R)
+                 r53 = pow53_pos_acc(R)
+                 Ck = max(0.0,(sqrt(So)/n)*((5./3.)*r23 - &
+                 ((2./3.)*r53*(2.0 * sqrt_z/(Bw + 2.0*h*z)))))
+               else
+                 Ck = 0.0
+               endif
+          endif
+
+           if(Ck .gt. 0.0) then
+            Km = max(dt,dx/Ck)
+           else
+            Km = dt
+           endif
+
+          if ( (h .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) .and. (Ck .gt. 0.0) ) then
+            X = min(0.5,max(0.25,0.5*(1-(((C1*qup)+(C2*quc)+(C3*qdp) + C4)/(2.0*TwCC*So*Ck*dx)))))
+          else
+            if(Ck .gt. 0.0) then
+             X = min(0.5,max(0.25,0.5*(1-(((C1*qup)+(C2*quc)+(C3*qdp) + C4)/(2.0*Twl*So*Ck*dx)))))
+            else
+             X = 0.5
+            endif
+          endif
+
+           D = (Km*(1 - X) + dt/2)
+           if(D .eq. 0.0) then
+              qdc = 0.0
+              vel = 0.0
+              qloss = 0.0
+              depth = h
+              return
+           endif
+
+           C1 =  (Km*X + dt/2.000000)/D
+           C2 =  (dt/2.000000 - Km*X)/D
+           C3 =  (Km*(1.000000-X)-dt/2.000000)/D
+           if(ChannK .le. 0.0) then
+             C4 =  (ql*dt)/D
+           else
+             C4 =  ((ql - (ChannK * dx * WPk))*dt)/D
+           endif
+
+           if( (C4 .lt. 0.0) .and. (abs(C4) .gt. (C1*qup)+(C2*quc)+(C3*qdp)))  then
+            C4 = -((C1*qup)+(C2*quc)+(C3*qdp))
+           endif
+
+           if((WP+WPC) .gt. 0.0) then
+            if( (C4 .lt. 0.0) .and. (abs(C4) .gt. (C1*qup)+(C2*quc)+(C3*qdp)))  then
+               C4 = -((C1*qup)+(C2*quc)+(C3*qdp))
+            endif
+            r23 = pow23_pos_acc(R)
+            Qj =  ((C1*qup)+(C2*quc)+(C3*qdp) + C4) - ((1.0000000/(((WP*n)+(WPC*nCC))/(WP+WPC))) * &
+                    (AREA+AREAC) * r23 * sqrt(So))
+           endif
+
+           if(Qj_0-Qj .ne. 0.0) then
+             h_1 = h - ((Qj * (h_0 - h))/(Qj_0 - Qj))
+              if(h_1 .lt. 0.0) then
+                h_1 = h
+              endif
+           else
+             h_1 = h
+           endif
+
+           if(h .gt. 0.0) then
+             rerror = abs((h_1 - h)/h)
+             aerror = abs(h_1 -h)
+           else
+             rerror = 0.0
+             aerror = 0.9
+           endif
+
+           h_0  = max(0.0,h)
+           h    = max(0.0,h_1)
+           iter = iter + 1
+
+           if( h .lt. mindepth) then
+             goto 111
+           endif
+
+         end do
+
+111      continue
+
+         if(iter .ge. maxiter) then
+           tries = tries + 1
+           if(tries .le. 4) then
+             h     =  h * 1.33
+             h_0   =  h_0 * 0.67
+             maxiter = maxiter + 25
+            goto 110
+           endif
+         endif
+
+        if(((C1*qup)+(C2*quc)+(C3*qdp) + C4) .lt. 0.0) then
+           if( (C4 .lt. 0.0) .and. (abs(C4) .gt. (C1*qup)+(C2*quc)+(C3*qdp)) )  then
+             qdc = 0.0
+           else
+             qdc = MAX( ( (C1*qup)+(C2*quc) + C4),((C1*qup)+(C3*qdp) + C4) )
+           endif
+        else
+          qdc =  ((C1*qup)+(C2*quc)+(C3*qdp) + C4)
+        endif
+
+        Twl = Bw + (2.0*z*h)
+        R = (h*(Bw + Twl) / 2.0) / (Bw + 2.0*sqrt((((Twl - Bw) / 2.0)*((Twl - Bw) / 2.0)) + h*h))
+        vel =  (1./n) * pow23_pos_acc(R) * sqrt(So)
+        depth = h
+
+      else
+       qdc = 0.0
+       depth = 0.0
+       vel = 0.0
+     endif
+
+      qloss = (ChannK * dx * WPk)
+      if((qloss*dt)/D > ((ql*dt)/D - C4)) then
+         qloss = ql - C4*(D/dt)
+      endif
+
+END SUBROUTINE SUBMUSKINGCUNGE_ACC
+! ----------------------------------------------------------------
+
 ! ------------------------------------------------
 !   FUNCTION KINEMATIC
 ! ------------------------------------------------
@@ -594,6 +983,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL                                      :: Km, X
         REAL , INTENT(INOUT), DIMENSION(:,:) :: QLINK
         REAL ,  DIMENSION(NLINKS,2) :: tmpQLINK
+        REAL ,  DIMENSION(NLINKS) :: qlink_acc_prev, qlink_acc_cur, tmpQLINK_acc
         REAL , INTENT(INOUT), DIMENSION(NLINKS)   :: HLINK
         REAL, dimension(NLINKS), intent(inout)    :: QLateral !--lateral flow
         REAL, INTENT(IN)                          :: DT    !-- model timestep
@@ -801,6 +1191,107 @@ END SUBROUTINE SUBMUSKINGCUNGE
 #ifdef MPP_LAND
        endif
 #endif
+       if (channel_option .eq. 2) then
+
+          do k = 1,NLINKSL
+             qlink_acc_prev(k) = QLINK(k,1)
+             qlink_acc_cur(k) = QLINK(k,2)
+             tmpQLINK_acc(k) = 0.0
+          end do
+
+#ifdef MPP_LAND
+!$acc parallel loop vector_length(1) private(n,m,Quc,Qup) &
+!$acc& copyin(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), qlink_acc_prev(1:NLINKSL), QLateral(1:NLINKSL), &
+!$acc&        So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), ChSSlp(1:NLINKSL), &
+!$acc&        Bw(1:NLINKSL), Tw(1:NLINKSL), Tw_CC(1:NLINKSL), n_CC(1:NLINKSL), &
+!$acc&        ChannK(1:NLINKSL), gtoNODE, gQLINK) &
+!$acc& copy(HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL)) &
+!$acc& copyout(tmpQLINK_acc(1:NLINKSL))
+          do k = 1,NLINKSL
+             if(TYPEL(k) .ne. 1) then
+                Quc  = 0.0
+                Qup  = 0.0
+
+!$acc loop seq
+                do n = 1, gtoNODE(k,1)
+                   m = gtoNODE(k,n+1)
+                   Quc = Quc + gQLINK(m,2)
+                   Qup = Qup + gQLINK(m,1)
+                end do
+
+                call SUBMUSKINGCUNGE_ACC(tmpQLINK_acc(k), velocity(k), qloss(k), LINKID(k),  &
+                    Qup,Quc, qlink_acc_prev(k), QLateral(k),   DTRT_CH, So(k), &
+                    CHANLEN(k), MannN(k), ChSSlp(k), Bw(k), Tw(k),Tw_CC(k), n_CC(k),  HLINK(k), ChannK(k) )
+             endif
+          end do
+#else
+!$acc parallel loop vector_length(1) private(m,Quc,Qup) &
+!$acc& copyin(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), TO_NODE(1:NLINKSL), &
+!$acc&        qlink_acc_prev(1:NLINKSL), qlink_acc_cur(1:NLINKSL), &
+!$acc&        QLateral(1:NLINKSL), So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), &
+!$acc&        ChSSlp(1:NLINKSL), Bw(1:NLINKSL), Tw(1:NLINKSL), Tw_CC(1:NLINKSL), &
+!$acc&        n_CC(1:NLINKSL), ChannK(1:NLINKSL)) &
+!$acc& copy(HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL)) &
+!$acc& copyout(tmpQLINK_acc(1:NLINKSL))
+          do k = 1,NLINKSL
+             if(TYPEL(k) .ne. 1) then
+                Quc  = 0.0
+                Qup  = 0.0
+
+!$acc loop seq
+                do m = 1, NLINKSL
+                   if (LINKID(k) .eq. TO_NODE(m)) then
+                     Quc = Quc + qlink_acc_cur(m)
+                     Qup = Qup + qlink_acc_prev(m)
+                   endif
+                end do
+
+                call SUBMUSKINGCUNGE_ACC(tmpQLINK_acc(k), velocity(k), qloss(k), LINKID(k),  &
+                    Qup,Quc, qlink_acc_prev(k), QLateral(k),   DTRT_CH, So(k), &
+                    CHANLEN(k), MannN(k), ChSSlp(k), Bw(k), Tw(k),Tw_CC(k), n_CC(k),  HLINK(k), ChannK(k) )
+             endif
+          end do
+#endif
+
+          do k = 1,NLINKSL
+             if(TYPEL(k) .ne. 1) then
+                tmpQLINK(k,2) = tmpQLINK_acc(k)
+             endif
+          end do
+
+          do k = 1,NLINKSL
+             if(TYPEL(k) == 1) then
+                 l_idx = lake_lookup(k)
+                 if (l_idx >= 0) then
+                     Quc  = 0.0
+                     Qup  = 0.0
+
+#ifdef MPP_LAND
+                     do n = 1, gtoNODE(k,1)
+                        m = gtoNODE(k,n+1)
+                        Quc = Quc + gQLINK(m,2)
+                        Qup = Qup + gQLINK(m,1)
+                     end do
+#else
+                     do m = 1, NLINKSL
+                        if (LINKID(k) .eq. TO_NODE(m)) then
+                           Quc = Quc + QLINK(m,2)
+                           Qup = Qup + QLINK(m,1)
+                        endif
+                     end do
+#endif
+
+                     call rt_domain(did)%reservoirs(l_idx)%ptr%run(Qup, Quc, 0.0, &
+                           RESHT(l_idx), QLINK(k,2), DTRT_CH, rt_domain(did)%final_reservoir_type(l_idx), &
+                           rt_domain(did)%reservoir_assimilated_value(l_idx), rt_domain(did)%reservoir_assimilated_source_file(l_idx))
+
+                     QLAKEO(l_idx)  = QLINK(k,2)
+                     QLAKEI(l_idx)  = Quc
+                 end if
+             endif
+          end do
+
+       else
        do k = 1,NLINKSL
 !          if (ORDER(k) .gt. 1 ) then  !-- exclude first order stream
              Quc  = 0.0
@@ -857,6 +1348,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
                    endif
 !            endif !!! order(1) .ne. 1
          end do       !--k links
+       endif
 
 #ifdef MPP_LAND
          call updateLake_seq(RESHT,nlakes,tmpRESHT)
