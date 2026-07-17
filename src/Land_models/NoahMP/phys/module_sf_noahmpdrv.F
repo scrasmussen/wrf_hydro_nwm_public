@@ -498,6 +498,14 @@ CONTAINS
 
     type(noahmp_parameters) :: parameters
     type(noahmp_type) :: noahmp_col
+#ifdef NOAHMP_ACC_COLUMNS
+    INTEGER                             :: noahmp_batch_n
+    INTEGER                             :: noahmp_batch_cap
+    INTEGER                             :: noahmp_batch_idx
+    INTEGER, ALLOCATABLE                :: noahmp_batch_i(:)
+    INTEGER, ALLOCATABLE                :: noahmp_batch_j(:)
+    type(noahmp_type), ALLOCATABLE      :: noahmp_batch(:)
+#endif
 
 
     INTEGER,                INTENT(IN)                 :: act_level
@@ -720,6 +728,26 @@ CONTAINS
     NoahmpIO_sub%IOPT_IRRM    = 0
     NoahmpIO_sub%IOPT_INFDV   = 0
 ! -----------------------------------------------------------------
+
+#ifdef NOAHMP_ACC_COLUMNS
+    noahmp_batch_n = 0
+    noahmp_batch_cap = 0
+    if (crocus_opt == 0) then
+       DO J = jts, jte
+          DO I = its, ite
+             if (XICE(I,J) < XICE_THRES .and. (XLAND(I,J)-1.5) < 0.0 .and. &
+                 IVGTYP(I,J) /= ISICE_TABLE) then
+                noahmp_batch_cap = noahmp_batch_cap + 1
+             endif
+          ENDDO
+       ENDDO
+       if (noahmp_batch_cap > 0) then
+          allocate(noahmp_batch_i(noahmp_batch_cap))
+          allocate(noahmp_batch_j(noahmp_batch_cap))
+          allocate(noahmp_batch(noahmp_batch_cap))
+       endif
+    endif
+#endif
 
     JLOOP : DO J=jts,jte
        IF(ITIMESTEP == 1)THEN
@@ -1618,6 +1646,16 @@ CONTAINS
          noahmp_col%energy%param%EmissivitySnow = 1.0
 #endif
 
+#ifdef NOAHMP_ACC_COLUMNS
+         if (crocus_opt == 0 .and. noahmp_batch_cap > 0) then
+            noahmp_batch_n = noahmp_batch_n + 1
+            noahmp_batch_i(noahmp_batch_n) = I
+            noahmp_batch_j(noahmp_batch_n) = J
+            noahmp_batch(noahmp_batch_n) = noahmp_col
+            CYCLE ILOOP
+         endif
+#endif
+
          call NoahmpMain(noahmp_col)
 
          ! ---- Extract outputs from noahmp_col ----
@@ -1952,6 +1990,280 @@ CONTAINS
           ENDIF                                                         ! endif of land-sea test
       ENDDO ILOOP                                                       ! of I loop
    ENDDO JLOOP                                                          ! of J loop
+
+#ifdef NOAHMP_ACC_COLUMNS
+   if (noahmp_batch_n > 0) then
+!$acc data copy(noahmp_batch(1:noahmp_batch_n))
+!$acc parallel loop gang present(noahmp_batch)
+      DO noahmp_batch_idx = 1, noahmp_batch_n
+         call NoahmpMain(noahmp_batch(noahmp_batch_idx))
+      ENDDO
+!$acc end parallel loop
+!$acc end data
+
+      DO noahmp_batch_idx = 1, noahmp_batch_n
+         I = noahmp_batch_i(noahmp_batch_idx)
+         J = noahmp_batch_j(noahmp_batch_idx)
+         noahmp_col = noahmp_batch(noahmp_batch_idx)
+         PRCP = PRECIP_IN(I,J) / DT
+
+         FSA    = noahmp_col%energy%flux%RadSwAbsSfc
+         FSR    = noahmp_col%energy%flux%RadSwReflSfc
+         FIRA   = noahmp_col%energy%flux%RadLwNetSfc
+         FSH    = noahmp_col%energy%flux%HeatSensibleSfc
+         SSOIL  = noahmp_col%energy%flux%HeatGroundTot
+         FCEV   = noahmp_col%energy%flux%HeatLatentCanopy
+         FGEV   = noahmp_col%energy%flux%HeatLatentGrd
+         FCTR   = noahmp_col%energy%flux%HeatLatentTransp
+         SAV    = noahmp_col%energy%flux%RadSwAbsVeg
+         SAG    = noahmp_col%energy%flux%RadSwAbsGrd
+         IRC    = noahmp_col%energy%flux%RadLwNetCanopy
+         IRG    = noahmp_col%energy%flux%RadLwNetVegGrd
+         IRB    = noahmp_col%energy%flux%RadLwNetBareGrd
+         SHC    = noahmp_col%energy%flux%HeatSensibleCanopy
+         SHG    = noahmp_col%energy%flux%HeatSensibleVegGrd
+         SHB    = noahmp_col%energy%flux%HeatSensibleBareGrd
+         EVG    = noahmp_col%energy%flux%HeatLatentVegGrd
+         EVB    = noahmp_col%energy%flux%HeatLatentBareGrd
+         GHV    = noahmp_col%energy%flux%HeatGroundVegGrd
+         GHB    = noahmp_col%energy%flux%HeatGroundBareGrd
+         TR     = noahmp_col%energy%flux%HeatLatentCanTransp
+         EVC    = noahmp_col%energy%flux%HeatLatentCanEvap
+         APAR   = noahmp_col%energy%flux%RadPhotoActAbsCan
+
+         TRAD   = noahmp_col%energy%state%TemperatureRadSfc
+         EMISSI = noahmp_col%energy%state%EmissivitySfc
+         QSFC1D = noahmp_col%energy%state%SpecHumiditySfcMean
+         TV     = noahmp_col%energy%state%TemperatureCanopy
+         TG     = noahmp_col%energy%state%TemperatureGrd
+         EAH    = noahmp_col%energy%state%PressureVaporCanAir
+         TAH    = noahmp_col%energy%state%TemperatureCanopyAir
+         CM     = noahmp_col%energy%state%ExchCoeffMomSfc
+         CH     = noahmp_col%energy%state%ExchCoeffShSfc
+         ALBOLD = noahmp_col%energy%state%AlbedoSnowPrev
+         PLAI   = noahmp_col%energy%state%LeafAreaIndex
+         PSAI   = noahmp_col%energy%state%StemAreaIndex
+         TAUSS  = noahmp_col%energy%state%SnowAgeNondim
+         Z0WRF  = noahmp_col%energy%state%RoughLenMomSfcToAtm
+         T2MV   = noahmp_col%energy%state%TemperatureAir2mVeg
+         T2MB   = noahmp_col%energy%state%TemperatureAir2mBare
+         Q2MV   = noahmp_col%energy%state%SpecHumidity2mVeg
+         Q2MB   = noahmp_col%energy%state%SpecHumidity2mBare
+         TGV    = noahmp_col%energy%state%TemperatureGrdVeg
+         TGB    = noahmp_col%energy%state%TemperatureGrdBare
+         CHV    = noahmp_col%energy%state%ExchCoeffShAbvCan
+         CHB    = noahmp_col%energy%state%ExchCoeffShBare
+         CHLEAF = noahmp_col%energy%state%ExchCoeffShLeaf
+         CHUC   = noahmp_col%energy%state%ExchCoeffShUndCan
+         CHV2   = noahmp_col%energy%state%ExchCoeffSh2mVeg
+         CHB2   = noahmp_col%energy%state%ExchCoeffSh2mBare
+         RSSUN  = noahmp_col%energy%state%ResistanceStomataSunlit
+         RSSHA  = noahmp_col%energy%state%ResistanceStomataShade
+         BGAP   = noahmp_col%energy%state%GapBtwCanopy
+         WGAP   = noahmp_col%energy%state%GapInCanopy
+         FVEGMP = noahmp_col%energy%state%VegFrac
+         SALB   = noahmp_col%energy%state%AlbedoSfc
+         ALBSND(1:2) = noahmp_col%energy%state%AlbedoSnowDir(1:2)
+         ALBSNI(1:2) = noahmp_col%energy%state%AlbedoSnowDif(1:2)
+         STC(-NSNOW+1:0)  = noahmp_col%energy%state%TemperatureSoilSnow(-NSNOW+1:0)
+         STC(1:NSOIL)     = noahmp_col%energy%state%TemperatureSoilSnow(1:NSOIL)
+
+         RUNSF  = noahmp_col%water%flux%RunoffSurface / DT
+         RUNSB  = noahmp_col%water%flux%RunoffSubsurface / DT
+         ECAN   = noahmp_col%water%flux%EvapCanopyNet
+         ETRAN  = noahmp_col%water%flux%Transpiration
+         ESOIL  = noahmp_col%water%flux%EvapGroundNet
+         QSNOW  = noahmp_col%water%flux%SnowfallGround
+         QRAIN  = noahmp_col%water%flux%RainfallGround
+         QSNBOT = noahmp_col%water%flux%SnowBotOutflow
+         FPICE  = noahmp_col%water%state%FrozenPrecipFrac
+         PONDING  = noahmp_col%water%state%PondSfcThinSnwTrans + &
+                    noahmp_col%water%state%PondSfcThinSnwComb  + &
+                    noahmp_col%water%state%PondSfcThinSnwMelt
+         PONDING1 = 0.0
+         PONDING2 = 0.0
+         FSNO   = noahmp_col%water%state%SnowCoverFrac
+         SWE    = noahmp_col%water%state%SnowWaterEquiv
+         SNDPTH = noahmp_col%water%state%SnowDepth
+         CANLIQ = noahmp_col%water%state%CanopyLiqWater
+         CANICE = noahmp_col%water%state%CanopyIce
+         FWET   = noahmp_col%water%state%CanopyWetFrac
+         SNEQVO = noahmp_col%water%state%SnowWaterEquivPrev
+         WSLAKE = noahmp_col%water%state%WaterStorageLake
+         ZWT    = noahmp_col%water%state%WaterTableDepth
+         WA     = noahmp_col%water%state%WaterStorageAquifer
+         WT     = noahmp_col%water%state%WaterStorageSoilAqf
+         SMCWTD = noahmp_col%water%state%SoilMoistureToWT
+         DEEPRECH = noahmp_col%water%state%RechargeGwDeepWT
+         RECH   = noahmp_col%water%state%RechargeGwShallowWT
+         ISNOW  = noahmp_col%config%domain%NumSnowLayerNeg
+         SMC(1:NSOIL)       = noahmp_col%water%state%SoilMoisture(1:NSOIL)
+         SMH2O(1:NSOIL)     = noahmp_col%water%state%SoilLiqWater(1:NSOIL)
+         SNICE(-NSNOW+1:0)  = noahmp_col%water%state%SnowIce(-NSNOW+1:0)
+         SNLIQ(-NSNOW+1:0)  = noahmp_col%water%state%SnowLiqWater(-NSNOW+1:0)
+         ZSNSO(-NSNOW+1:NSOIL) = noahmp_col%config%domain%DepthSnowSoilLayer(-NSNOW+1:NSOIL)
+
+         LFMASS = noahmp_col%biochem%state%LeafMass
+         RTMASS = noahmp_col%biochem%state%RootMass
+         STMASS = noahmp_col%biochem%state%StemMass
+         WOOD   = noahmp_col%biochem%state%WoodMass
+         STBLCP = noahmp_col%biochem%state%CarbonMassDeepSoil
+         FASTCP = noahmp_col%biochem%state%CarbonMassShallowSoil
+         GRAIN  = noahmp_col%biochem%state%GrainMass
+         GDD    = noahmp_col%biochem%state%GrowDegreeDay
+         PGS    = noahmp_col%biochem%state%PlantGrowStage
+         NEE    = noahmp_col%biochem%flux%NetEcoExchange
+         GPP    = noahmp_col%biochem%flux%GrossPriProduction
+         NPP    = noahmp_col%biochem%flux%NetPriProductionTot
+         PSN    = noahmp_col%biochem%flux%PhotosynTotal
+
+         QFX(I,J) = ECAN + ESOIL + ETRAN
+         LH(I,J)  = FCEV + FGEV + FCTR
+
+#ifdef WRF_HYDRO
+         if((RUNSF+1.0) .eq. RUNSF) then
+            RUNSF = 0
+            RUNSB = 0
+         endif
+         soldrain(i,j) = max(RUNSB*dt, 0.)
+         INFXSRT(i,j) = RUNSF*dt
+#endif
+
+         TSK(I,J)      = TRAD
+         HFX(I,J)      = FSH
+         GRDFLX(I,J)   = SSOIL
+         SMSTAV(I,J)   = 0.0
+         SMSTOT(I,J)   = 0.0
+         SFCRUNOFF(I,J)= SFCRUNOFF(I,J) + RUNSF * DT
+         UDRUNOFF(I,J) = UDRUNOFF(I,J)  + RUNSB * DT
+#ifdef WRF_HYDRO
+         if(present(ACCPRCP)) ACCPRCP(I,J)   = ACCPRCP(I,J) + PRCP * DT
+         if(present(ACCECAN)) ACCECAN(I,J)   = ACCECAN(I,J) + ECAN * DT
+         if(present(ACCETRAN)) ACCETRAN(I,J) = ACCETRAN(I,J) + ETRAN * DT
+         if(present(ACCEDIR)) ACCEDIR(I,J)   = ACCEDIR(I,J) + ESOIL * DT
+         if(present(SOILSAT_TOP)) SOILSAT_TOP(I,J) = &
+            SUM(SMC(1:2) * DZS(1:2)) / SUM(noahmp_col%water%param%SoilMoistureSat(1:2) * DZS(1:2))
+         if(present(SOILSAT)) SOILSAT(I,J) = &
+            SUM(SMC(1:NSOIL) * DZS(1:NSOIL)) / SUM(noahmp_col%water%param%SoilMoistureSat(1:NSOIL) * DZS(1:NSOIL))
+         if(present(SOILICE)) SOILICE(I,J) = &
+            1. - ( SUM(SMH2O(1:NSOIL) * DZS(1:NSOIL)) / SUM(SMC(1:NSOIL) * DZS(1:NSOIL)) )
+         if (present(SNOWT_AVG)) then
+            if ( SUM(SNICE(-NSNOW+1:0) + SNLIQ(-NSNOW+1:0)) .gt. 0 ) then
+               SNOWT_AVG(I,J) = SUM(STC(-NSNOW+1:0) * (SNICE(-NSNOW+1:0) + SNLIQ(-NSNOW+1:0))) / &
+                                 SUM(SNICE(-NSNOW+1:0) + SNLIQ(-NSNOW+1:0))
+            else
+               SNOWT_AVG(I,J) = undefined_value
+            endif
+         endif
+#endif
+         IF ( SALB > -999 ) ALBEDO(I,J) = SALB
+         SNOWC(I,J) = FSNO
+         SMOIS(I,1:NSOIL,J) = SMC(1:NSOIL)
+         SH2O(I,1:NSOIL,J)  = SMH2O(1:NSOIL)
+         TSLB(I,1:NSOIL,J)  = STC(1:NSOIL)
+         SNOW(I,J)  = SWE
+         SNOWH(I,J) = SNDPTH
+         CANWAT(I,J)= CANLIQ + CANICE
+         ACSNOW(I,J)= ACSNOW(I,J) + PRCP*DT * FPICE
+         ACSNOM(I,J)= ACSNOM(I,J) + QSNBOT*DT + PONDING + PONDING1 + PONDING2
+         EMISS(I,J) = EMISSI
+         QSFC(I,J)  = QSFC1D
+
+         ISNOWXY(I,J)  = ISNOW
+         TVXY(I,J)     = TV
+         TGXY(I,J)     = TG
+         CANLIQXY(I,J) = CANLIQ
+         CANICEXY(I,J) = CANICE
+         EAHXY(I,J)    = EAH
+         TAHXY(I,J)    = TAH
+         CMXY(I,J)     = CM
+         CHXY(I,J)     = CH
+         FWETXY(I,J)   = FWET
+         SNEQVOXY(I,J) = SNEQVO
+         ALBOLDXY(I,J) = ALBOLD
+         QSNOWXY(I,J)  = QSNOW
+         QRAINXY(I,J)  = QRAIN
+         WSLAKEXY(I,J) = WSLAKE
+         ZWTXY(I,J)    = ZWT
+         WAXY(I,J)     = WA
+         WTXY(I,J)     = WT
+         TSNOXY(I,-NSNOW+1:0,J) = STC(-NSNOW+1:0)
+         ZSNSOXY(I,-NSNOW+1:NSOIL,J) = ZSNSO(-NSNOW+1:NSOIL)
+         SNICEXY(I,-NSNOW+1:0,J) = SNICE(-NSNOW+1:0)
+         SNLIQXY(I,-NSNOW+1:0,J) = SNLIQ(-NSNOW+1:0)
+         LFMASSXY(I,J) = LFMASS
+         RTMASSXY(I,J) = RTMASS
+         STMASSXY(I,J) = STMASS
+         WOODXY(I,J)   = WOOD
+         STBLCPXY(I,J) = STBLCP
+         FASTCPXY(I,J) = FASTCP
+         XLAIXY(I,J)   = PLAI
+         XSAIXY(I,J)   = PSAI
+         TAUSSXY(I,J)  = TAUSS
+
+         Z0(I,J)     = Z0WRF
+         ZNT(I,J)    = Z0WRF
+         T2MVXY(I,J) = T2MV
+         T2MBXY(I,J) = T2MB
+         Q2MVXY(I,J) = Q2MV/(1.0 - Q2MV)
+         Q2MBXY(I,J) = Q2MB/(1.0 - Q2MB)
+         TRADXY(I,J) = TRAD
+         NEEXY(I,J)  = NEE
+         GPPXY(I,J)  = GPP
+         NPPXY(I,J)  = NPP
+         FVEGXY(I,J) = FVEGMP
+         RUNSFXY(I,J)= RUNSF
+         RUNSBXY(I,J)= RUNSB
+         ECANXY(I,J) = ECAN
+         EDIRXY(I,J) = ESOIL
+         ETRANXY(I,J)= ETRAN
+         FSAXY(I,J)  = FSA
+         FIRAXY(I,J) = FIRA
+         APARXY(I,J) = APAR
+         PSNXY(I,J)  = PSN
+         SAVXY(I,J)  = SAV
+         SAGXY(I,J)  = SAG
+         RSSUNXY(I,J)= RSSUN
+         RSSHAXY(I,J)= RSSHA
+         IF(SWE > 0.0) THEN
+            ALBSNDXY(I,:,J) = ALBSND
+            ALBSNIXY(I,:,J) = ALBSNI
+         ELSE
+            ALBSNDXY(I,:,J) = 0.0
+            ALBSNIXY(I,:,J) = 0.0
+         ENDIF
+         BGAPXY(I,J)   = BGAP
+         WGAPXY(I,J)   = WGAP
+         TGVXY(I,J)    = TGV
+         TGBXY(I,J)    = TGB
+         CHVXY(I,J)    = CHV
+         CHBXY(I,J)    = CHB
+         IRCXY(I,J)    = IRC
+         IRGXY(I,J)    = IRG
+         SHCXY(I,J)    = SHC
+         SHGXY(I,J)    = SHG
+         EVGXY(I,J)    = EVG
+         GHVXY(I,J)    = GHV
+         IRBXY(I,J)    = IRB
+         SHBXY(I,J)    = SHB
+         EVBXY(I,J)    = EVB
+         GHBXY(I,J)    = GHB
+         TRXY(I,J)     = TR
+         EVCXY(I,J)    = EVC
+         CHLEAFXY(I,J) = CHLEAF
+         CHUCXY(I,J)   = CHUC
+         CHV2XY(I,J)   = CHV2
+         CHB2XY(I,J)   = CHB2
+         RECHXY(I,J)   = RECHXY(I,J) + RECH*1.E3
+         DEEPRECHXY(I,J) = DEEPRECHXY(I,J) + DEEPRECH
+         SMCWTDXY(I,J) = SMCWTD
+      ENDDO
+   endif
+
+   if (allocated(noahmp_batch)) deallocate(noahmp_batch)
+   if (allocated(noahmp_batch_i)) deallocate(noahmp_batch_i)
+   if (allocated(noahmp_batch_j)) deallocate(noahmp_batch_j)
+#endif
 
 !------------------------------------------------------
   END SUBROUTINE noahmplsm

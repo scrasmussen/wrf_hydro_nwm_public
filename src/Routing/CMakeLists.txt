@@ -39,3 +39,7 @@ if (WRF_HYDRO_NUDGING_IO STREQUAL "1")
     hydro_nudging_io
   )
 endif()
+
+target_compile_options(hydro_routing PRIVATE
+    "$<$<COMPILE_LANGUAGE:Fortran>:SHELL:-h msgs>"
+)

@@ -1,4 +1,5 @@
 MODULE module_channel_routing
+use iso_fortran_env, only: int64
 #ifdef MPP_LAND
 use module_mpp_land
 use MODULE_mpp_ReachLS, only : updatelinkv,                   &
@@ -10,12 +11,77 @@ use module_reservoir, only: reservoir
 use module_RT_data, only: rt_domain
 use module_hydro_stop, only: HYDRO_stop
 
-use iso_fortran_env, only: int64
-
 #endif
 implicit none
 
 contains
+
+subroutine channel_acc_enter(NLINKSL, TYPEL, LINKID, So, CHANLEN, MannN, ChSSlp, &
+                             Bw, Tw, Tw_CC, n_CC, ChannK, HLINK, velocity, qloss &
+#ifdef MPP_LAND
+                             , gtoNode &
+#else
+                             , TO_NODE &
+#endif
+                             )
+  implicit none
+  integer, intent(in) :: NLINKSL
+  integer, intent(in), dimension(:) :: TYPEL
+  integer(kind=int64), intent(in), dimension(:) :: LINKID
+  real, intent(in), dimension(:) :: So, CHANLEN, MannN, ChSSlp
+  real, intent(in), dimension(:) :: Bw, Tw, Tw_CC, n_CC, ChannK
+  real, intent(in), dimension(:) :: HLINK, velocity, qloss
+#ifdef MPP_LAND
+  integer(kind=int64), intent(in), dimension(:,:) :: gtoNode
+#else
+  integer(kind=int64), intent(in), dimension(:) :: TO_NODE
+#endif
+
+! Static channel geometry and mutable hydraulic state remain resident for the run.
+!$acc enter data copyin(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), &
+!$acc& So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), &
+!$acc& ChSSlp(1:NLINKSL), Bw(1:NLINKSL), Tw(1:NLINKSL), &
+!$acc& Tw_CC(1:NLINKSL), n_CC(1:NLINKSL), ChannK(1:NLINKSL), &
+!$acc& HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL))
+#ifdef MPP_LAND
+!$acc enter data copyin(gtoNode)
+#else
+!$acc enter data copyin(TO_NODE(1:NLINKSL))
+#endif
+end subroutine channel_acc_enter
+
+subroutine channel_acc_exit(NLINKSL, TYPEL, LINKID, So, CHANLEN, MannN, ChSSlp, &
+                            Bw, Tw, Tw_CC, n_CC, ChannK, HLINK, velocity, qloss &
+#ifdef MPP_LAND
+                            , gtoNode &
+#else
+                            , TO_NODE &
+#endif
+                            )
+  implicit none
+  integer, intent(in) :: NLINKSL
+  integer, intent(in), dimension(:) :: TYPEL
+  integer(kind=int64), intent(in), dimension(:) :: LINKID
+  real, intent(in), dimension(:) :: So, CHANLEN, MannN, ChSSlp
+  real, intent(in), dimension(:) :: Bw, Tw, Tw_CC, n_CC, ChannK
+  real, intent(in), dimension(:) :: HLINK, velocity, qloss
+#ifdef MPP_LAND
+  integer(kind=int64), intent(in), dimension(:,:) :: gtoNode
+#else
+  integer(kind=int64), intent(in), dimension(:) :: TO_NODE
+#endif
+
+!$acc exit data delete(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), &
+!$acc& So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), &
+!$acc& ChSSlp(1:NLINKSL), Bw(1:NLINKSL), Tw(1:NLINKSL), &
+!$acc& Tw_CC(1:NLINKSL), n_CC(1:NLINKSL), ChannK(1:NLINKSL), &
+!$acc& HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL))
+#ifdef MPP_LAND
+!$acc exit data delete(gtoNode)
+#else
+!$acc exit data delete(TO_NODE(1:NLINKSL))
+#endif
+end subroutine channel_acc_exit
 
 ! ------------------------------------------------
 !   FUNCTION MUSKING
@@ -1201,11 +1267,12 @@ END SUBROUTINE SUBMUSKINGCUNGE_ACC
 
 #ifdef MPP_LAND
 !$acc parallel loop vector_length(1) private(n,m,Quc,Qup) &
-!$acc& copyin(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), qlink_acc_prev(1:NLINKSL), QLateral(1:NLINKSL), &
-!$acc&        So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), ChSSlp(1:NLINKSL), &
-!$acc&        Bw(1:NLINKSL), Tw(1:NLINKSL), Tw_CC(1:NLINKSL), n_CC(1:NLINKSL), &
-!$acc&        ChannK(1:NLINKSL), gtoNODE, gQLINK) &
-!$acc& copy(HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL)) &
+!$acc& present(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), So(1:NLINKSL), &
+!$acc&         CHANLEN(1:NLINKSL), MannN(1:NLINKSL), ChSSlp(1:NLINKSL), &
+!$acc&         Bw(1:NLINKSL), Tw(1:NLINKSL), Tw_CC(1:NLINKSL), n_CC(1:NLINKSL), &
+!$acc&         ChannK(1:NLINKSL), gtoNODE, HLINK(1:NLINKSL), &
+!$acc&         velocity(1:NLINKSL), qloss(1:NLINKSL)) &
+!$acc& copyin(qlink_acc_prev(1:NLINKSL), QLateral(1:NLINKSL), gQLINK) &
 !$acc& copyout(tmpQLINK_acc(1:NLINKSL))
           do k = 1,NLINKSL
              if(TYPEL(k) .ne. 1) then
@@ -1226,12 +1293,12 @@ END SUBROUTINE SUBMUSKINGCUNGE_ACC
           end do
 #else
 !$acc parallel loop vector_length(1) private(m,Quc,Qup) &
-!$acc& copyin(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), TO_NODE(1:NLINKSL), &
-!$acc&        qlink_acc_prev(1:NLINKSL), qlink_acc_cur(1:NLINKSL), &
-!$acc&        QLateral(1:NLINKSL), So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), &
-!$acc&        ChSSlp(1:NLINKSL), Bw(1:NLINKSL), Tw(1:NLINKSL), Tw_CC(1:NLINKSL), &
-!$acc&        n_CC(1:NLINKSL), ChannK(1:NLINKSL)) &
-!$acc& copy(HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL)) &
+!$acc& present(TYPEL(1:NLINKSL), LINKID(1:NLINKSL), TO_NODE(1:NLINKSL), &
+!$acc&         So(1:NLINKSL), CHANLEN(1:NLINKSL), MannN(1:NLINKSL), &
+!$acc&         ChSSlp(1:NLINKSL), Bw(1:NLINKSL), Tw(1:NLINKSL), &
+!$acc&         Tw_CC(1:NLINKSL), n_CC(1:NLINKSL), ChannK(1:NLINKSL), &
+!$acc&         HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL)) &
+!$acc& copyin(qlink_acc_prev(1:NLINKSL), qlink_acc_cur(1:NLINKSL), QLateral(1:NLINKSL)) &
 !$acc& copyout(tmpQLINK_acc(1:NLINKSL))
           do k = 1,NLINKSL
              if(TYPEL(k) .ne. 1) then
@@ -1375,6 +1442,9 @@ END SUBROUTINE SUBMUSKINGCUNGE_ACC
          end do
 
    end do ! nsteps
+
+! The host consumes these fields only after all channel substeps are complete.
+!$acc update self(HLINK(1:NLINKSL), velocity(1:NLINKSL), qloss(1:NLINKSL))
 
 #ifdef HYDRO_D
           print *, "END OF ALL REACHES...",KRT,DT_STEPS

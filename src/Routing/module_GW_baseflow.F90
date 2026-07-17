@@ -294,6 +294,8 @@ contains
    real, dimension(numbasns)                        :: ct_bas
    real, dimension(numbasns)                        :: gwbas_pix_ct
    integer                                          :: i,j,bas, k
+   integer(kind=int64)                              :: minBasInd, maxBasInd, basIndTmp
+   integer, allocatable, dimension(:)               :: basLookup
    character(len=19)				    :: header
    character(len=1)				    :: jnk
 
@@ -317,30 +319,80 @@ contains
 
 
 !!!Calculate aggregated percolation from deep runoff into GW basins...
-   do i=1,ix
-     do j=1,jx
+!Invert basnsInd into a basin-ID -> local-index lookup so each grid cell is
+!charged to its basin in O(1) instead of scanning every basin per cell.
+   minBasInd = 0
+   maxBasInd = -1
+   if(numbasns .gt. 0) then
+     minBasInd = minval(basnsInd)
+     maxBasInd = maxval(basnsInd)
+   end if
+
+   if( (numbasns .gt. 0) .and. (maxBasInd-minBasInd .lt. 10000000_int64) ) then
+
+     allocate(basLookup(0:int(maxBasInd-minBasInd)))
+     basLookup = 0
+     do bas=1,numbasns
+       basLookup(int(basnsInd(bas)-minBasInd)) = bas
+     end do
+
+     do i=1,ix
+       do j=1,jx
 
 !!DJG 4/15/2015...reset runoff2x, runoff1x, values to 0 where extreme values exist...(<0 or
 !> 1000)
-       if((runoff2x(i,j).lt.0.).OR.(runoff2x(i,j).gt.1000.)) then
-         runoff2x(i,j)=0.
-       end if
-       if((runoff1x(i,j).lt.0.).OR.(runoff1x(i,j).gt.1000.)) then
-         runoff1x(i,j)=0.
-       end if
+         if((runoff2x(i,j).lt.0.).OR.(runoff2x(i,j).gt.1000.)) then
+           runoff2x(i,j)=0.
+         end if
+         if((runoff1x(i,j).lt.0.).OR.(runoff1x(i,j).gt.1000.)) then
+           runoff1x(i,j)=0.
+         end if
 
-       do bas=1,numbasns
-         if(gwsubbasmsk(i,j).eq.basnsInd(bas) ) then
-           !ADCHANGE: Separate surface input from subsurface
-           if(OVRTSWCRT.eq.0) then
-             sum_perc8_surf(bas) = sum_perc8_surf(bas)+runoff1x(i,j)
+         basIndTmp = gwsubbasmsk(i,j)
+         if( (basIndTmp.ge.minBasInd) .and. (basIndTmp.le.maxBasInd) ) then
+           bas = basLookup(int(basIndTmp-minBasInd))
+           if(bas .gt. 0) then
+             !ADCHANGE: Separate surface input from subsurface
+             if(OVRTSWCRT.eq.0) then
+               sum_perc8_surf(bas) = sum_perc8_surf(bas)+runoff1x(i,j)
+             end if
+             sum_perc8(bas) = sum_perc8(bas)+runoff2x(i,j)  !Add only drainage to bucket...runoff2x in (mm)
+             ct_bas8(bas) = ct_bas8(bas) + 1
            end if
-           sum_perc8(bas) = sum_perc8(bas)+runoff2x(i,j)  !Add only drainage to bucket...runoff2x in (mm)
-           ct_bas8(bas) = ct_bas8(bas) + 1
          end if
        end do
      end do
-   end do
+
+     deallocate(basLookup)
+
+   else  !fallback per-cell basin scan when basin IDs span too wide a range to table
+
+     do i=1,ix
+       do j=1,jx
+
+!!DJG 4/15/2015...reset runoff2x, runoff1x, values to 0 where extreme values exist...(<0 or
+!> 1000)
+         if((runoff2x(i,j).lt.0.).OR.(runoff2x(i,j).gt.1000.)) then
+           runoff2x(i,j)=0.
+         end if
+         if((runoff1x(i,j).lt.0.).OR.(runoff1x(i,j).gt.1000.)) then
+           runoff1x(i,j)=0.
+         end if
+
+         do bas=1,numbasns
+           if(gwsubbasmsk(i,j).eq.basnsInd(bas) ) then
+             !ADCHANGE: Separate surface input from subsurface
+             if(OVRTSWCRT.eq.0) then
+               sum_perc8_surf(bas) = sum_perc8_surf(bas)+runoff1x(i,j)
+             end if
+             sum_perc8(bas) = sum_perc8(bas)+runoff2x(i,j)  !Add only drainage to bucket...runoff2x in (mm)
+             ct_bas8(bas) = ct_bas8(bas) + 1
+           end if
+         end do
+       end do
+     end do
+
+   end if
 
 #ifdef MPP_LAND
     call gw_sum_real(sum_perc8,numbasns,gnumbasns,basnsInd)

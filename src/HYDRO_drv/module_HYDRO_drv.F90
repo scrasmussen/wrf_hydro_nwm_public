@@ -18,7 +18,8 @@ module module_HYDRO_drv
     use module_GW_baseflow
     use module_gw_gw2d
     use module_gw_gw2d_data, only: gw2d
-    use module_channel_routing, only: drive_channel, drive_channel_rsl
+    use module_channel_routing, only: drive_channel, drive_channel_rsl, &
+                                      channel_acc_enter, channel_acc_exit
     use orchestrator_base
     use config_base, only: nlst, noah_lsm
     use module_routing, only: getChanDim, landrt_ini
@@ -1629,6 +1630,22 @@ contains
             if(allocated(rt_domain(did)%accBucket))       rt_domain(did)%accBucket    = zeroDbl
         end if
 
+        if ((nlst(did)%CHANRTSWCRT == 1 .or. nlst(did)%CHANRTSWCRT == 2) .and. &
+            nlst(did)%UDMP_OPT /= 1 .and. nlst(did)%channel_option == 2) then
+            call channel_acc_enter(rt_domain(did)%NLINKSL, rt_domain(did)%TYPEL, &
+                rt_domain(did)%LINKID, rt_domain(did)%So, rt_domain(did)%CHANLEN, &
+                rt_domain(did)%MannN, rt_domain(did)%ChSSlp, rt_domain(did)%Bw, &
+                rt_domain(did)%Tw, rt_domain(did)%Tw_CC, rt_domain(did)%n_CC, &
+                rt_domain(did)%ChannK, rt_domain(did)%HLINK, rt_domain(did)%velocity, &
+                rt_domain(did)%qloss &
+#ifdef MPP_LAND
+                , rt_domain(did)%gtoNode &
+#else
+                , rt_domain(did)%TO_NODE &
+#endif
+                )
+        endif
+
     end subroutine HYDRO_ini
 
     subroutine lsm_input(did,ix0,jx0,vegtyp0,soltyp0)
@@ -1805,11 +1822,30 @@ contains
         use module_stream_nudging,  only: finish_stream_nudging
 #endif
 
-        integer :: ierr
+        integer :: ierr, did
 
 #ifdef WRF_HYDRO_NUDGING
         call finish_stream_nudging()
 #endif
+        do did = 1, size(rt_domain)
+            if (allocated(rt_domain(did)%TYPEL)) then
+                if ((nlst(did)%CHANRTSWCRT == 1 .or. nlst(did)%CHANRTSWCRT == 2) .and. &
+                    nlst(did)%UDMP_OPT /= 1 .and. nlst(did)%channel_option == 2) then
+                    call channel_acc_exit(rt_domain(did)%NLINKSL, rt_domain(did)%TYPEL, &
+                        rt_domain(did)%LINKID, rt_domain(did)%So, rt_domain(did)%CHANLEN, &
+                        rt_domain(did)%MannN, rt_domain(did)%ChSSlp, rt_domain(did)%Bw, &
+                        rt_domain(did)%Tw, rt_domain(did)%Tw_CC, rt_domain(did)%n_CC, &
+                        rt_domain(did)%ChannK, rt_domain(did)%HLINK, rt_domain(did)%velocity, &
+                        rt_domain(did)%qloss &
+#ifdef MPP_LAND
+                        , rt_domain(did)%gtoNode &
+#else
+                        , rt_domain(did)%TO_NODE &
+#endif
+                        )
+                endif
+            endif
+        enddo
 #ifndef NCEP_WCOSS
         print*, "The model finished successfully......."
 #else
