@@ -1020,6 +1020,7 @@ contains
 
         integer :: i, j, krt, ixxrt, jyyrt, &
             AGGFACYRT, AGGFACXRT
+        logical :: acc_single_rank ! use the single-rank OpenACC path
 
 #ifdef HYDRO_D
 ! ADCHANGE: Water balance variables
@@ -1060,6 +1061,29 @@ contains
 #endif
 ! END Initial water balance variables
 #endif
+
+#ifdef MPP_LAND
+        acc_single_rank = (numprocs .eq. 1)
+#else
+        acc_single_rank = .true.
+#endif
+
+        if (acc_single_rank) then
+            ! Single-rank OpenACC path: aggregation runs on the device with
+            ! one thread per coarse grid cell.  Multi-rank keeps the original
+            ! path below because of the halo index shifts and host-side MPP
+            ! exchanges.
+            call aggregateDomain_acc( RT_DOMAIN(did)%IX, RT_DOMAIN(did)%JX, &
+                nlst(did)%NSOIL, RT_DOMAIN(did)%IXRT, RT_DOMAIN(did)%JXRT, &
+                nlst(did)%AGGFACTRT, &
+                rt_domain(did)%overland%control%surface_water_head_routing, &
+                rt_domain(did)%overland%properties%distance_to_neighbor(:,:,9), &
+                rt_domain(did)%subsurface%grid_transform%smcrt, &
+                rt_domain(did)%subsurface%grid_transform%smcmaxrt, &
+                rt_domain(did)%overland%control%surface_water_head_lsm, &
+                RT_DOMAIN(did)%SH2OX, RT_DOMAIN(did)%INFXSWGT, &
+                RT_DOMAIN(did)%SH2OWGT )
+        else
 
         do J=1,RT_DOMAIN(did)%JX
             do I=1,RT_DOMAIN(did)%IX
@@ -1211,6 +1235,8 @@ contains
 
             end do
         end do
+
+        endif ! acc_single_rank
 
 
 #ifdef MPP_LAND

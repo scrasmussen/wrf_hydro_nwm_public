@@ -972,6 +972,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real                       :: smScaleFact ! soil moisture scaling factor for ksat (0-1)
    real, dimension(IXRT,JXRT) :: OCEAN_INFXSUBRT
                                  ! dummy variable to dump infiltration excess over ocean cells
+   logical                    :: acc_single_rank ! use the single-rank OpenACC path
 #ifdef HYDRO_D
    ! For water budget calcs
    integer :: ii, jj, kk ! local loop indices
@@ -1022,6 +1023,24 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 #endif
 
    !DJG Weighting alg. alteration...(prescribe wghts if time = 1)
+
+#ifdef MPP_LAND
+   acc_single_rank = (numprocs .eq. 1)
+#else
+   acc_single_rank = .true.
+#endif
+
+   if (acc_single_rank) then
+   ! Single-rank OpenACC path: the disaggregation runs on the device with one
+   ! thread per fine grid cell.  Multi-rank keeps the original path below
+   ! because of the halo index shifts and host-side MPP exchanges.
+   call disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
+                               SICE, SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, &
+                               SMCWLT1, VEGTYP, LKSAT, NEXP, dist(:,:,9), INFXSWGT, &
+                               LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
+                               SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT, &
+                               SLDPTH, soiltypRT, soiltyp, iswater)
+   else
 
    do J=1,JX ! Start coarse grid j loop
       do I=1,IX ! Start coarse grid i loop
@@ -1179,6 +1198,8 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
       end do ! end coarse grid i loop
    end do ! end coarse fine grid j loop
 
+   endif ! acc_single_rank
+
    ! AD: Add new zeroing out of -9999 elevation cells which are ocean
    where (ELRT .lt. -9998)
       OCEAN_INFXSUBRT = INFXSUBRT
@@ -1239,6 +1260,342 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 #endif
 
 end subroutine disaggregateDomain
+
+!===================================================================================================
+! Subroutine Name:
+!   subroutine disaggregateDomain_acc
+! Abstract:
+!   Single-rank OpenACC twin of disaggregateDomain.  One device thread per
+!   fine grid cell (collapse over the coarse loops and the subgrid loops);
+!   each fine cell is owned by exactly one coarse cell so there are no
+!   write conflicts.  Fatal conditions that the original path reports via
+!   hydro_stop are collected in an error flag and raised on the host; the
+!   fully-frozen-layer repair (SMCRT=0.001, SICE=SMC) is preserved.  The
+!   ocean (ELRT) zeroing and the MPP exchanges stay in the caller.
+!===================================================================================================
+subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
+                                  SICE, SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, &
+                                  SMCWLT1, VEGTYP, LKSAT, NEXP, area_rt, INFXSWGT, &
+                                  LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
+                                  SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT, &
+                                  SLDPTH, soiltypRT, soiltyp, iswater)
+   use module_hydro_stop, only: HYDRO_stop
+
+   implicit none
+
+   integer, intent(in)                           :: IX,JX ! coarse grid i,j dims
+   integer, intent(in)                           :: IXRT,JXRT ! fine grid i,j dims
+   integer, intent(in)                           :: AGGFACTRT ! aggregation factor between grids
+   integer, intent(in)                           :: NSOIL ! number of soil layers
+   integer, intent(in)                           :: iswater ! water veg class (from geogrid attrib)
+   real, intent(in), dimension(NSOIL)            :: SLDPTH ! array soil layer depth intervals (m)
+   real, intent(in),  dimension(IX,JX)           :: area_lsm ! cell area on the coarse grid (m2)
+   integer, intent(in), dimension(IX,JX)         :: VEGTYP, soiltyp ! coarse grid veg and soil types
+   real, intent(in),  dimension(IX,JX)           :: SMCMAX1 ! coarse grid porosity
+   real, intent(in),  dimension(IX,JX)           :: SMCREF1 ! coarse grid field capacity
+   real, intent(in),  dimension(IX,JX)           :: SMCWLT1 ! coarse grid wilting point
+   real, intent(in),  dimension(IX,JX)           :: LKSAT ! coarse grid lateral ksat (m/s)
+   real, intent(in),  dimension(IX,JX)           :: NEXP ! coarse grid n exponent
+   real, intent(in),  dimension(IX,JX,NSOIL)     :: SMC ! total soil moisture (m3/m3)
+   real, intent(in),  dimension(IX,JX,NSOIL)     :: SH2OX ! liquid soil moisture (m3/m3)
+   real, intent(in),  dimension(IX,JX)           :: INFXSRT ! infiltration excess on coarse grid (mm)
+   real, intent(in), dimension(IXRT,JXRT)        :: area_rt ! fine grid cell area, dist(:,:,9) (m2)
+   real, intent(in), dimension(IXRT,JXRT)        :: LKSATFAC ! lateral ksat adj factor
+   integer, intent(in), dimension(IXRT,JXRT)     :: CH_NETRT ! channel network routing grid
+   real, intent(in), dimension(IXRT,JXRT)        :: INFXSWGT ! infiltration excess weighting grid
+   real, intent(in), dimension(IXRT,JXRT,NSOIL)  :: SH2OWGT ! soil moisture weighting grid
+   integer, intent(inout), dimension(IXRT,JXRT)  :: LAKE_MSKRT ! lake mask on the routing grid
+   integer, intent(out), dimension(IXRT,JXRT)    :: soiltypRT ! soil type on the routing grid
+   real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCMAXRT ! porosity on routing grid
+   real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCREFRT ! field capacity on routing grid
+   real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCWLTRT ! wilting point on routing grid
+   real, intent(out), dimension(IXRT,JXRT)       :: LKSATRT ! lateral ksat on the routing grid (m/s)
+   real, intent(out), dimension(IXRT,JXRT)       :: NEXPRT ! n exponent on the routing grid
+   real, intent(inout), dimension(IX,JX,NSOIL)   :: SICE ! soil ice content on coarse grid (m3/m3)
+   real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCRT ! soil moisture on routing grid (m3/m3)
+   real, intent(out), dimension(IXRT,JXRT)       :: INFXSUBRT ! infiltration excess on routing grid (mm)
+
+   integer :: i, j ! coarse grid loop indices
+   integer :: AGGFACYRT, AGGFACXRT ! fine grid aggregation factors
+   integer :: IXXRT, JYYRT ! fine grid i,j coordinates
+   integer :: KRT, KF ! soil layer loop indices
+   integer :: errFlag ! device-side fatal condition flag
+   real    :: LSMVOL ! total infiltration excess volume per LSM cell (mm * m2)
+   real    :: SMCEXCS ! excess soil moisture (m3/m3)
+   real    :: WATHOLDCAP ! water holding capacity, smcmax - smcwlt (m3/m3)
+   real    :: smScaleFact ! soil moisture scaling factor for ksat (0-1)
+
+   errFlag = 0
+
+!$acc data copyin(SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, SMCWLT1, &
+!$acc&            VEGTYP, LKSAT, NEXP, area_rt, INFXSWGT, LKSATFAC, CH_NETRT, &
+!$acc&            SH2OWGT, SLDPTH, soiltyp) &
+!$acc&     copy(SICE, LAKE_MSKRT) &
+!$acc&     copyout(SMCMAXRT, SMCREFRT, SMCWLTRT, SMCRT, INFXSUBRT, LKSATRT, &
+!$acc&             NEXPRT, soiltypRT)
+
+!$acc parallel loop collapse(4) &
+!$acc&     private(IXXRT,JYYRT,KRT,KF,LSMVOL,SMCEXCS,WATHOLDCAP,smScaleFact) &
+!$acc&     reduction(max:errFlag)
+   do J=1,JX ! Start coarse grid j loop
+      do I=1,IX ! Start coarse grid i loop
+         do AGGFACYRT=AGGFACTRT-1,0,-1 ! Start disagg fine grid j loop
+            do AGGFACXRT=AGGFACTRT-1,0,-1 ! Start disagg fine grid i loop
+
+               IXXRT = I * AGGFACTRT - AGGFACXRT ! Define fine grid i
+               JYYRT = J * AGGFACTRT - AGGFACYRT ! Define fine grid j
+
+               !DJG Weighting alg. alteration...
+               LSMVOL = INFXSRT(I,J) * area_lsm(I,J) ! mm * m2
+
+               ! Initial redistribution of total coarse grid cell infiltration excess
+               ! based on subgrid weight factor and current volume of water (mm * m2 / m2 = mm)
+               INFXSUBRT(IXXRT,JYYRT) = LSMVOL *     &
+                                        INFXSWGT(IXXRT,JYYRT) / area_rt(IXXRT,JYYRT)
+
+               do KRT=1,NSOIL ! Soil layer loop
+
+                  ! Adjustments for soil ice
+                  IF (SICE(I,J,KRT) .gt. 0) then
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J) - SICE(I,J,KRT)
+                     SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J) - SICE(I,J,KRT)
+                     WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J)
+                     IF (SICE(I,J,KRT) .le. WATHOLDCAP)    then
+                        SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
+                     else
+                        if (SICE(I,J,KRT) .lt. SMCMAX1(I,J)) then
+                           SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J) - &
+                                                       (SICE(I,J,KRT) - WATHOLDCAP)
+                        endif
+                        if (SICE(I,J,KRT) .ge. SMCMAX1(I,J)) then
+                           SMCWLTRT(IXXRT,JYYRT,KRT) = 0.
+                        endif
+                     endif
+                  ELSE ! no ice
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J)
+                     SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J)
+                     WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J)
+                     SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
+                  ENDIF   ! endif adjust for soil ice
+
+                  !Now Adjust soil moisture
+                  IF (SMCMAXRT(IXXRT,JYYRT,KRT) .GT. 0) THEN !Check for smcmax data (=0 over water)
+                     SMCRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT) * SH2OWGT(IXXRT,JYYRT,KRT)
+                  ELSE
+                     SMCRT(IXXRT,JYYRT,KRT) = 0.001  !will be skipped w/ landmask
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = 0.001
+                  END IF
+
+                  !DJG Check/Adjust so that subgrid cells do not exceed saturation...
+                  IF (SMCRT(IXXRT,JYYRT,KRT) .GT. SMCMAXRT(IXXRT,JYYRT,KRT)) THEN
+                     SMCEXCS = (SMCRT(IXXRT,JYYRT,KRT) - SMCMAXRT(IXXRT,JYYRT,KRT)) &
+                               * SLDPTH(KRT) * 1000.  !Excess soil water in units of (mm)
+                     SMCRT(IXXRT,JYYRT,KRT) = SMCMAXRT(IXXRT,JYYRT,KRT)
+                     ! (plain sequential loop per thread; EXIT is not allowed
+                     ! inside an !$acc loop construct)
+                     DO KF = KRT-1,1,-1  !loop back upward to redistribute excess water from disagg.
+                        SMCRT(IXXRT,JYYRT,KF) = SMCRT(IXXRT,JYYRT,KF) + SMCEXCS/(SLDPTH(KF)*1000.)
+                        !Recheck new lyr sat.
+                        IF (SMCRT(IXXRT,JYYRT,KF) .GT. SMCMAXRT(IXXRT,JYYRT,KF)) THEN
+                           SMCEXCS = (SMCRT(IXXRT,JYYRT,KF) - SMCMAXRT(IXXRT,JYYRT,KF)) &
+                                     * SLDPTH(KF) * 1000.  !Excess soil water in units of (mm)
+                           SMCRT(IXXRT,JYYRT,KF) = SMCMAXRT(IXXRT,JYYRT,KF)
+                        ELSE  ! Excess soil water expired
+                           SMCEXCS = 0.
+                           EXIT
+                        END IF
+                     END DO
+                     IF (SMCEXCS .GT. 0) THEN  !If not expired by sfc then add to Infil. Excess
+                        INFXSUBRT(IXXRT,JYYRT) = INFXSUBRT(IXXRT,JYYRT) + SMCEXCS
+                        SMCEXCS = 0.
+                     END IF
+                  END IF  !End if for soil moisture saturation excess
+
+               end do !End do for soil profile loop
+
+               ! Debug/repair loop (prints from the original path are dropped;
+               ! fatal conditions raise hydro_stop on the host after the kernel)
+               do KRT=1,NSOIL
+                  IF (SMCRT(IXXRT,JYYRT,KRT) .GT. SMCMAXRT(IXXRT,JYYRT,KRT)) THEN
+                     errFlag = max(errFlag, 1)
+                  ELSE IF (SMCRT(IXXRT,JYYRT,KRT).LE.0.) THEN
+                     ! ADCHANGE: If values are close but not exact, end up with a crash.
+                     ! Force values to match.
+                     IF (ABS(SMC(i,j,KRT) - sice(i,j,KRT)) .LE. 0.00001) THEN
+                        SMCRT(IXXRT,JYYRT,KRT) = 0.001
+                        sice(i,j,KRT) = SMC(i,j,KRT)
+                     ELSE
+                        errFlag = max(errFlag, 2)
+                     END IF
+                  END IF
+               end do !debug loop
+
+               ! Now do simple grid remapping tasks
+
+               ! Lateral ksat
+               ! AD_CHANGE:
+               ! Corrected to scale from 0 at SMCREF to full LKSAT*LKSATFAC at SMCMAX.
+               smScaleFact = (SMCRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT,NSOIL)) / &
+                                (SMCMAXRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT, NSOIL))
+               smScaleFact = max(0., smScaleFact) !becomes 0 if less than SMCREF
+               smScaleFact = min(1., smScaleFact) !make sure scale factor doesn't go over 1
+               LKSATRT(IXXRT,JYYRT) = LKSAT(I,J) * LKSATFAC(IXXRT,JYYRT) * smScaleFact
+
+               ! n exponent for subsurface routing
+               nexprt(ixxrt,jyyrt) = nexp(i,j)
+
+               ! Lake mask
+               IF (VEGTYP(I,J) .eq. iswater .and. CH_NETRT(IXXRT,JYYRT).le.0) then
+                  LAKE_MSKRT(IXXRT,JYYRT) = -9999
+               end if
+
+               ! Soil type
+               soiltypRT(ixxrt,jyyrt) = soiltyp(i,j)
+
+            end do ! end disagg fine grid i loop
+         end do ! end disagg fine grid j loop
+      end do ! end coarse grid i loop
+   end do ! end coarse grid j loop
+
+!$acc end data
+
+   if (errFlag .eq. 1) then
+      call hydro_stop("In disaggregateDomain() - SMCMAX exceeded upon disaggregation3")
+   else if (errFlag .eq. 2) then
+      call hydro_stop("In disaggregateDomain() - SMCRT depleted")
+   endif
+
+end subroutine disaggregateDomain_acc
+
+!===================================================================================================
+! Subroutine Name:
+!   subroutine aggregateDomain_acc
+! Abstract:
+!   Single-rank OpenACC twin of the aggregateDomain loop nest in
+!   module_HYDRO_drv.F90.  One device thread per coarse grid cell; the
+!   per-cell aggregation temporaries (SFCHEADAGGRT, LSMVOL, SH2OAGGRT) from
+!   RT_DOMAIN become thread-private locals.  The soil moisture aggregation
+!   is restructured with the layer loop outermost so the accumulator is a
+!   scalar, preserving the original per-layer summation order.  Fatal
+!   conditions raise hydro_stop on the host after the kernel; the
+!   non-fatal negative SMCRT/SH2OWGT warning prints are dropped.
+!===================================================================================================
+subroutine aggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
+                               head_rt, area_rt, SMCRT, SMCMAXRT, &
+                               head_lsm, SH2OX, INFXSWGT, SH2OWGT)
+   use module_hydro_stop, only: HYDRO_stop
+
+   implicit none
+
+   integer, intent(in)                           :: IX,JX ! coarse grid i,j dims
+   integer, intent(in)                           :: IXRT,JXRT ! fine grid i,j dims
+   integer, intent(in)                           :: AGGFACTRT ! aggregation factor between grids
+   integer, intent(in)                           :: NSOIL ! number of soil layers
+   real, intent(in), dimension(IXRT,JXRT)        :: head_rt ! surface water head, routing grid (mm)
+   real, intent(in), dimension(IXRT,JXRT)        :: area_rt ! fine grid cell area, dist(:,:,9) (m2)
+   real, intent(in), dimension(IXRT,JXRT,NSOIL)  :: SMCRT ! soil moisture on routing grid (m3/m3)
+   real, intent(in), dimension(IXRT,JXRT,NSOIL)  :: SMCMAXRT ! porosity on routing grid
+   real, intent(out), dimension(IX,JX)           :: head_lsm ! surface water head, coarse grid (mm)
+   real, intent(out), dimension(IX,JX,NSOIL)     :: SH2OX ! liquid soil moisture, coarse grid (m3/m3)
+   real, intent(out), dimension(IXRT,JXRT)       :: INFXSWGT ! infiltration excess weighting grid
+   real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SH2OWGT ! soil moisture weighting grid
+
+   integer :: i, j ! coarse grid loop indices
+   integer :: AGGFACYRT, AGGFACXRT ! fine grid aggregation factors
+   integer :: IXXRT, JYYRT ! fine grid i,j coordinates
+   integer :: KRT ! soil layer loop index
+   integer :: errFlag ! device-side fatal condition flag
+   real    :: SFCHEADAGG ! aggregated surface head accumulator (mm)
+   real    :: LSMVOL ! aggregated surface water volume per LSM cell (mm * m2)
+   real    :: SH2OAGG ! aggregated soil moisture accumulator (m3/m3)
+
+   errFlag = 0
+
+!$acc data copyin(head_rt, area_rt, SMCRT, SMCMAXRT) &
+!$acc&     copyout(head_lsm, SH2OX, INFXSWGT, SH2OWGT)
+
+!$acc parallel loop collapse(2) &
+!$acc&     private(IXXRT,JYYRT,AGGFACXRT,AGGFACYRT,KRT,SFCHEADAGG,LSMVOL,SH2OAGG) &
+!$acc&     reduction(max:errFlag)
+   do J=1,JX
+      do I=1,IX
+
+         !State Variables
+         SFCHEADAGG = 0.
+         LSMVOL = 0.
+         do AGGFACYRT=AGGFACTRT-1,0,-1
+            do AGGFACXRT=AGGFACTRT-1,0,-1
+               IXXRT = I*AGGFACTRT - AGGFACXRT
+               JYYRT = J*AGGFACTRT - AGGFACYRT
+               SFCHEADAGG = SFCHEADAGG + head_rt(IXXRT,JYYRT)
+               LSMVOL = LSMVOL + head_rt(IXXRT,JYYRT) * area_rt(IXXRT,JYYRT)
+            end do
+         end do
+         head_lsm(I,J) = SFCHEADAGG / (AGGFACTRT**2)
+
+         ! Soil moisture aggregation: layer loop outermost so the accumulator
+         ! is a scalar; the per-layer subcell summation order matches the
+         ! original SH2OAGGRT accumulation.
+         do KRT=1,NSOIL
+            SH2OAGG = 0.
+            do AGGFACYRT=AGGFACTRT-1,0,-1
+               do AGGFACXRT=AGGFACTRT-1,0,-1
+                  IXXRT = I*AGGFACTRT - AGGFACXRT
+                  JYYRT = J*AGGFACTRT - AGGFACYRT
+                  SH2OAGG = SH2OAGG + SMCRT(IXXRT,JYYRT,KRT)
+               end do
+            end do
+            SH2OX(I,J,KRT) = SH2OAGG / (AGGFACTRT**2)
+         end do
+
+         !DJG Calculate subgrid weighting array...
+         do AGGFACYRT=AGGFACTRT-1,0,-1
+            do AGGFACXRT=AGGFACTRT-1,0,-1
+               IXXRT = I*AGGFACTRT - AGGFACXRT
+               JYYRT = J*AGGFACTRT - AGGFACYRT
+
+               if (LSMVOL.gt.0.) then
+                  INFXSWGT(IXXRT,JYYRT) = head_rt(IXXRT,JYYRT) &
+                                          * area_rt(IXXRT,JYYRT) / LSMVOL
+               else
+                  INFXSWGT(IXXRT,JYYRT) = 1./FLOAT(AGGFACTRT**2)
+               end if
+
+               do KRT=1,NSOIL
+                  IF ( (SMCRT(IXXRT,JYYRT,KRT) - SMCMAXRT(IXXRT,JYYRT,KRT)) &
+                        .GT. 0.000001 ) THEN
+                     errFlag = max(errFlag, 1)
+                  END IF
+                  IF (SH2OX(I,J,KRT).LT.0.) THEN
+                     errFlag = max(errFlag, 2)
+                  END IF
+
+                  IF ( SH2OX(I,J,KRT) .gt. 0 ) THEN
+                     SH2OWGT(IXXRT,JYYRT,KRT) = SMCRT(IXXRT,JYYRT,KRT) &
+                                                / SH2OX(I,J,KRT)
+                  ELSE
+                     SH2OWGT(IXXRT,JYYRT,KRT) = 0.0
+                  ENDIF
+                  SH2OWGT(IXXRT,JYYRT,KRT) = max(1.0E-05, SH2OWGT(IXXRT,JYYRT,KRT))
+               end do
+
+            end do
+         end do
+
+      end do
+   end do
+
+!$acc end data
+
+   if (errFlag .eq. 1) then
+      call hydro_stop("In module_HYDRO_drv.F aggregateDomain() - "// &
+          "SMCMAX exceeded upon aggregation.")
+   else if (errFlag .eq. 2) then
+      call hydro_stop("In module_HYDRO_drv.F aggregateDomain() "// &
+          "- Error negative SH2OX")
+   endif
+
+end subroutine aggregateDomain_acc
 !===================================================================================================
 
 

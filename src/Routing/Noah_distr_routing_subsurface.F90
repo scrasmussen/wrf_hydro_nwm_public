@@ -134,6 +134,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     INTEGER :: DT_STEPS             !-- number of timestep in routing
     REAL :: SUBDT                !-- subsurface routing timestep
     INTEGER :: KRT                  !-- routing counter
+    LOGICAL :: acc_single_rank      !-- use the single-rank OpenACC path
     REAL, DIMENSION(subrt_static%IXRT,subrt_static%JXRT,subrt_static%nsoil) :: SMCTMP  !--temp store of SMC
     REAL, DIMENSION(subrt_static%IXRT,subrt_static%JXRT) :: ZWATTABLRTTMP ! temp store of ZWAT
     REAL, DIMENSION(subrt_static%IXRT,subrt_static%JXRT) :: INFXSUBRTTMP ! temp store of infilx
@@ -242,6 +243,35 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     ! allow users to still have option to use 2d overland (both are controlled by same
     ! rt_option flag). Remove this hard-coded option when rt_option=2 is fixed for subsurface.
     !     if(subrt_static%rt_option .eq. 1) then
+
+#ifdef MPP_LAND
+    acc_single_rank = (numprocs .eq. 1)
+#else
+    acc_single_rank = .true.
+#endif
+
+    if (acc_single_rank) then
+    ! Single-rank OpenACC path: steepest-descent routing and the soil
+    ! moisture update run inside one device data region.  Multi-rank keeps
+    ! the original path below because the MPP halo exchanges are host-side.
+    CALL SUBSFC_RTNG_ACC(subrt_static%IXRT, subrt_static%JXRT, subrt_static%nsoil, &
+                         subrt_data%properties%distance_to_neighbor, &
+                         subrt_data%properties%zwattablrt, &
+                         subrt_data%properties%lksatrt, &
+                         subrt_data%properties%nexprt, &
+                         subrt_data%properties%soldeprt, &
+                         subrt_data%properties%surface_slope, &
+                         subrt_data%properties%max_surface_slope_index, &
+                         CWATAVAIL, SATLYRCHK, SUBDT, &
+                         subrt_data%properties%sldpth, &
+                         subrt_data%grid_transform%smcrt, &
+                         subrt_data%grid_transform%smcmaxrt, &
+                         subrt_data%grid_transform%smcrefrt, &
+                         subrt_input%infiltration_excess, &
+                         subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
+                         subrt_data%state%qsubrt)
+    else
+
     CALL ROUTE_SUBSURFACE1(subrt_data%properties%distance_to_neighbor, &
                            subrt_data%properties%zwattablrt, &
                            subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
@@ -385,6 +415,8 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     END DO          ! END DO Y dim
     !!!! End loop through subsurface routing domain...
 
+    endif ! acc_single_rank
+
 #ifdef MPP_LAND
     do i = 1, subrt_static%nsoil
         call MPP_LAND_COM_REAL(subrt_data%grid_transform%smcrt(:,:,i),subrt_static%IXRT,subrt_static%JXRT,99)
@@ -449,6 +481,331 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     !DJG ----------------------------------------------------------------
 END SUBROUTINE SUBSFC_RTNG
 !DJG ----------------------------------------------------------------
+
+!DJG ----------------------------------------------------------------
+!DJG   SUBROUTINE SUBSFC_RTNG_ACC
+!DJG   Single-rank OpenACC twin of the SUBSFC_RTNG routing + soil
+!DJG   moisture update path.  Runs the steepest-descent subsurface
+!DJG   routing (ROUTE_SUBSURFACE1_ACC) and the vertical soil moisture
+!DJG   redistribution inside one device data region.  Fatal input
+!DJG   conditions that the original path reports via hydro_stop are
+!DJG   collected in an error flag on the device and raised on the host.
+!DJG ----------------------------------------------------------------
+
+SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
+        SO8RT, SO8RT_D, CWATAVAIL, SATLYRCHK, SUBDT, sldpth, &
+        smcrt, smcmaxrt, smcrefrt, infiltration_excess, &
+        QSUBDRY, QSUBDRYT, qsub)
+
+    use module_hydro_stop, only: HYDRO_stop
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: XX, YY, NSOIL
+    REAL, INTENT(IN), DIMENSION(XX,YY,9) :: dist ! distance to neighbor cells (m)
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: z ! depth to water table (m)
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: latksat ! lateral saturated hydraulic conductivity (m/s)
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: nexp ! latksat decay coefficient
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: soldep ! soil depth (m)
+    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT ! terrain slope in all directions (m/m)
+    INTEGER, INTENT(IN), DIMENSION(XX,YY,3) :: SO8RT_D ! steepest terrain slope cell (i, j, index)
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: CWATAVAIL ! water available for routing (m)
+    INTEGER, INTENT(IN), DIMENSION(XX,YY) :: SATLYRCHK ! highest saturated layer index
+    REAL, INTENT(IN) :: SUBDT ! subsurface routing timestep (s)
+    REAL, INTENT(IN), DIMENSION(NSOIL) :: sldpth ! soil layer thicknesses (m)
+    REAL, INTENT(INOUT), DIMENSION(XX,YY,NSOIL) :: smcrt
+    REAL, INTENT(IN), DIMENSION(XX,YY,NSOIL) :: smcmaxrt
+    REAL, INTENT(IN), DIMENSION(XX,YY,NSOIL) :: smcrefrt
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: infiltration_excess
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
+    REAL, INTENT(INOUT) :: QSUBDRYT ! total subsurface flow outside of domain (m3/s)
+    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: qsub ! subsurface flow outside of cell (m3/s)
+
+    REAL, DIMENSION(XX,YY) :: hh_pre ! precomputed head falloff term (dimensionless)
+    REAL*8, DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
+    LOGICAL :: soldep_bad ! fatal static-input condition found this step
+    INTEGER :: i, j, kk, errFlag
+    REAL :: SUBFLO ! water to route into/out of soil column (m)
+    REAL :: WATAVAIL ! water available in a soil layer (m)
+
+    ! Host-side static-input check (the original routing loop makes the same
+    ! test for every interior cell each step before computing fluxes), fused
+    ! with the precompute of the head falloff term hh = (1 - z/soldep)**nexp.
+    ! The power uses host libm so the real-exponent result matches the
+    ! original CPU path bit for bit (CCE device libm pow is not available;
+    ! see cbrt_pos_acc et al. in module_channel_routing for the
+    ! fixed-exponent equivalents).  nexp is commonly uniform 1.0, and
+    ! x**1.0 == x exactly, so that case skips the pow call.
+    soldep_bad = .false.
+    do j=2,YY-1
+        do i=2,XX-1
+            if (soldep(i,j) .eq. 0) then
+                soldep_bad = .true.
+            else if (nexp(i,j) .eq. 1.0) then
+                hh_pre(i,j) = 1 - ( z(i,j) / soldep(i,j) )
+            else
+                hh_pre(i,j) = ( 1 - ( z(i,j) / soldep(i,j) ) ) ** nexp(i,j)
+            endif
+        end do
+    end do
+    if (soldep_bad) then
+        call hydro_stop("In ROUTE_SUBSURFACE1() - soldep is = zero")
+    endif
+
+    errFlag = 0
+
+!$acc data copyin(dist, z, latksat, nexp, soldep, SO8RT, SO8RT_D, &
+!$acc&            CWATAVAIL, SATLYRCHK, sldpth, smcmaxrt, smcrefrt, hh_pre) &
+!$acc&     copy(smcrt, infiltration_excess, QSUBDRY, qsub) &
+!$acc&     create(qsub_tmp, QSUBDRY_tmp)
+
+    CALL ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, XX, YY, &
+        SO8RT, SO8RT_D, CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
+        hh_pre, qsub_tmp, QSUBDRY_tmp, errFlag)
+
+    if (errFlag .eq. 1) then
+        call hydro_stop("In ROUTE_SUBSURFACE1() - dist(i,j,index) is <= zero ")
+    else if (errFlag .eq. 2) then
+        call hydro_stop("In ROUTE_SUBSURFACE1() - hsub<0 at gridcell ")
+    else if (errFlag .eq. 3) then
+        call hydro_stop("In ROUTE_SUBSURFACE1() - qqsub should be negative")
+    endif
+
+    !!!! Update soil moisture fields with subsurface flow...
+    errFlag = 0
+
+!$acc parallel loop collapse(2) private(i,j,kk,SUBFLO,WATAVAIL) reduction(max:errFlag)
+    DO J=1,YY
+        DO I=1,XX
+
+            SUBFLO = qsub(i,j) / dist(i,j,9) * SUBDT !Convert qsub from m^3/s to m
+
+            WATAVAIL = 0.  !Initialize to 0. for every cell...
+
+            IF (SUBFLO.GT.0) THEN ! Increase soil moist for +SUBFLO (Inflow)
+
+                ! Loop through soil layers from bottom to top
+                ! (plain sequential loop per thread; EXIT is not allowed
+                ! inside an !$acc loop construct)
+                DO KK=NSOIL,1,-1
+                    ! Check for saturated layers
+                    IF (smcrt(I,J,KK) .GE. smcmaxrt(I,J,KK)) THEN
+                        IF (smcrt(I,J,KK) .GT. smcmaxrt(I,J,KK)) THEN
+                            errFlag = max(errFlag, 1)
+                        END IF
+                    ELSE
+                        WATAVAIL = (smcmaxrt(I,J,KK)-smcrt(I,J,KK))*sldpth(KK)
+                        IF (WATAVAIL.GE.SUBFLO) THEN
+                            smcrt(I,J,KK) = smcrt(I,J,KK) + SUBFLO/sldpth(KK)
+                            SUBFLO = 0.
+                        ELSE
+                            SUBFLO = SUBFLO - WATAVAIL
+                            smcrt(I,J,KK) = smcmaxrt(I,J,KK)
+                        END IF
+                    END IF
+
+                    IF (SUBFLO.EQ.0.) EXIT
+                END DO      ! END DO FOR SOIL LAYERS
+
+                ! If all layers sat. add remaining subflo to infilt. excess...
+                IF (KK.eq.0.AND.SUBFLO.gt.0.) then
+                    infiltration_excess(I,J) = infiltration_excess(I,J) + SUBFLO*1000.    !Units = mm
+                    SUBFLO=0.
+                END IF
+
+            ELSE IF (SUBFLO.LT.0) THEN    ! Decrease soil moist for -SUBFLO (Drainage)
+
+                DO KK=SATLYRCHK(I,J),NSOIL
+                    WATAVAIL = (smcrt(I,J,KK) - smcrefrt(I,J,KK)) * sldpth(KK)
+                    IF (WATAVAIL.GE.ABS(SUBFLO)) THEN
+                        smcrt(I,J,KK) = smcrt(I,J,KK) + SUBFLO/sldpth(KK)
+                        SUBFLO=0.
+                    ELSE     ! Since subflo is small on a time-step following is unlikely...
+                        smcrt(I,J,KK) = smcrefrt(I,J,KK)
+                        SUBFLO=SUBFLO+WATAVAIL
+                    END IF
+                    IF (SUBFLO.EQ.0.) EXIT
+                END DO  ! END DO FOR SOIL LAYERS
+
+                if(abs(subflo) .le. 1.E-7 )  subflo = 0.0  !truncate residual to 1E-7 prec.
+
+            END IF  ! end if for +/- SUBFLO soil moisture accounting...
+
+        END DO
+    END DO
+
+!$acc end data
+
+    if (errFlag .eq. 1) then
+        call hydro_stop("In SUBSFC_RTNG() - SMCMAX exceeded")
+    endif
+
+END SUBROUTINE SUBSFC_RTNG_ACC
+
+!DJG ----------------------------------------------------------------
+!DJG   SUBROUTINE ROUTE_SUBSURFACE1_ACC
+!DJG   OpenACC twin of ROUTE_SUBSURFACE1 for the single-rank path.
+!DJG   GETSUB8/GETSUB8DIR are inlined (same neighbor order and max
+!DJG   comparison, so the steepest slope selection is identical) and
+!DJG   the neighbor/boundary flux scatters use atomic updates.  Must
+!DJG   be called inside the SUBSFC_RTNG_ACC data region.
+!DJG ----------------------------------------------------------------
+
+SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
+                                 XX, YY, SO8RT, SO8RT_D, &
+                                 CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
+                                 hh_pre, qsub_tmp, QSUBDRY_tmp, errFlag)
+
+   implicit none
+
+   ! Passed variables
+   integer, intent(in) :: XX,YY
+   real, intent(in), dimension(XX,YY,9)    :: dist ! distance to neighbor cells (m)
+   real, intent(in), dimension(XX,YY)      :: z ! depth to water table (m)
+   real, intent(in), dimension(XX,YY)      :: latksat
+                                              ! lateral saturated hydraulic conductivity (m/s)
+   real, intent(in), dimension(XX,YY)      :: nexp ! latksat decay coefficient
+   real, intent(in), dimension(XX,YY)      :: soldep ! soil depth (m)
+   real, intent(in), dimension(XX,YY,8)    :: SO8RT ! terrain slope in all directions (m/m)
+   integer, intent(in), dimension(XX,YY,3) :: SO8RT_D ! steepest terrain slope cell (i, j, index)
+   real, intent(in), dimension(XX,YY)      :: CWATAVAIL ! water available for routing (m)
+   real, intent(in)                        :: SUBDT ! subsurface routing timestep (s)
+   real, intent(inout), dimension(XX,YY)   :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
+   real, intent(inout)                     :: QSUBDRYT
+                                              ! total subsurface flow outside of domain (m3/s)
+   real, intent(inout), dimension(XX,YY)   :: qsub ! subsurface flow outside of cell (m3/s)
+   real, intent(in), dimension(XX,YY)      :: hh_pre ! precomputed (1-z/soldep)**nexp
+   real*8, intent(inout), dimension(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
+   integer, intent(inout)                  :: errFlag ! device-side fatal condition flag
+
+   ! Neighbor i/j offsets for direction indices 1-8, matching GETSUB8
+   ! (starting north and rotating clockwise).
+   integer, parameter :: NEIGH_DI(8) = (/ 0, 1, 1, 1, 0, -1, -1, -1 /)
+   integer, parameter :: NEIGH_DJ(8) = (/ 1, 1, 0, -1, -1, -1, 0, 1 /)
+
+   ! Local variables
+   integer :: i, j, k ! indices for local loops
+   integer :: IXX0, JYY0, index ! i, j, and direction index for steepest slope neighbor
+   real    :: beta ! total head slope (m/m)
+   real    :: dzdx ! subsurface head slope (m/m)
+   real    :: neighSlp ! total terrain+head slope for a neighbor (m/m)
+   real    :: hh ! interim variable for subsurface solution per DHSVM (dimensionless)
+   real    :: gamma ! interim variable for subsurface solution per DHSVM (m3/s)
+   real    :: ksat ! saturated hydraulic conductivity (m/s)
+   real    :: qqsub ! net subsurface flow out of cell (m3/s)
+   real    :: waterToRoute ! total water to route from cell (m)
+   real    :: qsubdryt_delta ! accumulated boundary flow this call (m3/s)
+
+   ! Initialize temp variables
+!$acc parallel loop collapse(2) private(i,j)
+   do j=1,YY
+      do i=1,XX
+         qsub_tmp(i,j) = 0.
+         QSUBDRY_tmp(i,j) = 0.
+      end do
+   end do
+
+   qsubdryt_delta = 0.0
+
+!$acc parallel loop collapse(2) &
+!$acc&     private(IXX0,JYY0,index,k,beta,dzdx,neighSlp,hh,ksat,gamma,qqsub,waterToRoute) &
+!$acc&     reduction(+:qsubdryt_delta) reduction(max:errFlag)
+   do j=2,YY-1 ! start j loop
+
+      do i=2,XX-1 ! start i loop
+
+         ! Set initial guess values for steepest slope neighbor based on terrain
+         IXX0 = SO8RT_D(i,j,1)
+         JYY0 = SO8RT_D(i,j,2)
+         index = SO8RT_D(i,j,3)
+
+         ! Inlined GETSUB8: check all 8 neighbors for the steepest
+         ! elev+head slope.  beta stays -1 if none can be found.
+         beta = -1.0
+!$acc loop seq
+         do k = 1, 8
+            dzdx = ( z(i,j) - z(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist(i,j,k)
+            neighSlp = SO8RT(i,j,k) - dzdx
+            if ( beta < neighSlp ) then
+               IXX0 = i + NEIGH_DI(k)
+               JYY0 = j + NEIGH_DJ(k)
+               beta = neighSlp
+               index = k
+            end if
+         end do
+
+         if (dist(i,j,index) .le. 0) then
+            errFlag = max(errFlag, 1)
+         else if (beta .gt. 0) then            !if-then for flux calc
+            if (beta .lt. 1E-20 ) then
+               beta = 1E-20
+            endif
+
+            ! Do the rest if the lowest grid can be found.
+            hh = hh_pre(i,j)
+            ksat = latksat(i,j)
+
+            if (hh .lt. 0.) then
+               errFlag = max(errFlag, 2)
+            else
+               ! Calculate flux from cell
+               ! AD_NOTE: gamma and qqsub are negative when flow is out of cell
+               gamma = -1.0 * ( (dist(i,j,index) * ksat * soldep(i,j)) / nexp(i,j) ) * beta
+               qqsub = gamma * hh
+
+               ! Calculate total water to route (where dist(i,j,9) is cell area):
+               waterToRoute = ABS(qqsub) / dist(i,j,9) * SUBDT
+               if ( (qqsub .le. 0.0) .and. (CWATAVAIL(i,j) .lt. waterToRoute) ) THEN
+                  qqsub = -1.0 * CWATAVAIL(i,j) * dist(i,j,9) / SUBDT
+               endif
+
+               ! Remove from cell qsub to track net fluxes over full i, j loop
+               ! (remember: qqsub is negative when flow is out of cell!)
+               qsub(i,j) = qsub(i,j) + qqsub
+               ! Add to neighbor cell qsub to track net fluxes over full i, j loop
+!$acc atomic update
+               qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) - qqsub
+
+               if (qqsub .gt. 0) then
+                  errFlag = max(errFlag, 3)
+               endif
+
+               ! Make boundary adjustments if cells are on edge of domain
+               ! (single-rank path: local domain edges are the global edges)
+               if ((ixx0.eq.1).or.(ixx0.eq.xx).or.(jyy0.eq.1).or.(jyy0.eq.yy)) then
+                  ! If on edge, move flux tracking BACK from neighbor cell qsub and into
+                  ! boundary qsub (note: qsubdry is negative and qqsub is negative, so we
+                  ! are making it a bigger sink here)
+!$acc atomic update
+                  qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) + qqsub
+!$acc atomic update
+                  QSUBDRY_tmp(ixx0,jyy0) = QSUBDRY_tmp(ixx0,jyy0) + qqsub
+                  ! Add to total BOUNDARY qsub
+                  qsubdryt_delta = qsubdryt_delta + qqsub
+               endif
+            endif
+
+         endif  ! end if for flux calc
+
+      end do  ! end i loop
+
+   end do   ! end j loop
+
+   QSUBDRYT = QSUBDRYT + qsubdryt_delta
+
+   ! Sum grids to get net of self and neighbor fluxes after looping through all cells
+   ! (i.e., net of out-flux from one cell and in-flux from its neighbor cell)
+!$acc parallel loop collapse(2) private(i,j)
+   do j=1,YY
+      do i=1,XX
+         qsub(i,j) = qsub(i,j) + qsub_tmp(i,j)
+         QSUBDRY(i,j) = QSUBDRY(i,j) + QSUBDRY_tmp(i,j)
+      end do
+   end do
+
+   return
+
+end subroutine ROUTE_SUBSURFACE1_ACC
 
 
 !DJG ------------------------------------------------------------------------
