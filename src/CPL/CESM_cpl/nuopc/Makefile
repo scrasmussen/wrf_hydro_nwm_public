@@ -41,7 +41,7 @@ endif
 # Model Variables
 # ###############
 
-MODEL_DIR    := $(abspath $(PWD)/../../../)
+MODEL_DIR    := $(abspath $(CURDIR)/../../../)
 MODEL_MKDIR  := $(abspath $(MODEL_DIR))
 MODEL_LIBDIR := $(abspath $(MODEL_DIR)/lib)
 MODEL_MODDIR := $(abspath $(MODEL_DIR)/mod)
@@ -133,10 +133,11 @@ wrfhydro_nuopc_fields.mod: wrfhydro_nuopc_fields.o
 wrfhydro_nuopc_flags.mod: wrfhydro_nuopc_flags.o
 wrfhydro_esmf_extensions.mod: wrfhydro_esmf_extensions.o
 
-libwrfhydro_nuopc.a: $(CAP_OBJS) librof.a
-	ar rcs $@ $(CAP_OBJS)
+libwrfhydro_nuopc.a: librof.a
+	cp $< $@
 
-librof.a: $(CAP_OBJS)
+librof.a: $(MODEL_LIB) $(CAP_OBJS)
+	cp $(MODEL_LIB) $@
 	ar rcs $@ $(CAP_OBJS)
 
 fflags= \
