@@ -46,14 +46,21 @@ def buildnml(case, caseroot, compname):
     srcroot = case.get_value("COMP_ROOT_DIR_ROF")
     rundir = case.get_value("RUNDIR")
 
-    nmltemplate = "hydro.namelist.template"
-    nmlsrc = os.path.join(srcroot+'/cime_config', nmltemplate)
-
     nmlfile = "hydro.namelist"
-    nmldestination = os.path.join(rundir, nmlfile)
+    nmltemplate = f"{nmlfile}.template"
+    nmlsrc = os.path.join(srcroot, "cime_config", nmltemplate)
+    case_nml = os.path.join(caseroot, nmlfile)
+    run_nml = os.path.join(rundir, nmlfile)
 
-    print(f"   - copying namelist {nmltemplate} to {nmldestination}")
-    shutil.copy(nmlsrc, nmldestination)
+    print(f"   - copying namelist {nmltemplate} to {case_nml}")
+    shutil.copy(nmlsrc, case_nml)
+
+    # The case copy is user-visible and persistent. Keep only a link in the
+    # run directory so both locations always refer to the same namelist.
+    if os.path.lexists(run_nml):
+        os.remove(run_nml)
+    print(f"   - linking {run_nml} to {case_nml}")
+    os.symlink(case_nml, run_nml)
 
 def _main_func():
     caseroot = parse_input(sys.argv)

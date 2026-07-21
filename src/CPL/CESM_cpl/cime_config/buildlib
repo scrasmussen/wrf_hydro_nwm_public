@@ -35,6 +35,7 @@ def print_and_run(cmd):
     print(f'$ {cmd}')
     rc, out, err = run_cmd(cmd)
     logger.info("%s: \n\n output:\n %s \n\n err:\n\n%s\n"%(cmd,out,err))
+    expect(rc == 0, f"Command failed ({rc}): {cmd}\n{err}")
 
 
 def _main_func():
