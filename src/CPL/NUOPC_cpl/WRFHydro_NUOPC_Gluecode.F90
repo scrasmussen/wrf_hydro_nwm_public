@@ -1,16 +1,8 @@
 #include "WRFHydro_NUOPC_Macros.h"
 
 module wrfhydro_nuopc_gluecode
-! !MODULE: wrfhydro_nuopc_gluecode
-!
-! !DESCRIPTION:
-!   This module connects NUOPC initialize, advance,
-!   and finalize to WRFHYDRO.
-!
-! !REVISION HISTORY:
-!  13Oct15    Dan Rosen  Initial Specification
-!
-! !USES:
+! This module connects NUOPC initialize, advance,
+! and finalize to WRFHYDRO.
   use ESMF
   use NUOPC
   use mpi

@@ -77,28 +77,36 @@ module wrfhydro_nuopc_fields
                  "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
                  TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SH20, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_2","smc2", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_3","smc3", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_moisture_fraction_layer_4","smc4", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
                  "K", ESMF_REGRIDMETHOD_BILINEAR, &
