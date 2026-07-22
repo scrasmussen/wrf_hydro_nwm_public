@@ -544,6 +544,9 @@ module rof_comp_nuopc
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
+    ! create geogrid from CESM input files
+    call wrfhydro_create_geogrid_file()
+
     call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
@@ -705,166 +708,166 @@ module rof_comp_nuopc
     call NUOPC_CompGet(gcomp, name=cname, verbosity=verbosity, &
          diagnostic=diagnostic, rc=rc)
 
-!     ! query Component for its internal State
-!     nullify(is%wrap)
-!     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query Component for its internal State
+    nullify(is%wrap)
+    call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the Component for its clock
-!     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the Component for its clock
+    call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! set up invalid time (by convention)
-!     call ESMF_TimeSet(invalidTime, yy=99999999, mm=01, dd=01, &
-!       h=00, m=00, s=00, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! set up invalid time (by convention)
+    call ESMF_TimeSet(invalidTime, yy=99999999, mm=01, dd=01, &
+      h=00, m=00, s=00, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! get the current time out of the clock
-!     call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! get the current time out of the clock
+    call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     write (nStr,"(I0)") is%wrap%did
+    write (nStr,"(I0)") is%wrap%did
 
-!     ! initialize import state
-!     if (is%wrap%init_import.eq.FILLV_MISSING) then
-!       call state_fill_uniform(is%wrap%NStateImp(1), &
-!         fillValue=ESMF_MISSING_VALUE, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       importUpdated = .TRUE.
-!     elseif (is%wrap%init_import.eq.FILLV_ZERO) then
-!       call state_fill_uniform(is%wrap%NStateImp(1), &
-!         fillValue=0.0_ESMF_KIND_R8, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       importUpdated = .TRUE.
-!     elseif (is%wrap%init_import.eq.FILLV_DEPENDENCY) then
-!       importCurrent = NUOPC_IsAtTime(is%wrap%NStateImp(1), &
-!         time=currTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       if (importCurrent) then
-!         call ESMF_LogWrite( &
-!           trim(cname)//': '//rname//' Initialize-Data-Dependency SATISFIED!!! Nest='//trim(nStr), &
-!           ESMF_LOGMSG_INFO)
-!         importUpdated = .TRUE.
-!       else
-!         call ESMF_LogWrite( &
-!           trim(cname)//': '//rname//' Initialize-Data-Dependency NOT YET SATISFIED!!! Nest='//trim(nStr), &
-!           ESMF_LOGMSG_INFO)
-!         importUpdated = .FALSE.
-!       endif
-!     elseif (is%wrap%init_import.eq.FILLV_PRESCRIBE) then
-!       call state_fill_prescribe(is%wrap%NStateImp(1), &
-!         fieldList=cap_fld_list, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       importUpdated = .TRUE.
-!     elseif (is%wrap%init_import.eq.FILLV_FILE) then
-!       call state_fill_file(is%wrap%NStateImp(1), &
-!         filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
-!           "_imp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       importUpdated = .TRUE.
-!     elseif (is%wrap%init_import.eq.FILLV_MODEL) then
-!       if (is%wrap%memr_import.eq.MEMORY_COPY) then
-!         call state_copy_frhyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       endif
-!       call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       if (mdlRestart) then
-!         call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       else
-!         call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       endif
-!       importUpdated = .TRUE.
-!     else
-!       initTypeStr = is%wrap%init_import
-!       call ESMF_LogSetError(ESMF_FAILURE, &
-!         msg="Import data initialize routine unknown "//trim(initTypeStr), &
-!         line=__LINE__,file=__FILE__,rcToReturn=rc)
-!       return  ! bail out
-!       importUpdated = .FALSE.
-!     endif
+    ! initialize import state
+    if (is%wrap%init_import.eq.FILLV_MISSING) then
+      call state_fill_uniform(is%wrap%NStateImp(1), &
+        fillValue=ESMF_MISSING_VALUE, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      importUpdated = .TRUE.
+    elseif (is%wrap%init_import.eq.FILLV_ZERO) then
+      call state_fill_uniform(is%wrap%NStateImp(1), &
+        fillValue=0.0_ESMF_KIND_R8, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      importUpdated = .TRUE.
+    elseif (is%wrap%init_import.eq.FILLV_DEPENDENCY) then
+      importCurrent = NUOPC_IsAtTime(is%wrap%NStateImp(1), &
+        time=currTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      if (importCurrent) then
+        call ESMF_LogWrite( &
+          trim(cname)//': '//rname//' Initialize-Data-Dependency SATISFIED!!! Nest='//trim(nStr), &
+          ESMF_LOGMSG_INFO)
+        importUpdated = .TRUE.
+      else
+        call ESMF_LogWrite( &
+          trim(cname)//': '//rname//' Initialize-Data-Dependency NOT YET SATISFIED!!! Nest='//trim(nStr), &
+          ESMF_LOGMSG_INFO)
+        importUpdated = .FALSE.
+      endif
+    elseif (is%wrap%init_import.eq.FILLV_PRESCRIBE) then
+      call state_fill_prescribe(is%wrap%NStateImp(1), &
+        fieldList=cap_fld_list, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      importUpdated = .TRUE.
+    elseif (is%wrap%init_import.eq.FILLV_FILE) then
+      call state_fill_file(is%wrap%NStateImp(1), &
+        filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
+          "_imp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      importUpdated = .TRUE.
+    elseif (is%wrap%init_import.eq.FILLV_MODEL) then
+      if (is%wrap%memr_import.eq.MEMORY_COPY) then
+        call state_copy_frhyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      endif
+      call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      if (mdlRestart) then
+        call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      else
+        call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=invalidTime, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      endif
+      importUpdated = .TRUE.
+    else
+      initTypeStr = is%wrap%init_import
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg="Import data initialize routine unknown "//trim(initTypeStr), &
+        line=__LINE__,file=__FILE__,rcToReturn=rc)
+      return  ! bail out
+      importUpdated = .FALSE.
+    endif
 
-!     ! initialize export state
-!     if (is%wrap%init_export.eq.FILLV_MISSING) then
-!       call state_fill_uniform(is%wrap%NStateExp(1), &
-!         fillValue=ESMF_MISSING_VALUE, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       exportUpdated = .TRUE.
-!     elseif (is%wrap%init_export.eq.FILLV_ZERO) then
-!       call state_fill_uniform(is%wrap%NStateExp(1), &
-!         fillValue=0.0_ESMF_KIND_R8, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       exportUpdated = .TRUE.
-!     elseif (is%wrap%init_export.eq.FILLV_PRESCRIBE) then
-!       call state_fill_prescribe(is%wrap%NStateExp(1), &
-!         fieldList=cap_fld_list, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       exportUpdated = .TRUE.
-!     elseif (is%wrap%init_export.eq.FILLV_FILE) then
-!       call state_fill_file(is%wrap%NStateExp(1), &
-!         filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
-!           "_exp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return
-!       call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       exportUpdated = .TRUE.
-!     elseif (is%wrap%init_export.eq.FILLV_MODEL) then
-!       if (is%wrap%memr_export.eq.MEMORY_COPY) then
-!         call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       endif
-!       call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       if (mdlRestart) then
-!         call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       else
-!         call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       endif
-!       exportUpdated = .TRUE.
-!     else
-!       initTypeStr = is%wrap%init_export
-!       call ESMF_LogSetError(ESMF_FAILURE, &
-!         msg="Export data initialize routine unknown "//trim(initTypeStr), &
-!         line=__LINE__,file=__FILE__,rcToReturn=rc)
-!       return  ! bail out
-!       exportUpdated = .FALSE.
-!     endif
+    ! initialize export state
+    if (is%wrap%init_export.eq.FILLV_MISSING) then
+      call state_fill_uniform(is%wrap%NStateExp(1), &
+        fillValue=ESMF_MISSING_VALUE, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      exportUpdated = .TRUE.
+    elseif (is%wrap%init_export.eq.FILLV_ZERO) then
+      call state_fill_uniform(is%wrap%NStateExp(1), &
+        fillValue=0.0_ESMF_KIND_R8, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      exportUpdated = .TRUE.
+    elseif (is%wrap%init_export.eq.FILLV_PRESCRIBE) then
+      call state_fill_prescribe(is%wrap%NStateExp(1), &
+        fieldList=cap_fld_list, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      exportUpdated = .TRUE.
+    elseif (is%wrap%init_export.eq.FILLV_FILE) then
+      call state_fill_file(is%wrap%NStateExp(1), &
+        filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
+          "_exp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      exportUpdated = .TRUE.
+    elseif (is%wrap%init_export.eq.FILLV_MODEL) then
+      if (is%wrap%memr_export.eq.MEMORY_COPY) then
+        call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      endif
+      call WRFHYDRO_get_restart(is%wrap%did, restart=mdlRestart, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      if (mdlRestart) then
+        call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      else
+        call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=invalidTime, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      endif
+      exportUpdated = .TRUE.
+    else
+      initTypeStr = is%wrap%init_export
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg="Export data initialize routine unknown "//trim(initTypeStr), &
+        line=__LINE__,file=__FILE__,rcToReturn=rc)
+      return  ! bail out
+      exportUpdated = .FALSE.
+    endif
 
-!     ! set InitializeDataComplete Attribute to "true", indicating to the
-!     ! generic code that all inter-model data dependencies are satisfied
-!     if (importUpdated.AND.exportUpdated) then
-!       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       ! Write initialization files
-!       if (btest(diagnostic,16)) then
-!         call NUOPC_Write(is%wrap%NStateImp(1), &
-!           fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-!             rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
-!           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!         call NUOPC_Write(is%wrap%NStateExp(1), &
-!           fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-!             rname//"_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
-!           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       endif
-!     endif
+    ! set InitializeDataComplete Attribute to "true", indicating to the
+    ! generic code that all inter-model data dependencies are satisfied
+    if (importUpdated.AND.exportUpdated) then
+      call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      ! Write initialization files
+      if (btest(diagnostic,16)) then
+        call NUOPC_Write(is%wrap%NStateImp(1), &
+          fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+            rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+          overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call NUOPC_Write(is%wrap%NStateExp(1), &
+          fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+            rname//"_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+          overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      endif
+    endif
 
   end subroutine DataInitialize
 
@@ -890,82 +893,82 @@ module rof_comp_nuopc
     call NUOPC_CompGet(gcomp, name=cname, verbosity=verbosity, &
          diagnostic=diagnostic, rc=rc)
 
-!     ! query Component for its internal State
-!     nullify(is%wrap)
-!     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query Component for its internal State
+    nullify(is%wrap)
+    call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the Component for its clock
-!     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the Component for its clock
+    call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the clock for its timestep
-!     call ESMF_ClockGet(modelClock, timeStep=timeStep, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the clock for its timestep
+    call ESMF_ClockGet(modelClock, timeStep=timeStep, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the timestep for seconds
-!     call ESMF_TimeIntervalGet(timestep,s=dt,rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the timestep for seconds
+    call ESMF_TimeIntervalGet(timestep,s=dt,rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! override timestep
-!     if (is%wrap%timeStepInt /= 0) then
-!       call ESMF_TimeIntervalSet(timestep, &
-!         s=is%wrap%timeStepInt, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       call WRFHYDRO_set_timestep(is%wrap%did,real(is%wrap%timeStepInt),rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       call ESMF_ClockSet(modelClock, timeStep=timeStep, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     else
-!       call WRFHYDRO_set_timestep(is%wrap%did,real(dt),rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    ! override timestep
+    if (is%wrap%timeStepInt /= 0) then
+      call ESMF_TimeIntervalSet(timestep, &
+        s=is%wrap%timeStepInt, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call WRFHYDRO_set_timestep(is%wrap%did,real(is%wrap%timeStepInt),rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call ESMF_ClockSet(modelClock, timeStep=timeStep, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    else
+      call WRFHYDRO_set_timestep(is%wrap%did,real(dt),rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     call NUOPC_CompSetClock(gcomp, modelClock, timeStep, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call NUOPC_CompSetClock(gcomp, modelClock, timeStep, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     is%wrap%clock(1) = modelClock
+    is%wrap%clock(1) = modelClock
 
-!     ! Reset Timers
-!     call ESMF_TimeIntervalSet(is%wrap%stepTimer(1), &
-!       s_r8=0._ESMF_KIND_R8, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! Reset Timers
+    call ESMF_TimeIntervalSet(is%wrap%stepTimer(1), &
+      s_r8=0._ESMF_KIND_R8, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     if (btest(verbosity,16)) call LogClock()
+    if (btest(verbosity,16)) call LogClock()
 
-!     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-!     subroutine LogClock()
-!       ! local variables
-!       character(ESMF_MAXSTR)     :: logMsg
-!       type(ESMF_Time)            :: currTime
-!       type(ESMF_TimeInterval)    :: timestep
-!       character(len=64)          :: currTimeStr
-!       character(len=64)          :: timestepStr
+    subroutine LogClock()
+      ! local variables
+      character(ESMF_MAXSTR)     :: logMsg
+      type(ESMF_Time)            :: currTime
+      type(ESMF_TimeInterval)    :: timestep
+      character(len=64)          :: currTimeStr
+      character(len=64)          :: timestepStr
 
-!       if (ESMF_ClockIsCreated(is%wrap%clock(1))) then
-!         call ESMF_ClockGet(is%wrap%clock(1), &
-!           currTime=currTime,timeStep=timestep,rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!         call ESMF_TimeGet(currTime, &
-!           timeString=currTimeStr,rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!         call ESMF_TimeIntervalGet(timestep, &
-!           timeString=timestepStr,rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       else
-!         currTimeStr = "(not_created)"
-!         timestepStr = "(not_created)"
-!       endif
+      if (ESMF_ClockIsCreated(is%wrap%clock(1))) then
+        call ESMF_ClockGet(is%wrap%clock(1), &
+          currTime=currTime,timeStep=timestep,rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call ESMF_TimeGet(currTime, &
+          timeString=currTimeStr,rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call ESMF_TimeIntervalGet(timestep, &
+          timeString=timestepStr,rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      else
+        currTimeStr = "(not_created)"
+        timestepStr = "(not_created)"
+      endif
 
-!       write (logMsg, "(A,(A,A))") trim(cname)//": ", &
-!         "Current Time = ",trim(currTimeStr)
-!       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
-!       write (logMsg, "(A,(A,A))") trim(cname)//": ", &
-!         "Time Step    = ",trim(timestepStr)
-!       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+      write (logMsg, "(A,(A,A))") trim(cname)//": ", &
+        "Current Time = ",trim(currTimeStr)
+      call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+      write (logMsg, "(A,(A,A))") trim(cname)//": ", &
+        "Time Step    = ",trim(timestepStr)
+      call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
 
-!     end subroutine LogClock
+    end subroutine LogClock
 
   end subroutine SetClock
 
@@ -1091,168 +1094,168 @@ subroutine CheckImport(gcomp, rc)
     call NUOPC_CompGet(gcomp, name=cname, verbosity=verbosity, &
          diagnostic=diagnostic, rc=rc)
 
-!     ! query component for its internal State
-!     nullify(is%wrap)
-!     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query component for its internal State
+    nullify(is%wrap)
+    call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the component for its clock, importState, and exportState
-!     call NUOPC_ModelGet(gcomp, &
-!       modelClock=modelClock, &
-!       importState=importState, &
-!       exportState=exportState, &
-!       rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the component for its clock, importState, and exportState
+    call NUOPC_ModelGet(gcomp, &
+      modelClock=modelClock, &
+      importState=importState, &
+      exportState=exportState, &
+      rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the clock for its current time and timestep
-!     call ESMF_ClockGet(modelClock, &
-!       currTime=currTime, timeStep=timeStep, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     advEndTime = currTime + timeStep
-!     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     call ESMF_TimeGet(advEndTime, timeString=advEndTimeStr, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the clock for its current time and timestep
+    call ESMF_ClockGet(modelClock, &
+      currTime=currTime, timeStep=timeStep, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    advEndTime = currTime + timeStep
+    call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_TimeGet(advEndTime, timeString=advEndTimeStr, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     write (nStr,"(I0)") is%wrap%did
+    write (nStr,"(I0)") is%wrap%did
 
-!     ! Write import files
-!     if (btest(diagnostic,16)) then
-!       call NUOPC_Write(is%wrap%NStateImp(1), &
-!         fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-!           rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
-!         overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    ! Write import files
+    if (btest(diagnostic,16)) then
+      call NUOPC_Write(is%wrap%NStateImp(1), &
+        fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+          rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+        overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     if (is%wrap%memr_import.eq.MEMORY_COPY) then
-!       call state_copy_tohyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    if (is%wrap%memr_import.eq.MEMORY_COPY) then
+      call state_copy_tohyd(is%wrap%NStateImp(1), is%wrap%did, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     if (is%wrap%misg_import.eq.MISSINGVAL_FAIL) then
-!       call state_check_missing(is%wrap%NStateImp(1), did=is%wrap%did, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     elseif (is%wrap%misg_import.eq.MISSINGVAL_PRESCRIBE) then
-!       call state_prescribe_missing(is%wrap%NStateImp(1), did=is%wrap%did, &
-!         fieldList=cap_fld_list, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     elseif (is%wrap%misg_import.eq.MISSINGVAL_IGNORE) then
-! !     DO NOTHING
-!     else
-!       misgValTypeStr = is%wrap%misg_import
-!       call ESMF_LogSetError(ESMF_FAILURE, &
-!         msg="Unknown missing value handler "//trim(misgValTypeStr), &
-!         line=__LINE__,file=__FILE__,rcToReturn=rc)
-!       return  ! bail out
-!     endif
+    if (is%wrap%misg_import.eq.MISSINGVAL_FAIL) then
+      call state_check_missing(is%wrap%NStateImp(1), did=is%wrap%did, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    elseif (is%wrap%misg_import.eq.MISSINGVAL_PRESCRIBE) then
+      call state_prescribe_missing(is%wrap%NStateImp(1), did=is%wrap%did, &
+        fieldList=cap_fld_list, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    elseif (is%wrap%misg_import.eq.MISSINGVAL_IGNORE) then
+!     DO NOTHING
+    else
+      misgValTypeStr = is%wrap%misg_import
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg="Unknown missing value handler "//trim(misgValTypeStr), &
+        line=__LINE__,file=__FILE__,rcToReturn=rc)
+      return  ! bail out
+    endif
 
-!     if (btest(diagnostic,16)) then
-!       call model_debug(is%wrap%NStateImp(1), did=is%wrap%did, &
-!         memflg=is%wrap%memr_import, &
-!         filePrefix=trim(is%wrap%dirOutput)//"/wrfhydro_"// &
-!           rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    if (btest(diagnostic,16)) then
+      call model_debug(is%wrap%NStateImp(1), did=is%wrap%did, &
+        memflg=is%wrap%memr_import, &
+        filePrefix=trim(is%wrap%dirOutput)//"/wrfhydro_"// &
+          rname//"_imp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     is%wrap%stepTimer(1) = is%wrap%stepTimer(1) + timeStep
+    is%wrap%stepTimer(1) = is%wrap%stepTimer(1) + timeStep
 
-!     call ESMF_ClockGet(is%wrap%clock(1),timeStep=timestep,rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_ClockGet(is%wrap%clock(1),timeStep=timestep,rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     do while (is%wrap%stepTimer(1) >= timestep)
-!       ! call wrfhydro advance
-!       if (btest(verbosity,16)) then
-!         call LogAdvance(nIndex=1,nStr=nStr)
-!       endif
-!       call wrfhydro_nuopc_run(is%wrap%did,is%wrap%lsm_forcings(1), &
-!         is%wrap%clock(1),is%wrap%NStateImp(1),is%wrap%NStateExp(1),rc)
-!       if(ESMF_STDERRORCHECK(rc)) return ! bail out
-!       call ESMF_ClockAdvance(is%wrap%clock(1),rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       is%wrap%stepTimer(1) = &
-!         is%wrap%stepTimer(1) - timestep
-!     enddo
+    do while (is%wrap%stepTimer(1) >= timestep)
+      ! call wrfhydro advance
+      if (btest(verbosity,16)) then
+        call LogAdvance(nIndex=1,nStr=nStr)
+      endif
+      call wrfhydro_nuopc_run(is%wrap%did,is%wrap%lsm_forcings(1), &
+        is%wrap%clock(1),is%wrap%NStateImp(1),is%wrap%NStateExp(1),rc)
+      if(ESMF_STDERRORCHECK(rc)) return ! bail out
+      call ESMF_ClockAdvance(is%wrap%clock(1),rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      is%wrap%stepTimer(1) = &
+        is%wrap%stepTimer(1) - timestep
+    enddo
 
-!     if (is%wrap%memr_export.eq.MEMORY_COPY) then
-!       call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    if (is%wrap%memr_export.eq.MEMORY_COPY) then
+      call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     if (is%wrap%reset_import) then
-!       if ((is%wrap%memr_import.eq.MEMORY_POINTER) .AND. &
-!           (is%wrap%memr_export.eq.MEMORY_POINTER)) then
-!         call ESMF_LogSetError(ESMF_FAILURE, &
-!           msg="Cannot reset import field if pointer is shared with export.", &
-!           line=__LINE__,file=__FILE__,rcToReturn=rc)
-!         return  ! bail out
-!       else
-!         call state_fill_uniform(is%wrap%NStateImp(1), &
-!           fillValue=ESMF_MISSING_VALUE, rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return
-!       endif
-!     endif
+    if (is%wrap%reset_import) then
+      if ((is%wrap%memr_import.eq.MEMORY_POINTER) .AND. &
+          (is%wrap%memr_export.eq.MEMORY_POINTER)) then
+        call ESMF_LogSetError(ESMF_FAILURE, &
+          msg="Cannot reset import field if pointer is shared with export.", &
+          line=__LINE__,file=__FILE__,rcToReturn=rc)
+        return  ! bail out
+      else
+        call state_fill_uniform(is%wrap%NStateImp(1), &
+          fillValue=ESMF_MISSING_VALUE, rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return
+      endif
+    endif
 
-!     ! Write export files
-!     if (btest(diagnostic,16)) then
-!       call NUOPC_Write(is%wrap%NStateExp(1), &
-!         fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
-!           rname//"_exp_D"//trim(nStr)//"_"//trim(advEndTimeStr)//"_", &
-!         overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    ! Write export files
+    if (btest(diagnostic,16)) then
+      call NUOPC_Write(is%wrap%NStateExp(1), &
+        fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
+          rname//"_exp_D"//trim(nStr)//"_"//trim(advEndTimeStr)//"_", &
+        overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    contains ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-!     subroutine LogAdvance(nIndex,nStr)
-!       integer                    :: nIndex
-!       character(len=9)           :: nStr
-!       ! local variables
-!       character(ESMF_MAXSTR)     :: logMsg
-!       character(len=32)          :: nModeStr
-!       type(ESMF_Time)            :: nestCurrTime
-!       type(ESMF_TimeInterval)    :: nestTimestep
-!       character(len=32)          :: nCurrTimeStr
-!       character(len=32)          :: nTimeStepStr
+    subroutine LogAdvance(nIndex,nStr)
+      integer                    :: nIndex
+      character(len=9)           :: nStr
+      ! local variables
+      character(ESMF_MAXSTR)     :: logMsg
+      character(len=32)          :: nModeStr
+      type(ESMF_Time)            :: nestCurrTime
+      type(ESMF_TimeInterval)    :: nestTimestep
+      character(len=32)          :: nCurrTimeStr
+      character(len=32)          :: nTimeStepStr
 
-!       call ESMF_LogWrite(trim(cname)//': '//rname//&
-!         ' Advancing Nest='//trim(nStr),ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(trim(cname)//': '//rname//&
+        ' Advancing Nest='//trim(nStr),ESMF_LOGMSG_INFO)
 
-!       if (is%wrap%lsm_forcings(nIndex)) then
-!         nModeStr = "WRFHYDRO_Coupled"
-!       else
-!         nModeStr = "WRFHYDRO_Offline"
-!       endif
+      if (is%wrap%lsm_forcings(nIndex)) then
+        nModeStr = "WRFHYDRO_Coupled"
+      else
+        nModeStr = "WRFHYDRO_Offline"
+      endif
 
-!       write (logMsg, "(A,(A,A,A),(A,A))") trim(cname)//': ', &
-!         'Nest(',trim(nStr),') ', &
-!         'Mode = ',trim(nModeStr)
-!       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+      write (logMsg, "(A,(A,A,A),(A,A))") trim(cname)//': ', &
+        'Nest(',trim(nStr),') ', &
+        'Mode = ',trim(nModeStr)
+      call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
 
-!       if (ESMF_ClockIsCreated(is%wrap%clock(nIndex))) then
-!         call ESMF_ClockGet(is%wrap%clock(nIndex), &
-!           currTime=nestCurrTime,timeStep=nestTimestep,rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!         call ESMF_TimeGet(nestCurrTime, &
-!           timeString=nCurrTimeStr,rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!         call ESMF_TimeIntervalGet(nestTimestep, &
-!           timeString=nTimeStepStr,rc=rc)
-!         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!       else
-!         nCurrTimeStr = "(not_created)"
-!         nTimestepStr = "(not_created)"
-!       endif
-!       write (logMsg, "(A,(A,A,A),(A,A))") trim(cname)//": ", &
-!         "Nest(",trim(nStr),") ", &
-!         "Current Time = ",trim(nCurrTimeStr)
-!       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
-!       write (logMsg, "(A,(A,A,A),(A,A))") trim(cname)//": ", &
-!         "Nest(",trim(nStr),") ", &
-!         "Time Step    = ",trim(nTimestepStr)
-!       call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+      if (ESMF_ClockIsCreated(is%wrap%clock(nIndex))) then
+        call ESMF_ClockGet(is%wrap%clock(nIndex), &
+          currTime=nestCurrTime,timeStep=nestTimestep,rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call ESMF_TimeGet(nestCurrTime, &
+          timeString=nCurrTimeStr,rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+        call ESMF_TimeIntervalGet(nestTimestep, &
+          timeString=nTimeStepStr,rc=rc)
+        if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      else
+        nCurrTimeStr = "(not_created)"
+        nTimestepStr = "(not_created)"
+      endif
+      write (logMsg, "(A,(A,A,A),(A,A))") trim(cname)//": ", &
+        "Nest(",trim(nStr),") ", &
+        "Current Time = ",trim(nCurrTimeStr)
+      call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
+      write (logMsg, "(A,(A,A,A),(A,A))") trim(cname)//": ", &
+        "Nest(",trim(nStr),") ", &
+        "Time Step    = ",trim(nTimestepStr)
+      call ESMF_LogWrite(trim(logMsg),ESMF_LOGMSG_INFO)
 
-!     end subroutine LogAdvance
+    end subroutine LogAdvance
 
   end subroutine ModelAdvance
 
@@ -1280,39 +1283,39 @@ subroutine CheckImport(gcomp, rc)
     call NUOPC_CompGet(gcomp, name=cname, verbosity=verbosity, &
          diagnostic=diagnostic, rc=rc)
 
-!     ! query Component for its internal State
-!     nullify(is%wrap)
-!     call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query Component for its internal State
+    nullify(is%wrap)
+    call ESMF_UserCompGetInternalState(gcomp, label_InternalState, is, rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     ! query the Component for its clock
-!     call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    ! query the Component for its clock
+    call NUOPC_ModelGet(gcomp, modelClock=modelClock, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_ClockGet(modelClock, currTime=currTime, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call ESMF_TimeGet(currTime, timeString=currTimeStr, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     write (nStr,"(I0)") is%wrap%did
+    write (nStr,"(I0)") is%wrap%did
 
-!     ! Write export file
-!     if (is%wrap%writeRestart) then
-!       call NUOPC_Write(is%wrap%NStateExp(1), &
-!         fileNamePrefix=trim(is%wrap%dirOutput)//"/restart_"//trim(cname)// &
-!           "_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
-!           overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-!       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
-!     endif
+    ! Write export file
+    if (is%wrap%writeRestart) then
+      call NUOPC_Write(is%wrap%NStateExp(1), &
+        fileNamePrefix=trim(is%wrap%dirOutput)//"/restart_"//trim(cname)// &
+          "_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
+          overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    endif
 
-!     call wrfhydro_nuopc_fin(is%wrap%did,rc)
-!     if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    call wrfhydro_nuopc_fin(is%wrap%did,rc)
+    if (ESMF_STDERRORCHECK(rc)) return  ! bail out
 
-!     deallocate(is%wrap, stat=stat)
-!     if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
-!       msg='WRFHYDRO: Deallocation of internal state memory failed.', &
-!       file=FILENAME,rcToReturn=rc)) return ! bail out
+    deallocate(is%wrap, stat=stat)
+    if (ESMF_LogFoundDeallocError(statusToCheck=stat, &
+      msg='WRFHYDRO: Deallocation of internal state memory failed.', &
+      file=FILENAME,rcToReturn=rc)) return ! bail out
 
   end subroutine ModelFinalize
   function esmf_stderrorcheck(rc) result(res)
