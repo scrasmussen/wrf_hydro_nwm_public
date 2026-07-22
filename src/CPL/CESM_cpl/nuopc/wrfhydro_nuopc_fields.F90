@@ -68,8 +68,8 @@ module wrfhydro_nuopc_fields
                  "1     ",IMPORT_F,EXPORT_F,0.45d0),                      &
     cap_fld_type("vegetation_type                         ","vegtyp  ", &
                  "1     ",IMPORT_F,EXPORT_F,16.0d0),                      &
-    cap_fld_type("surface_water_depth                     ","sfchead ", &
-                 "mm    ",IMPORT_F,EXPORT_T ,0.00d0),                      &
+    cap_fld_type("Flrr_flood                              ","sfchead ", &
+                 "kg m-2 s-1",IMPORT_F,EXPORT_T ,0.00d0),                 &
     cap_fld_type("Flrl_rofinfl_excess_sur                 ","infxsrt ", &
                  "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0),                 &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
@@ -92,6 +92,7 @@ module wrfhydro_nuopc_fields
   public state_fill_file
   public state_copy_tohyd
   public state_copy_frhyd
+  public state_update_sfchead_export
   public state_check_missing
   public state_prescribe_missing
   public model_debug
@@ -630,6 +631,7 @@ module wrfhydro_nuopc_fields
     integer,          intent(out) :: rc
     ! local variables
     character(len=16)       :: cmemflg
+    real(ESMF_KIND_FIELD), pointer :: farrayPtr2d(:,:)
     character(len=12), parameter :: method = "field_create"
 
 
@@ -726,9 +728,16 @@ module wrfhydro_nuopc_fields
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if(ESMF_STDERRORCHECK(rc)) return ! bail out
         case ('sfchead')
+          ! sfchead is an accumulated depth in WRF-Hydro, but CESM expects
+          ! Flrr_flood as a rate.  Give this field its own persistent ESMF
+          ! buffer rather than exposing the WRF-Hydro depth array directly.
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%overland%control%surface_water_head_lsm, &
+            typekind=ESMF_TYPEKIND_FIELD, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call ESMF_FieldGet(field_create, farrayPtr=farrayPtr2d, rc=rc)
+          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call sfchead_to_flood(did, farrayPtr2d, rc)
           if(ESMF_STDERRORCHECK(rc)) return ! bail out
         case ('infxsrt')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
@@ -772,6 +781,74 @@ module wrfhydro_nuopc_fields
     endif
 
   end function
+
+  !-----------------------------------------------------------------------------
+
+  subroutine sfchead_to_flood(did, flood, rc)
+    integer, intent(in)                 :: did
+    real(ESMF_KIND_FIELD), intent(out)  :: flood(:,:)
+    integer, intent(out)                :: rc
+    character(len=18), parameter        :: method = "sfchead_to_flood"
+
+    rc = ESMF_SUCCESS
+
+    if (nlst(did)%dt .le. 0.0) then
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg=method//": Timestep must be greater than zero.", &
+        file=FILENAME, rcToReturn=rc)
+      return ! bail out
+    endif
+
+    ! One mm of liquid water is one kg m-2.  CESM's component hierarchy
+    ! requires a negative sign for water moving from ROF back to LND.
+    flood = -rt_domain(did)%overland%control%surface_water_head_lsm / &
+      real(nlst(did)%dt, ESMF_KIND_FIELD)
+
+  end subroutine sfchead_to_flood
+
+  !-----------------------------------------------------------------------------
+
+  subroutine state_update_sfchead_export(state, did, rc)
+    type(ESMF_State), intent(inout)      :: state
+    integer, intent(in)                  :: did
+    integer, intent(out)                 :: rc
+    integer                              :: n
+    integer                              :: dimCount
+    logical                              :: realized
+    type(ESMF_Field)                     :: field
+    real(ESMF_KIND_FIELD), pointer       :: farrayPtr2d(:,:)
+    character(len=28), parameter         :: method = &
+      "state_update_sfchead_export"
+
+    rc = ESMF_SUCCESS
+    realized = .false.
+
+    do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
+      if (trim(cap_fld_list(n)%st_name) .eq. 'sfchead') then
+        realized = cap_fld_list(n)%rl_export
+        exit
+      endif
+    enddo
+
+    ! The mediator may choose not to connect an advertised optional field.
+    if (.not.realized) return
+
+    call ESMF_StateGet(state, itemName='sfchead', field=field, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call ESMF_FieldGet(field, dimCount=dimCount, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    if (dimCount .ne. 2) then
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg=method//": sfchead export field must be two dimensional.", &
+        file=FILENAME, rcToReturn=rc)
+      return ! bail out
+    endif
+    call ESMF_FieldGet(field, farrayPtr=farrayPtr2d, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call sfchead_to_flood(did, farrayPtr2d, rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+
+  end subroutine state_update_sfchead_export
 
   !-----------------------------------------------------------------------------
 
@@ -1135,7 +1212,8 @@ module wrfhydro_nuopc_fields
           case ('vegtyp')
             farrayPtr2d = rt_domain(did)%vegtyp
           case ('sfchead')
-            farrayPtr2d = rt_domain(did)%overland%control%surface_water_head_lsm
+            call sfchead_to_flood(did, farrayPtr2d, rc)
+            if (ESMF_STDERRORCHECK(rc)) return ! bail out
           case ('infxsrt')
             farrayPtr2d = rt_domain(did)%infxsrt
           case ('soldrain')
