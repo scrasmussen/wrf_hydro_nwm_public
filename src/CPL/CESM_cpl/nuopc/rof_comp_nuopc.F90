@@ -1180,6 +1180,12 @@ subroutine CheckImport(gcomp, rc)
     if (is%wrap%memr_export.eq.MEMORY_COPY) then
       call state_copy_frhyd(is%wrap%NStateExp(1), is%wrap%did, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+    else
+      ! sfchead uses an ESMF-owned buffer even in pointer mode because its
+      ! accumulated depth must be converted to the CESM Flrr_flood rate.
+      call state_update_sfchead_export(is%wrap%NStateExp(1), &
+        is%wrap%did, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     endif
 
     if (is%wrap%reset_import) then
