@@ -57,14 +57,16 @@ module wrfhydro_nuopc_gluecode
   public :: wrfhydro_nuopc_ini
   public :: wrfhydro_nuopc_run
   public :: wrfhydro_nuopc_fin
-  public :: WRFHYDRO_GridCreate
-  public :: WRFHYDRO_get_timestep
-  public :: WRFHYDRO_set_timestep
-  public :: WRFHYDRO_get_hgrid
-  public :: WRFHYDRO_get_restart
-
+  public :: wrfhydro_gridcreate
+  public :: wrfhydro_get_timestep
+  public :: wrfhydro_set_timestep
+  public :: wrfhydro_get_hgrid
+  public :: wrfhydro_get_restart
+  public :: wrfhydro_create_geogrid_file
 
   character(len=*), parameter :: filename = "wrfhydro_nuopc_cap.F90"
+  ! land-surface grid file
+  character(len=*), parameter :: geogrid_file = 'geo_em.d01.nc'
   ! PARAMETERS
   character(len=ESMF_MAXSTR) :: indir = 'WRFHYDRO_FORCING'
   integer                    :: num_nests = UNINITIALIZED
@@ -1236,4 +1238,792 @@ contains
     end if
   end function esmf_stderrorcheck
 
-end module
+
+  subroutine wrfhydro_create_geogrid_file()
+    use netcdf
+
+    character(len=*), parameter :: method = 'wrfhydro_create_geogrid_file'
+    character(len=*), parameter :: default_geogrid = './DOMAIN/geo_em.d01.nc'
+    character(len=*), parameter :: default_metadata = &
+      './DOMAIN/GEOGRID_LDASOUT_Spatial_Metadata.nc'
+    character(len=*), parameter :: default_fulldom = './DOMAIN/Fulldom_hires.nc'
+
+    character(len=2048) :: fsurdat_file, mesh_file
+    character(len=2048) :: geogrid_path, metadata_file, fulldom_file
+    logical :: found, exists
+
+    integer :: ncid, crs_varid
+    integer :: nx, ny, nx_src, ny_src
+    integer :: natpft_count, numurbl_count, nlevsoi_count
+    integer :: i, j, rc
+
+    real(ESMF_KIND_R8) :: standard_parallel(2)
+    real(ESMF_KIND_R8) :: central_lon, origin_lat
+    real(ESMF_KIND_R8) :: false_easting, false_northing, earth_radius
+    real(ESMF_KIND_R8), allocatable :: x(:), y(:), x_corner(:), y_corner(:)
+    real(ESMF_KIND_R8), allocatable :: latitude(:,:), longitude(:,:)
+    real(ESMF_KIND_R8), allocatable :: latitude_corner(:,:), longitude_corner(:,:)
+    real(ESMF_KIND_R8), allocatable :: hgt(:,:), sand(:,:), clay(:,:)
+    real(ESMF_KIND_R8), allocatable :: sand_src(:,:,:), clay_src(:,:,:)
+    real(ESMF_KIND_R8), allocatable :: landfrac_src(:,:), natveg_src(:,:)
+    real(ESMF_KIND_R8), allocatable :: crop_src(:,:), wetland_src(:,:)
+    real(ESMF_KIND_R8), allocatable :: lake_src(:,:), glacier_src(:,:)
+    real(ESMF_KIND_R8), allocatable :: pft_src(:,:,:), urban_src(:,:,:)
+    real(ESMF_KIND_R8), allocatable :: work_src(:,:), work_dst(:,:), max_fraction(:,:)
+    integer, allocatable :: lu_index(:,:), soil_category(:,:), landmask(:,:)
+
+    type(ESMF_Mesh) :: source_mesh
+    type(ESMF_Grid) :: target_grid
+    type(ESMF_Field) :: source_field, target_field
+    type(ESMF_RouteHandle) :: bilinear_handle
+    real(ESMF_KIND_R8), pointer :: source_ptr(:) => null()
+    real(ESMF_KIND_R8), pointer :: target_ptr(:,:) => null()
+    real(ESMF_KIND_R8), pointer :: grid_lon(:,:) => null()
+    real(ESMF_KIND_R8), pointer :: grid_lat(:,:) => null()
+    real(ESMF_KIND_R8), pointer :: grid_lon_corner(:,:) => null()
+    real(ESMF_KIND_R8), pointer :: grid_lat_corner(:,:) => null()
+
+    geogrid_path = default_geogrid
+    metadata_file = default_metadata
+    fulldom_file = default_fulldom
+
+    call read_case_value('hydro.namelist', 'geo_static_flnm', geogrid_path, found)
+    if (.not. found) geogrid_path = default_geogrid
+    call read_case_value('hydro.namelist', 'land_spatial_meta_flnm', metadata_file, found)
+    if (.not. found) metadata_file = default_metadata
+    call read_case_value('hydro.namelist', 'geo_finegrid_flnm', fulldom_file, found)
+    if (.not. found) fulldom_file = default_fulldom
+
+    inquire(file=trim(geogrid_path), exist=exists)
+    if (exists) then
+      call ESMF_LogWrite(method//': using existing '//trim(geogrid_path), &
+        ESMF_LOGMSG_INFO)
+      return
+    end if
+
+    call read_case_value('lnd_in', 'fsurdat', fsurdat_file, found)
+    if (.not. found) call fatal('Could not find fsurdat in lnd_in')
+    call read_case_value('nuopc.runconfig', 'mesh_lnd', mesh_file, found)
+    if (.not. found) call fatal('Could not find mesh_lnd in nuopc.runconfig')
+
+    call require_file(trim(fsurdat_file))
+    call require_file(trim(mesh_file))
+    call require_file(trim(metadata_file))
+    call require_file(trim(fulldom_file))
+
+    call ESMF_LogWrite(method//': creating '//trim(geogrid_path), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite(method//': CTSM surface data: '//trim(fsurdat_file), &
+      ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite(method//': CTSM mesh: '//trim(mesh_file), ESMF_LOGMSG_INFO)
+
+    ! The routing-stack metadata defines the destination grid.  Its x and y
+    ! coordinates are cell centers in a spherical Lambert conformal projection.
+    call check_nf(nf90_open(trim(metadata_file), NF90_NOWRITE, ncid), &
+      'opening land spatial metadata')
+    call get_dimension(ncid, 'x', nx)
+    call get_dimension(ncid, 'y', ny)
+    allocate(x(nx), y(ny), x_corner(nx+1), y_corner(ny+1))
+    call read_variable_1d(ncid, 'x', x)
+    call read_variable_1d(ncid, 'y', y)
+    call check_nf(nf90_inq_varid(ncid, 'crs', crs_varid), 'finding metadata crs')
+    call check_nf(nf90_get_att(ncid, crs_varid, 'standard_parallel', &
+      standard_parallel), 'reading standard_parallel')
+    call check_nf(nf90_get_att(ncid, crs_varid, &
+      'longitude_of_central_meridian', central_lon), 'reading central meridian')
+    call check_nf(nf90_get_att(ncid, crs_varid, &
+      'latitude_of_projection_origin', origin_lat), 'reading projection origin')
+    call check_nf(nf90_get_att(ncid, crs_varid, 'false_easting', false_easting), &
+      'reading false_easting')
+    call check_nf(nf90_get_att(ncid, crs_varid, 'false_northing', false_northing), &
+      'reading false_northing')
+    call check_nf(nf90_get_att(ncid, crs_varid, 'earth_radius', earth_radius), &
+      'reading earth_radius')
+    call check_nf(nf90_close(ncid), 'closing land spatial metadata')
+
+    call centers_to_corners(x, x_corner)
+    call centers_to_corners(y, y_corner)
+    allocate(latitude(nx,ny), longitude(nx,ny))
+    allocate(latitude_corner(nx+1,ny+1), longitude_corner(nx+1,ny+1))
+    do j = 1, ny
+      do i = 1, nx
+        call inverse_lambert(x(i), y(j), standard_parallel, central_lon, &
+          origin_lat, false_easting, false_northing, earth_radius, &
+          latitude(i,j), longitude(i,j))
+      end do
+    end do
+    do j = 1, ny+1
+      do i = 1, nx+1
+        call inverse_lambert(x_corner(i), y_corner(j), standard_parallel, &
+          central_lon, origin_lat, false_easting, false_northing, earth_radius, &
+          latitude_corner(i,j), longitude_corner(i,j))
+      end do
+    end do
+
+    ! Read CTSM surface fields.  The ESMF mesh elements and the flattened
+    ! (lsmlon,lsmlat) surface arrays have the same ordering.
+    call check_nf(nf90_open(trim(fsurdat_file), NF90_NOWRITE, ncid), &
+      'opening CTSM surface dataset')
+    call get_dimension(ncid, 'lsmlon', nx_src)
+    call get_dimension(ncid, 'lsmlat', ny_src)
+    call get_dimension(ncid, 'natpft', natpft_count)
+    call get_dimension(ncid, 'numurbl', numurbl_count)
+    call get_dimension(ncid, 'nlevsoi', nlevsoi_count)
+    if (natpft_count < 15) call fatal('CTSM surface dataset has fewer than 15 natural PFTs')
+    if (nlevsoi_count < 1) call fatal('CTSM surface dataset has no soil levels')
+
+    allocate(landfrac_src(nx_src,ny_src), natveg_src(nx_src,ny_src))
+    allocate(crop_src(nx_src,ny_src), wetland_src(nx_src,ny_src))
+    allocate(lake_src(nx_src,ny_src), glacier_src(nx_src,ny_src))
+    allocate(pft_src(nx_src,ny_src,natpft_count))
+    allocate(urban_src(nx_src,ny_src,numurbl_count))
+    allocate(sand_src(nx_src,ny_src,nlevsoi_count))
+    allocate(clay_src(nx_src,ny_src,nlevsoi_count))
+    call read_variable_2d(ncid, 'LANDFRAC_MKSURFDATA', landfrac_src)
+    call read_variable_2d(ncid, 'PCT_NATVEG', natveg_src)
+    call read_variable_2d(ncid, 'PCT_CROP', crop_src)
+    call read_variable_2d(ncid, 'PCT_WETLAND', wetland_src)
+    call read_variable_2d(ncid, 'PCT_LAKE', lake_src)
+    call read_variable_2d(ncid, 'PCT_GLACIER', glacier_src)
+    call read_variable_3d(ncid, 'PCT_NAT_PFT', pft_src)
+    call read_variable_3d(ncid, 'PCT_URBAN', urban_src)
+    call read_variable_3d(ncid, 'PCT_SAND', sand_src)
+    call read_variable_3d(ncid, 'PCT_CLAY', clay_src)
+    call check_nf(nf90_close(ncid), 'closing CTSM surface dataset')
+
+    ! Build a serial ESMF destination grid and a reusable bilinear route from
+    ! the CTSM land mesh.  This routine is called during the one-PET setup run.
+    source_mesh = ESMF_MeshCreate(filename=trim(mesh_file), &
+      fileformat=ESMF_FILEFORMAT_ESMFMESH, rc=rc)
+    call check_esmf(rc, 'creating CTSM source mesh')
+    target_grid = ESMF_GridCreate(maxIndex=(/nx,ny/), regDecomp=(/1,1/), &
+      decompflag=(/ESMF_DECOMP_BALANCED,ESMF_DECOMP_BALANCED/), &
+      coordSys=ESMF_COORDSYS_SPH_DEG, coordTypeKind=ESMF_TYPEKIND_R8, rc=rc)
+    call check_esmf(rc, 'creating geogrid destination grid')
+    call ESMF_GridAddCoord(target_grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    call check_esmf(rc, 'adding destination center coordinates')
+    call ESMF_GridGetCoord(target_grid, coordDim=1, &
+      staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=grid_lon, rc=rc)
+    call check_esmf(rc, 'getting destination center longitudes')
+    call ESMF_GridGetCoord(target_grid, coordDim=2, &
+      staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=grid_lat, rc=rc)
+    call check_esmf(rc, 'getting destination center latitudes')
+    grid_lon = longitude
+    grid_lat = latitude
+    call ESMF_GridAddCoord(target_grid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
+    call check_esmf(rc, 'adding destination corner coordinates')
+    call ESMF_GridGetCoord(target_grid, coordDim=1, &
+      staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=grid_lon_corner, rc=rc)
+    call check_esmf(rc, 'getting destination corner longitudes')
+    call ESMF_GridGetCoord(target_grid, coordDim=2, &
+      staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=grid_lat_corner, rc=rc)
+    call check_esmf(rc, 'getting destination corner latitudes')
+    grid_lon_corner = longitude_corner
+    grid_lat_corner = latitude_corner
+
+    source_field = ESMF_FieldCreate(mesh=source_mesh, &
+      typekind=ESMF_TYPEKIND_R8, meshloc=ESMF_MESHLOC_ELEMENT, &
+      name='ctsm_geogrid_source', rc=rc)
+    call check_esmf(rc, 'creating CTSM source field')
+    target_field = ESMF_FieldCreate(grid=target_grid, &
+      typekind=ESMF_TYPEKIND_R8, staggerloc=ESMF_STAGGERLOC_CENTER, &
+      name='wrfhydro_geogrid_target', rc=rc)
+    call check_esmf(rc, 'creating geogrid destination field')
+    call ESMF_FieldGet(source_field, farrayPtr=source_ptr, rc=rc)
+    call check_esmf(rc, 'getting CTSM source field storage')
+    call ESMF_FieldGet(target_field, farrayPtr=target_ptr, rc=rc)
+    call check_esmf(rc, 'getting geogrid destination field storage')
+    if (size(source_ptr) /= nx_src*ny_src) then
+      call fatal('CTSM mesh element count does not match fsurdat lsmlon*lsmlat')
+    end if
+    if (size(target_ptr,1) /= nx .or. size(target_ptr,2) /= ny) then
+      call fatal('ESMF target field shape does not match routing-stack metadata')
+    end if
+    call ESMF_FieldRegridStore(source_field, target_field, &
+      routehandle=bilinear_handle, regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+      lineType=ESMF_LINETYPE_GREAT_CIRCLE, &
+      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+    call check_esmf(rc, 'building CTSM-to-geogrid bilinear weights')
+
+    allocate(work_src(nx_src,ny_src), work_dst(nx,ny), max_fraction(nx,ny))
+    allocate(sand(nx,ny), clay(nx,ny), lu_index(nx,ny))
+    allocate(soil_category(nx,ny), landmask(nx,ny), hgt(nx,ny))
+
+    call apply_regrid(sand_src(:,:,1), sand)
+    call apply_regrid(clay_src(:,:,1), clay)
+
+    ! Convert CTSM landunit/PFT fractions to dominant USGS categories.  CTSM
+    ! natural-PFT indices 0:14 are the first 15 entries in PCT_NAT_PFT.
+    max_fraction = -huge(1.0_ESMF_KIND_R8)
+    lu_index = 19
+    work_src = landfrac_src * sum(urban_src, dim=3)
+    call consider_usgs_category(1, work_src)
+    work_src = landfrac_src * crop_src
+    call consider_usgs_category(2, work_src)
+    work_src = landfrac_src * natveg_src * sum(pft_src(:,:,13:15), dim=3) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(7, work_src)
+    work_src = landfrac_src * natveg_src * sum(pft_src(:,:,10:12), dim=3) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(8, work_src)
+    work_src = landfrac_src * natveg_src * sum(pft_src(:,:,7:9), dim=3) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(11, work_src)
+    work_src = landfrac_src * natveg_src * pft_src(:,:,4) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(12, work_src)
+    work_src = landfrac_src * natveg_src * sum(pft_src(:,:,5:6), dim=3) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(13, work_src)
+    work_src = landfrac_src * natveg_src * sum(pft_src(:,:,2:3), dim=3) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(14, work_src)
+    work_src = landfrac_src * wetland_src
+    call consider_usgs_category(17, work_src)
+    work_src = landfrac_src * natveg_src * pft_src(:,:,1) / 100.0_ESMF_KIND_R8
+    call consider_usgs_category(19, work_src)
+    work_src = landfrac_src * glacier_src
+    call consider_usgs_category(24, work_src)
+    work_src = 100.0_ESMF_KIND_R8 * max(0.0_ESMF_KIND_R8, &
+      1.0_ESMF_KIND_R8-landfrac_src) + landfrac_src * lake_src
+    call consider_usgs_category(16, work_src)
+
+    landmask = 1
+    where (lu_index == 16) landmask = 0
+    do j = 1, ny
+      do i = 1, nx
+        if (landmask(i,j) == 0) then
+          soil_category(i,j) = 14
+        else
+          soil_category(i,j) = usda_soil_category(sand(i,j), clay(i,j))
+        end if
+      end do
+    end do
+
+    ! Fulldom_hires is projection-aligned with the target geogrid.  Block
+    ! averaging preserves the available 100-m terrain information at 1 km.
+    call aggregate_fulldom_topography(trim(fulldom_file), x, y, hgt)
+
+    call write_geogrid(trim(geogrid_path))
+
+    call ESMF_RouteHandleDestroy(bilinear_handle, rc=rc)
+    call check_esmf(rc, 'destroying geogrid route handle')
+    call ESMF_FieldDestroy(source_field, rc=rc)
+    call check_esmf(rc, 'destroying CTSM source field')
+    call ESMF_FieldDestroy(target_field, rc=rc)
+    call check_esmf(rc, 'destroying geogrid destination field')
+    call ESMF_MeshDestroy(source_mesh, rc=rc)
+    call check_esmf(rc, 'destroying CTSM source mesh')
+    call ESMF_GridDestroy(target_grid, rc=rc)
+    call check_esmf(rc, 'destroying geogrid destination grid')
+
+    call ESMF_LogWrite(method//': created '//trim(geogrid_path), ESMF_LOGMSG_INFO)
+
+  contains
+
+    subroutine fatal(message)
+      character(len=*), intent(in) :: message
+      call ESMF_LogWrite(method//': '//trim(message), ESMF_LOGMSG_ERROR)
+      error stop trim(method)//': '//trim(message)
+    end subroutine fatal
+
+    subroutine check_nf(status, context)
+      integer, intent(in) :: status
+      character(len=*), intent(in) :: context
+      if (status /= NF90_NOERR) then
+        call fatal(trim(context)//': '//trim(nf90_strerror(status)))
+      end if
+    end subroutine check_nf
+
+    subroutine check_esmf(status, context)
+      integer, intent(in) :: status
+      character(len=*), intent(in) :: context
+      character(len=32) :: status_string
+      if (status /= ESMF_SUCCESS) then
+        write(status_string,'(I0)') status
+        call fatal(trim(context)//' (ESMF rc='//trim(status_string)//')')
+      end if
+    end subroutine check_esmf
+
+    subroutine require_file(path)
+      character(len=*), intent(in) :: path
+      logical :: file_exists
+      inquire(file=trim(path), exist=file_exists)
+      if (.not. file_exists) call fatal('Required file does not exist: '//trim(path))
+    end subroutine require_file
+
+    subroutine read_case_value(path, key, value, was_found)
+      character(len=*), intent(in) :: path, key
+      character(len=*), intent(out) :: value
+      logical, intent(out) :: was_found
+      character(len=4096) :: line, lower_line, rhs
+      integer :: unit_number, ios, key_position, equal_position
+      integer :: first_quote, second_quote, stop_position
+
+      value = ''
+      was_found = .false.
+      open(newunit=unit_number, file=trim(path), status='old', action='read', iostat=ios)
+      if (ios /= 0) return
+      do
+        read(unit_number,'(A)',iostat=ios) line
+        if (ios /= 0) exit
+        lower_line = lower_string(line)
+        key_position = index(lower_line, lower_string(trim(key)))
+        if (key_position == 0) cycle
+        equal_position = index(line(key_position:), '=')
+        if (equal_position == 0) cycle
+        rhs = adjustl(line(key_position+equal_position:))
+        first_quote = index(rhs, "'")
+        if (first_quote == 0) first_quote = index(rhs, '"')
+        if (first_quote > 0) then
+          second_quote = index(rhs(first_quote+1:), rhs(first_quote:first_quote))
+          if (second_quote > 0) then
+            value = rhs(first_quote+1:first_quote+second_quote-1)
+            was_found = .true.
+            exit
+          end if
+        else
+          stop_position = scan(rhs, ' ,!')
+          if (stop_position == 0) stop_position = len_trim(rhs)+1
+          value = rhs(1:stop_position-1)
+          was_found = len_trim(value) > 0
+          if (was_found) exit
+        end if
+      end do
+      close(unit_number)
+    end subroutine read_case_value
+
+    pure function lower_string(input) result(output)
+      character(len=*), intent(in) :: input
+      character(len=len(input)) :: output
+      integer :: k, code
+      do k = 1, len(input)
+        code = iachar(input(k:k))
+        if (code >= iachar('A') .and. code <= iachar('Z')) then
+          output(k:k) = achar(code + iachar('a') - iachar('A'))
+        else
+          output(k:k) = input(k:k)
+        end if
+      end do
+    end function lower_string
+
+    subroutine get_dimension(file_id, name, length)
+      integer, intent(in) :: file_id
+      character(len=*), intent(in) :: name
+      integer, intent(out) :: length
+      integer :: dimension_id
+      call check_nf(nf90_inq_dimid(file_id, trim(name), dimension_id), &
+        'finding dimension '//trim(name))
+      call check_nf(nf90_inquire_dimension(file_id, dimension_id, len=length), &
+        'reading dimension '//trim(name))
+    end subroutine get_dimension
+
+    subroutine read_variable_1d(file_id, name, values)
+      integer, intent(in) :: file_id
+      character(len=*), intent(in) :: name
+      real(ESMF_KIND_R8), intent(out) :: values(:)
+      integer :: variable_id
+      call check_nf(nf90_inq_varid(file_id, trim(name), variable_id), &
+        'finding variable '//trim(name))
+      call check_nf(nf90_get_var(file_id, variable_id, values), &
+        'reading variable '//trim(name))
+    end subroutine read_variable_1d
+
+    subroutine read_variable_2d(file_id, name, values)
+      integer, intent(in) :: file_id
+      character(len=*), intent(in) :: name
+      real(ESMF_KIND_R8), intent(out) :: values(:,:)
+      integer :: variable_id
+      call check_nf(nf90_inq_varid(file_id, trim(name), variable_id), &
+        'finding variable '//trim(name))
+      call check_nf(nf90_get_var(file_id, variable_id, values), &
+        'reading variable '//trim(name))
+    end subroutine read_variable_2d
+
+    subroutine read_variable_3d(file_id, name, values)
+      integer, intent(in) :: file_id
+      character(len=*), intent(in) :: name
+      real(ESMF_KIND_R8), intent(out) :: values(:,:,:)
+      integer :: variable_id
+      call check_nf(nf90_inq_varid(file_id, trim(name), variable_id), &
+        'finding variable '//trim(name))
+      call check_nf(nf90_get_var(file_id, variable_id, values), &
+        'reading variable '//trim(name))
+    end subroutine read_variable_3d
+
+    subroutine centers_to_corners(center, corner)
+      real(ESMF_KIND_R8), intent(in) :: center(:)
+      real(ESMF_KIND_R8), intent(out) :: corner(:)
+      integer :: k, count
+      count = size(center)
+      if (count < 2 .or. size(corner) /= count+1) then
+        call fatal('Cannot derive grid corners from center coordinate array')
+      end if
+      corner(1) = center(1) - 0.5_ESMF_KIND_R8*(center(2)-center(1))
+      do k = 2, count
+        corner(k) = 0.5_ESMF_KIND_R8*(center(k-1)+center(k))
+      end do
+      corner(count+1) = center(count) + &
+        0.5_ESMF_KIND_R8*(center(count)-center(count-1))
+    end subroutine centers_to_corners
+
+    subroutine inverse_lambert(x_coordinate, y_coordinate, parallels, lon0_degrees, &
+        lat0_degrees, easting, northing, radius, lat_degrees, lon_degrees)
+      real(ESMF_KIND_R8), intent(in) :: x_coordinate, y_coordinate
+      real(ESMF_KIND_R8), intent(in) :: parallels(2), lon0_degrees, lat0_degrees
+      real(ESMF_KIND_R8), intent(in) :: easting, northing, radius
+      real(ESMF_KIND_R8), intent(out) :: lat_degrees, lon_degrees
+      real(ESMF_KIND_R8), parameter :: pi = acos(-1.0_ESMF_KIND_R8)
+      real(ESMF_KIND_R8) :: phi1, phi2, phi0, lambda0
+      real(ESMF_KIND_R8) :: cone, factor, rho0, rho, theta, dx, dy
+
+      phi1 = parallels(1)*pi/180.0_ESMF_KIND_R8
+      phi2 = parallels(2)*pi/180.0_ESMF_KIND_R8
+      phi0 = lat0_degrees*pi/180.0_ESMF_KIND_R8
+      lambda0 = lon0_degrees*pi/180.0_ESMF_KIND_R8
+      if (abs(phi1-phi2) < 1.0e-12_ESMF_KIND_R8) then
+        cone = sin(phi1)
+      else
+        cone = log(cos(phi1)/cos(phi2)) / &
+          log(tan(pi/4.0_ESMF_KIND_R8+phi2/2.0_ESMF_KIND_R8) / &
+              tan(pi/4.0_ESMF_KIND_R8+phi1/2.0_ESMF_KIND_R8))
+      end if
+      factor = cos(phi1) * &
+        tan(pi/4.0_ESMF_KIND_R8+phi1/2.0_ESMF_KIND_R8)**cone / cone
+      rho0 = radius*factor / &
+        tan(pi/4.0_ESMF_KIND_R8+phi0/2.0_ESMF_KIND_R8)**cone
+      dx = x_coordinate-easting
+      dy = rho0-(y_coordinate-northing)
+      rho = sign(sqrt(dx*dx+dy*dy), cone)
+      if (abs(rho) < tiny(rho)) then
+        lat_degrees = sign(90.0_ESMF_KIND_R8, cone)
+        lon_degrees = lon0_degrees
+      else
+        theta = atan2(dx,dy)
+        lat_degrees = (2.0_ESMF_KIND_R8*atan((radius*factor/rho)** &
+          (1.0_ESMF_KIND_R8/cone))-pi/2.0_ESMF_KIND_R8)*180.0_ESMF_KIND_R8/pi
+        lon_degrees = (lambda0+theta/cone)*180.0_ESMF_KIND_R8/pi
+      end if
+      lon_degrees = modulo(lon_degrees+180.0_ESMF_KIND_R8, &
+        360.0_ESMF_KIND_R8)-180.0_ESMF_KIND_R8
+    end subroutine inverse_lambert
+
+    subroutine apply_regrid(source_values, target_values)
+      real(ESMF_KIND_R8), intent(in) :: source_values(:,:)
+      real(ESMF_KIND_R8), intent(out) :: target_values(:,:)
+      integer :: local_rc
+      source_ptr = reshape(source_values, (/size(source_ptr)/))
+      target_ptr = 0.0_ESMF_KIND_R8
+      call ESMF_FieldRegrid(source_field, target_field, bilinear_handle, rc=local_rc)
+      call check_esmf(local_rc, 'applying CTSM-to-geogrid weights')
+      target_values = target_ptr
+    end subroutine apply_regrid
+
+    subroutine consider_usgs_category(category, source_fraction)
+      integer, intent(in) :: category
+      real(ESMF_KIND_R8), intent(in) :: source_fraction(:,:)
+      call apply_regrid(source_fraction, work_dst)
+      where (work_dst > max_fraction)
+        max_fraction = work_dst
+        lu_index = category
+      end where
+    end subroutine consider_usgs_category
+
+    integer function usda_soil_category(sand_percent, clay_percent) result(category)
+      real(ESMF_KIND_R8), intent(in) :: sand_percent, clay_percent
+      real(ESMF_KIND_R8) :: sand_value, clay_value, silt_value, total
+      real(ESMF_KIND_R8) :: distance, best_distance
+      real(ESMF_KIND_R8), parameter :: reference_sand(12) = &
+        (/92.0,82.0,60.0,25.0,10.0,40.0,60.0,10.0,35.0,52.0,10.0,25.0/)
+      real(ESMF_KIND_R8), parameter :: reference_clay(12) = &
+        (/3.0,6.0,10.0,13.0,5.0,20.0,27.0,34.0,34.0,42.0,47.0,48.0/)
+      integer :: k
+
+      sand_value = max(0.0_ESMF_KIND_R8, sand_percent)
+      clay_value = max(0.0_ESMF_KIND_R8, clay_percent)
+      total = sand_value+clay_value
+      if (total > 100.0_ESMF_KIND_R8) then
+        sand_value = 100.0_ESMF_KIND_R8*sand_value/total
+        clay_value = 100.0_ESMF_KIND_R8*clay_value/total
+      end if
+      silt_value = max(0.0_ESMF_KIND_R8, &
+        100.0_ESMF_KIND_R8-sand_value-clay_value)
+
+      if (sand_value >= 85.0_ESMF_KIND_R8 .and. &
+          silt_value+1.5_ESMF_KIND_R8*clay_value < 15.0_ESMF_KIND_R8) then
+        category = 1
+      else if (sand_value >= 70.0_ESMF_KIND_R8 .and. sand_value < 90.0_ESMF_KIND_R8 .and. &
+          silt_value+1.5_ESMF_KIND_R8*clay_value >= 15.0_ESMF_KIND_R8 .and. &
+          silt_value+2.0_ESMF_KIND_R8*clay_value < 30.0_ESMF_KIND_R8) then
+        category = 2
+      else if ((clay_value >= 7.0_ESMF_KIND_R8 .and. clay_value < 20.0_ESMF_KIND_R8 .and. &
+          sand_value > 52.0_ESMF_KIND_R8 .and. &
+          silt_value+2.0_ESMF_KIND_R8*clay_value >= 30.0_ESMF_KIND_R8) .or. &
+          (clay_value < 7.0_ESMF_KIND_R8 .and. silt_value < 50.0_ESMF_KIND_R8 .and. &
+          silt_value+2.0_ESMF_KIND_R8*clay_value >= 30.0_ESMF_KIND_R8)) then
+        category = 3
+      else if ((silt_value >= 50.0_ESMF_KIND_R8 .and. clay_value >= 12.0_ESMF_KIND_R8 .and. &
+          clay_value < 27.0_ESMF_KIND_R8) .or. &
+          (silt_value >= 50.0_ESMF_KIND_R8 .and. silt_value < 80.0_ESMF_KIND_R8 .and. &
+          clay_value < 12.0_ESMF_KIND_R8)) then
+        category = 4
+      else if (silt_value >= 80.0_ESMF_KIND_R8 .and. clay_value < 12.0_ESMF_KIND_R8) then
+        category = 5
+      else if (clay_value >= 7.0_ESMF_KIND_R8 .and. clay_value < 27.0_ESMF_KIND_R8 .and. &
+          silt_value >= 28.0_ESMF_KIND_R8 .and. silt_value < 50.0_ESMF_KIND_R8 .and. &
+          sand_value <= 52.0_ESMF_KIND_R8) then
+        category = 6
+      else if (clay_value >= 20.0_ESMF_KIND_R8 .and. clay_value < 35.0_ESMF_KIND_R8 .and. &
+          silt_value < 28.0_ESMF_KIND_R8 .and. sand_value > 45.0_ESMF_KIND_R8) then
+        category = 7
+      else if (clay_value >= 27.0_ESMF_KIND_R8 .and. clay_value < 40.0_ESMF_KIND_R8 .and. &
+          sand_value <= 20.0_ESMF_KIND_R8) then
+        category = 8
+      else if (clay_value >= 27.0_ESMF_KIND_R8 .and. clay_value < 40.0_ESMF_KIND_R8 .and. &
+          sand_value > 20.0_ESMF_KIND_R8 .and. sand_value <= 45.0_ESMF_KIND_R8) then
+        category = 9
+      else if (clay_value >= 35.0_ESMF_KIND_R8 .and. sand_value > 45.0_ESMF_KIND_R8) then
+        category = 10
+      else if (clay_value >= 40.0_ESMF_KIND_R8 .and. silt_value >= 40.0_ESMF_KIND_R8) then
+        category = 11
+      else if (clay_value >= 40.0_ESMF_KIND_R8 .and. sand_value <= 45.0_ESMF_KIND_R8 .and. &
+          silt_value < 40.0_ESMF_KIND_R8) then
+        category = 12
+      else
+        category = 1
+        best_distance = huge(1.0_ESMF_KIND_R8)
+        do k = 1, 12
+          distance = (sand_value-reference_sand(k))**2 + &
+            (clay_value-reference_clay(k))**2
+          if (distance < best_distance) then
+            best_distance = distance
+            category = k
+          end if
+        end do
+      end if
+    end function usda_soil_category
+
+    subroutine aggregate_fulldom_topography(path, target_x, target_y, target_hgt)
+      character(len=*), intent(in) :: path
+      real(ESMF_KIND_R8), intent(in) :: target_x(:), target_y(:)
+      real(ESMF_KIND_R8), intent(out) :: target_hgt(:,:)
+      integer :: file_id, full_nx, full_ny, ratio_x, ratio_y
+      integer :: ii, jj, i0, i1, j0, j1, variable_id
+      real, allocatable :: full_topography(:,:)
+      real(ESMF_KIND_R8), allocatable :: full_x(:), full_y(:)
+      real(ESMF_KIND_R8) :: center_value, tolerance
+
+      call check_nf(nf90_open(trim(path), NF90_NOWRITE, file_id), &
+        'opening Fulldom_hires')
+      call get_dimension(file_id, 'x', full_nx)
+      call get_dimension(file_id, 'y', full_ny)
+      if (mod(full_nx,size(target_x)) /= 0 .or. &
+          mod(full_ny,size(target_y)) /= 0) then
+        call fatal('Fulldom_hires dimensions are not integer multiples of the geogrid')
+      end if
+      ratio_x = full_nx/size(target_x)
+      ratio_y = full_ny/size(target_y)
+      allocate(full_x(full_nx), full_y(full_ny), full_topography(full_nx,full_ny))
+      call read_variable_1d(file_id, 'x', full_x)
+      call read_variable_1d(file_id, 'y', full_y)
+      call check_nf(nf90_inq_varid(file_id, 'TOPOGRAPHY', variable_id), &
+        'finding Fulldom_hires TOPOGRAPHY')
+      call check_nf(nf90_get_var(file_id, variable_id, full_topography), &
+        'reading Fulldom_hires TOPOGRAPHY')
+      call check_nf(nf90_close(file_id), 'closing Fulldom_hires')
+
+      tolerance = 1.0e-5_ESMF_KIND_R8 * max(1.0_ESMF_KIND_R8, &
+        max(maxval(abs(target_x)),maxval(abs(target_y))))
+      do ii = 1, size(target_x)
+        i0 = (ii-1)*ratio_x+1
+        i1 = ii*ratio_x
+        center_value = sum(full_x(i0:i1))/real(ratio_x,ESMF_KIND_R8)
+        if (abs(center_value-target_x(ii)) > tolerance) then
+          call fatal('Fulldom_hires x coordinates are not aligned with the geogrid')
+        end if
+      end do
+      do jj = 1, size(target_y)
+        j0 = (jj-1)*ratio_y+1
+        j1 = jj*ratio_y
+        center_value = sum(full_y(j0:j1))/real(ratio_y,ESMF_KIND_R8)
+        if (abs(center_value-target_y(jj)) > tolerance) then
+          call fatal('Fulldom_hires y coordinates are not aligned with the geogrid')
+        end if
+      end do
+      do jj = 1, size(target_y)
+        j0 = (jj-1)*ratio_y+1
+        j1 = jj*ratio_y
+        do ii = 1, size(target_x)
+          i0 = (ii-1)*ratio_x+1
+          i1 = ii*ratio_x
+          target_hgt(ii,jj) = sum(real(full_topography(i0:i1,j0:j1), &
+            ESMF_KIND_R8))/real(ratio_x*ratio_y,ESMF_KIND_R8)
+        end do
+      end do
+    end subroutine aggregate_fulldom_topography
+
+    subroutine write_geogrid(path)
+      character(len=*), intent(in) :: path
+      character(len=*), parameter :: time_string = '0000-00-00_00:00:00'
+      integer :: file_id
+      integer :: dim_time, dim_we, dim_sn, dim_wes, dim_sns
+      integer :: dim_soil, dim_land, dim_datestr
+      integer :: var_times, var_hgt, var_hgt_m, var_lat, var_lat_m
+      integer :: var_lon, var_lon_m, var_lat_c, var_lon_c
+      integer :: var_lu, var_soil, var_mask
+      integer :: dimensions_3d(3), corner_dimensions_3d(3)
+      real(ESMF_KIND_R8) :: dx, dy, center_latitude, center_longitude
+      real(ESMF_KIND_R8) :: normalized_central_lon
+
+      dx = abs(x(2)-x(1))
+      dy = abs(y(2)-y(1))
+      center_latitude = latitude((nx+1)/2,(ny+1)/2)
+      center_longitude = longitude((nx+1)/2,(ny+1)/2)
+      normalized_central_lon = modulo(central_lon+180.0_ESMF_KIND_R8, &
+        360.0_ESMF_KIND_R8)-180.0_ESMF_KIND_R8
+
+      call check_nf(nf90_create(trim(path), NF90_CLOBBER, file_id), &
+        'creating geogrid file')
+      call check_nf(nf90_def_dim(file_id, 'Time', NF90_UNLIMITED, dim_time), &
+        'defining Time')
+      call check_nf(nf90_def_dim(file_id, 'west_east', nx, dim_we), &
+        'defining west_east')
+      call check_nf(nf90_def_dim(file_id, 'south_north', ny, dim_sn), &
+        'defining south_north')
+      call check_nf(nf90_def_dim(file_id, 'west_east_stag', nx+1, dim_wes), &
+        'defining west_east_stag')
+      call check_nf(nf90_def_dim(file_id, 'south_north_stag', ny+1, dim_sns), &
+        'defining south_north_stag')
+      call check_nf(nf90_def_dim(file_id, 'soil_cat', 19, dim_soil), &
+        'defining soil_cat')
+      call check_nf(nf90_def_dim(file_id, 'land_cat', 27, dim_land), &
+        'defining land_cat')
+      call check_nf(nf90_def_dim(file_id, 'DateStrLen', len(time_string), dim_datestr), &
+        'defining DateStrLen')
+
+      dimensions_3d = (/dim_we,dim_sn,dim_time/)
+      corner_dimensions_3d = (/dim_wes,dim_sns,dim_time/)
+      call check_nf(nf90_def_var(file_id, 'Times', NF90_CHAR, &
+        (/dim_datestr,dim_time/), var_times), 'defining Times')
+      call check_nf(nf90_def_var(file_id, 'HGT', NF90_FLOAT, dimensions_3d, var_hgt), &
+        'defining HGT')
+      call check_nf(nf90_def_var(file_id, 'HGT_M', NF90_FLOAT, dimensions_3d, var_hgt_m), &
+        'defining HGT_M')
+      call check_nf(nf90_def_var(file_id, 'XLAT', NF90_FLOAT, dimensions_3d, var_lat), &
+        'defining XLAT')
+      call check_nf(nf90_def_var(file_id, 'XLAT_M', NF90_FLOAT, dimensions_3d, var_lat_m), &
+        'defining XLAT_M')
+      call check_nf(nf90_def_var(file_id, 'XLONG', NF90_FLOAT, dimensions_3d, var_lon), &
+        'defining XLONG')
+      call check_nf(nf90_def_var(file_id, 'XLONG_M', NF90_FLOAT, dimensions_3d, var_lon_m), &
+        'defining XLONG_M')
+      call check_nf(nf90_def_var(file_id, 'XLAT_C', NF90_FLOAT, &
+        corner_dimensions_3d, var_lat_c), 'defining XLAT_C')
+      call check_nf(nf90_def_var(file_id, 'XLONG_C', NF90_FLOAT, &
+        corner_dimensions_3d, var_lon_c), 'defining XLONG_C')
+      call check_nf(nf90_def_var(file_id, 'LU_INDEX', NF90_INT, dimensions_3d, var_lu), &
+        'defining LU_INDEX')
+      call check_nf(nf90_def_var(file_id, 'SCT_DOM', NF90_INT, dimensions_3d, var_soil), &
+        'defining SCT_DOM')
+      call check_nf(nf90_def_var(file_id, 'LANDMASK', NF90_INT, dimensions_3d, var_mask), &
+        'defining LANDMASK')
+
+      call put_wps_variable_attributes(file_id, var_hgt, 'm', 'Terrain height')
+      call put_wps_variable_attributes(file_id, var_hgt_m, 'm', 'Terrain height')
+      call put_wps_variable_attributes(file_id, var_lat, 'degrees_north', 'Latitude')
+      call put_wps_variable_attributes(file_id, var_lat_m, 'degrees_north', 'Latitude')
+      call put_wps_variable_attributes(file_id, var_lon, 'degrees_east', 'Longitude')
+      call put_wps_variable_attributes(file_id, var_lon_m, 'degrees_east', 'Longitude')
+      call put_wps_variable_attributes(file_id, var_lat_c, 'degrees_north', &
+        'Latitude at cell corners')
+      call put_wps_variable_attributes(file_id, var_lon_c, 'degrees_east', &
+        'Longitude at cell corners')
+      call put_wps_variable_attributes(file_id, var_lu, 'category', &
+        'Dominant USGS land-use category derived from CTSM surface fractions')
+      call put_wps_variable_attributes(file_id, var_soil, 'category', &
+        'Dominant top-layer USDA soil texture category derived from CTSM')
+      call put_wps_variable_attributes(file_id, var_mask, 'none', &
+        'Land mask: 1=land, 0=water')
+
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'TITLE', &
+        'WRF-Hydro geogrid generated from CTSM surface data'), 'writing TITLE')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'MMINLU', 'USGS'), &
+        'writing MMINLU')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'MMINSL', 'STAS'), &
+        'writing MMINSL')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'ISWATER', 16), &
+        'writing ISWATER')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'ISLAKE', -1), &
+        'writing ISLAKE')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'ISICE', 24), &
+        'writing ISICE')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'ISURBAN', 1), &
+        'writing ISURBAN')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'ISOILWATER', 14), &
+        'writing ISOILWATER')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'MAP_PROJ', 1), &
+        'writing MAP_PROJ')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'MAP_PROJ_CHAR', &
+        'Lambert Conformal'), 'writing MAP_PROJ_CHAR')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'DX', dx), 'writing DX')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'DY', dy), 'writing DY')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'TRUELAT1', &
+        standard_parallel(1)), 'writing TRUELAT1')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'TRUELAT2', &
+        standard_parallel(2)), 'writing TRUELAT2')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'STAND_LON', &
+        normalized_central_lon), 'writing STAND_LON')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'MOAD_CEN_LAT', &
+        origin_lat), 'writing MOAD_CEN_LAT')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'CEN_LAT', &
+        center_latitude), 'writing CEN_LAT')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, 'CEN_LON', &
+        center_longitude), 'writing CEN_LON')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, &
+        'WEST-EAST_GRID_DIMENSION', nx+1), 'writing WEST-EAST_GRID_DIMENSION')
+      call check_nf(nf90_put_att(file_id, NF90_GLOBAL, &
+        'SOUTH-NORTH_GRID_DIMENSION', ny+1), 'writing SOUTH-NORTH_GRID_DIMENSION')
+
+      call check_nf(nf90_enddef(file_id), 'ending geogrid define mode')
+      call check_nf(nf90_put_var(file_id, var_times, time_string, &
+        start=(/1,1/), count=(/len(time_string),1/)), 'writing Times')
+      call check_nf(nf90_put_var(file_id, var_hgt, hgt, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing HGT')
+      call check_nf(nf90_put_var(file_id, var_hgt_m, hgt, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing HGT_M')
+      call check_nf(nf90_put_var(file_id, var_lat, latitude, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing XLAT')
+      call check_nf(nf90_put_var(file_id, var_lat_m, latitude, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing XLAT_M')
+      call check_nf(nf90_put_var(file_id, var_lon, longitude, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing XLONG')
+      call check_nf(nf90_put_var(file_id, var_lon_m, longitude, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing XLONG_M')
+      call check_nf(nf90_put_var(file_id, var_lat_c, latitude_corner, &
+        start=(/1,1,1/), count=(/nx+1,ny+1,1/)), 'writing XLAT_C')
+      call check_nf(nf90_put_var(file_id, var_lon_c, longitude_corner, &
+        start=(/1,1,1/), count=(/nx+1,ny+1,1/)), 'writing XLONG_C')
+      call check_nf(nf90_put_var(file_id, var_lu, lu_index, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing LU_INDEX')
+      call check_nf(nf90_put_var(file_id, var_soil, soil_category, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing SCT_DOM')
+      call check_nf(nf90_put_var(file_id, var_mask, landmask, &
+        start=(/1,1,1/), count=(/nx,ny,1/)), 'writing LANDMASK')
+      call check_nf(nf90_close(file_id), 'closing geogrid file')
+    end subroutine write_geogrid
+
+    subroutine put_wps_variable_attributes(file_id, variable_id, units, description)
+      integer, intent(in) :: file_id, variable_id
+      character(len=*), intent(in) :: units, description
+      call check_nf(nf90_put_att(file_id, variable_id, 'FieldType', 104), &
+        'writing FieldType attribute')
+      call check_nf(nf90_put_att(file_id, variable_id, 'MemoryOrder', 'XY '), &
+        'writing MemoryOrder attribute')
+      call check_nf(nf90_put_att(file_id, variable_id, 'description', &
+        trim(description)), 'writing description attribute')
+      call check_nf(nf90_put_att(file_id, variable_id, 'units', trim(units)), &
+        'writing units attribute')
+      call check_nf(nf90_put_att(file_id, variable_id, 'stagger', 'M'), &
+        'writing stagger attribute')
+      call check_nf(nf90_put_att(file_id, variable_id, 'sr_x', 1), &
+        'writing sr_x attribute')
+      call check_nf(nf90_put_att(file_id, variable_id, 'sr_y', 1), &
+        'writing sr_y attribute')
+    end subroutine put_wps_variable_attributes
+
+  end subroutine wrfhydro_create_geogrid_file
+
+end module wrfhydro_nuopc_gluecode
