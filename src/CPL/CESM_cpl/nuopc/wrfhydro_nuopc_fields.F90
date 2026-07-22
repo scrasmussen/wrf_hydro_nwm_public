@@ -70,8 +70,8 @@ module wrfhydro_nuopc_fields
                  "1     ",IMPORT_F,EXPORT_F,16.0d0),                      &
     cap_fld_type("surface_water_depth                     ","sfchead ", &
                  "mm    ",IMPORT_F,EXPORT_T ,0.00d0),                      &
-    cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
-                 "mm    ",IMPORT_T ,EXPORT_F,0.00d0),                      &
+    cap_fld_type("Flrl_rofinfl_excess_sur                 ","infxsrt ", &
+                 "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0),                 &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
                  "mm    ",IMPORT_T ,EXPORT_F,0.00d0)                       &
     /)
