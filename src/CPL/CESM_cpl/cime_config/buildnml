@@ -124,6 +124,17 @@ def buildnml(case, caseroot, compname):
 
     _stage_routing_stack(rundir)
 
+    hydro_table_dir = os.path.normpath(
+        os.path.join(srcroot, "..", "..", "template", "HYDRO")
+    )
+    for table_name in ("HYDRO.TBL", "CHANPARM.TBL"):
+        table_src = os.path.join(hydro_table_dir, table_name)
+        table_run = os.path.join(rundir, table_name)
+        if not os.path.isfile(table_src):
+            raise RuntimeError(f"WRF-Hydro parameter table not found: {table_src}")
+        print(f"   - copying {table_src} to {table_run}")
+        shutil.copy2(table_src, table_run)
+
     for nmlfile in ("hydro.namelist", "namelist.hrldas"):
         nmltemplate = f"{nmlfile}.template"
         nmlsrc = os.path.join(srcroot, "cime_config", nmltemplate)
