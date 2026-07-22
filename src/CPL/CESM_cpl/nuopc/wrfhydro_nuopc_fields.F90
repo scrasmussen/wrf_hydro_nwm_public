@@ -18,7 +18,8 @@ module wrfhydro_nuopc_fields
 
   private
   character(len=128), parameter :: filename = "wrfhydro_nuopc_fields.F90"
-
+  logical, parameter :: IMPORT_T = .true., IMPORT_F = .false.
+  logical, parameter :: EXPORT_T = .true., EXPORT_F = .false.
 
   type cap_fld_type
     sequence
@@ -34,45 +35,45 @@ module wrfhydro_nuopc_fields
 
   type(cap_fld_type), target, dimension(20) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("inst_soil_temperature                   ","stc     ", &
-                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+                 "K     ",IMPORT_T ,EXPORT_F,288.d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1  ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2  ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3  ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4  ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_moisture_fraction_layer_1          ","smc1    ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_moisture_fraction_layer_2          ","smc2    ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_moisture_fraction_layer_3          ","smc3    ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_moisture_fraction_layer_4          ","smc4    ", &
-                 "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
+                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_temperature_layer_1                ","stc1    ", &
-                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+                 "K     ",IMPORT_T ,EXPORT_F,288.d0),                      &
     cap_fld_type("soil_temperature_layer_2                ","stc2    ", &
-                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+                 "K     ",IMPORT_T ,EXPORT_F,288.d0),                      &
     cap_fld_type("soil_temperature_layer_3                ","stc3    ", &
-                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+                 "K     ",IMPORT_T ,EXPORT_F,288.d0),                      &
     cap_fld_type("soil_temperature_layer_4                ","stc4    ", &
-                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+                 "K     ",IMPORT_T ,EXPORT_F,288.d0),                      &
     cap_fld_type("soil_porosity                           ","smcmax1 ", &
-                 "1     ",.FALSE.,.FALSE.,0.45d0),                      &
+                 "1     ",IMPORT_F,EXPORT_F,0.45d0),                      &
     cap_fld_type("vegetation_type                         ","vegtyp  ", &
-                 "1     ",.FALSE.,.FALSE.,16.0d0),                      &
+                 "1     ",IMPORT_F,EXPORT_F,16.0d0),                      &
     cap_fld_type("surface_water_depth                     ","sfchead ", &
-                 "mm    ",.FALSE.,.TRUE. ,0.00d0),                      &
+                 "mm    ",IMPORT_F,EXPORT_T ,0.00d0),                      &
     cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
-                 "mm    ",.TRUE. ,.FALSE.,0.00d0),                      &
+                 "mm    ",IMPORT_T ,EXPORT_F,0.00d0),                      &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
-                 "mm    ",.TRUE. ,.FALSE.,0.00d0)                       &
+                 "mm    ",IMPORT_T ,EXPORT_F,0.00d0)                       &
     /)
 
   public cap_fld_list
