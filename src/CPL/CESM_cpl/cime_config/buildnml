@@ -13,6 +13,9 @@
 import os
 import shutil
 import sys
+import tarfile
+import tempfile
+import urllib.request
 
 CIMEROOT = os.environ.get("CIMEROOT")
 if CIMEROOT is None:
@@ -36,6 +39,79 @@ from wrfhydro_namelist import wrfhydro_namelist
 
 logger = logging.getLogger(__name__)
 
+ROUTING_STACK_URL = (
+    "https://github.com/NCAR/wrf-hydro_cesm/releases/download/0.0.1/"
+    "ctsm_100m_routing_stack.tar.gz"
+)
+ROUTING_STACK_ARCHIVE = "ctsm_100m_routing_stack.tar.gz"
+ROUTING_STACK_DIR = "ctsm_100m_routing_stack"
+
+
+def _extract_routing_stack(archive, rundir):
+    """Safely extract the routing stack into rundir."""
+    extract_dir = tempfile.mkdtemp(prefix=".routing-stack-", dir=rundir)
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            extract_root = os.path.realpath(extract_dir)
+            for member in tar.getmembers():
+                member_path = os.path.realpath(
+                    os.path.join(extract_dir, member.name)
+                )
+                if os.path.commonpath((extract_root, member_path)) != extract_root:
+                    raise RuntimeError(
+                        f"Unsafe path in routing stack archive: {member.name}"
+                    )
+                if member.issym() or member.islnk():
+                    raise RuntimeError(
+                        f"Links are not allowed in routing stack archive: "
+                        f"{member.name}"
+                    )
+            tar.extractall(extract_dir)
+
+        extracted_stack = os.path.join(extract_dir, ROUTING_STACK_DIR)
+        if not os.path.isdir(extracted_stack):
+            raise RuntimeError(
+                f"{archive} does not contain {ROUTING_STACK_DIR}"
+            )
+        os.replace(extracted_stack, os.path.join(rundir, ROUTING_STACK_DIR))
+    finally:
+        shutil.rmtree(extract_dir, ignore_errors=True)
+
+
+def _stage_routing_stack(rundir):
+    """Download, extract, and link the WRF-Hydro routing stack."""
+    archive = os.path.join(rundir, ROUTING_STACK_ARCHIVE)
+    routing_stack = os.path.join(rundir, ROUTING_STACK_DIR)
+
+    if not os.path.isdir(routing_stack):
+        if not os.path.isfile(archive):
+            archive_tmp = f"{archive}.tmp"
+            print(f"   - downloading routing stack from {ROUTING_STACK_URL}")
+            try:
+                with urllib.request.urlopen(ROUTING_STACK_URL) as response, \
+                        open(archive_tmp, "wb") as output:
+                    shutil.copyfileobj(response, output)
+                os.replace(archive_tmp, archive)
+            finally:
+                if os.path.exists(archive_tmp):
+                    os.remove(archive_tmp)
+
+        print(f"   - extracting routing stack {archive} into {rundir}")
+        _extract_routing_stack(archive, rundir)
+
+    domain_link = os.path.join(rundir, "DOMAIN")
+    if os.path.lexists(domain_link):
+        if not os.path.islink(domain_link):
+            raise RuntimeError(
+                f"Cannot create DOMAIN link: {domain_link} already exists "
+                "and is not a symbolic link"
+            )
+        os.remove(domain_link)
+
+    print(f"   - linking {domain_link} to {routing_stack}")
+    os.symlink(routing_stack, domain_link)
+
+
 def buildnml(case, caseroot, compname):
     """Build the wrfhydro control file """
 
@@ -46,21 +122,23 @@ def buildnml(case, caseroot, compname):
     srcroot = case.get_value("COMP_ROOT_DIR_ROF")
     rundir = case.get_value("RUNDIR")
 
-    nmlfile = "hydro.namelist"
-    nmltemplate = f"{nmlfile}.template"
-    nmlsrc = os.path.join(srcroot, "cime_config", nmltemplate)
-    case_nml = os.path.join(caseroot, nmlfile)
-    run_nml = os.path.join(rundir, nmlfile)
+    _stage_routing_stack(rundir)
 
-    print(f"   - copying namelist {nmltemplate} to {case_nml}")
-    shutil.copy(nmlsrc, case_nml)
+    for nmlfile in ("hydro.namelist", "namelist.hrldas"):
+        nmltemplate = f"{nmlfile}.template"
+        nmlsrc = os.path.join(srcroot, "cime_config", nmltemplate)
+        case_nml = os.path.join(caseroot, nmlfile)
+        run_nml = os.path.join(rundir, nmlfile)
 
-    # The case copy is user-visible and persistent. Keep only a link in the
-    # run directory so both locations always refer to the same namelist.
-    if os.path.lexists(run_nml):
-        os.remove(run_nml)
-    print(f"   - linking {run_nml} to {case_nml}")
-    os.symlink(case_nml, run_nml)
+        print(f"   - copying namelist {nmltemplate} to {case_nml}")
+        shutil.copy(nmlsrc, case_nml)
+
+        # The case copy is user-visible and persistent. Keep only a link in
+        # the run directory so both locations always refer to the same file.
+        if os.path.lexists(run_nml):
+            os.remove(run_nml)
+        print(f"   - linking {run_nml} to {case_nml}")
+        os.symlink(case_nml, run_nml)
 
 def _main_func():
     caseroot = parse_input(sys.argv)
