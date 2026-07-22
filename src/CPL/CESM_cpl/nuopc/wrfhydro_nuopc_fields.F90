@@ -18,7 +18,8 @@ module wrfhydro_nuopc_fields
 
   private
   character(len=128), parameter :: filename = "wrfhydro_nuopc_fields.F90"
-
+  logical, parameter :: IMPORT_T = .true., IMPORT_F = .false.
+  logical, parameter :: EXPORT_T = .true., EXPORT_F = .false.
 
   type cap_fld_type
     sequence
