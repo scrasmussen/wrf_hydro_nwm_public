@@ -444,10 +444,11 @@ contains
           ix=rt_domain(did)%ix,jx=rt_domain(did)%jx, &
           infxsrt=rt_domain(did)%infxsrt,soldrain=rt_domain(did)%soldrain)
       else
-        ! CMEPS supplies the time-averaged infiltration-excess rate in
-        ! kg m-2 s-1. For liquid water this is numerically mm s-1. WRF-Hydro
-        ! expects the accumulated depth in mm for the current coupling step.
+        ! CMEPS supplies the time-averaged runoff rates in kg m-2 s-1.
+        ! For liquid water these are numerically mm s-1. WRF-Hydro expects
+        ! accumulated depths in mm for the current coupling step.
         rt_domain(did)%infxsrt = rt_domain(did)%infxsrt * nlst(did)%dt
+        rt_domain(did)%soldrain = rt_domain(did)%soldrain * nlst(did)%dt
       endif
     endif
 
