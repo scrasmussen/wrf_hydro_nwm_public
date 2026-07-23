@@ -10,6 +10,7 @@ module wrfhydro_nuopc_fields
   use wrfhydro_nuopc_macros
   use config_base,      only: nlst
   use module_rt_data,   only: rt_domain
+  use module_mpp_land,  only: left_id, down_id
   use overland_data,    only: overland_struct
   use overland_control, only: overland_control_struct
 
@@ -36,7 +37,7 @@ module wrfhydro_nuopc_fields
   logical, parameter :: IMPORT_T = .true., IMPORT_F = .false.
   logical, parameter :: EXPORT_T = .true., EXPORT_F = .false.
 
-  type(cap_fld_type), target, dimension(20) :: cap_fld_list = (/          &
+  type(cap_fld_type), target, dimension(21) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
@@ -73,6 +74,8 @@ module wrfhydro_nuopc_fields
                  "1     ",IMPORT_F,EXPORT_F,16.0d0),                      &
     cap_fld_type("Flrr_flood                              ","sfchead ", &
                  "kg m-2 s-1",IMPORT_F,EXPORT_T ,0.00d0),                 &
+    cap_fld_type("Flrr_volrmch                            ","volrmch ", &
+                 "m     ",IMPORT_F,EXPORT_T ,0.00d0),                     &
     cap_fld_type("Flrl_rofinfl_excess_sur                 ","infxsrt ", &
                  "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0),                 &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
@@ -96,6 +99,7 @@ module wrfhydro_nuopc_fields
   public state_copy_tohyd
   public state_copy_frhyd
   public state_update_sfchead_export
+  public state_update_volrmch_export
   public state_check_missing
   public state_prescribe_missing
   public model_debug
@@ -742,6 +746,18 @@ module wrfhydro_nuopc_fields
           if(ESMF_STDERRORCHECK(rc)) return ! bail out
           call sfchead_to_flood(did, farrayPtr2d, rc)
           if(ESMF_STDERRORCHECK(rc)) return ! bail out
+        case ('volrmch')
+          ! WRF-Hydro stores channel water as a volume for each routing
+          ! link.  CESM expects main-channel volume divided by the area of
+          ! the coupling-grid cell, so this field needs a persistent buffer.
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            typekind=ESMF_TYPEKIND_FIELD, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call ESMF_FieldGet(field_create, farrayPtr=farrayPtr2d, rc=rc)
+          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+          call channel_volume_to_depth(did, farrayPtr2d, rc)
+          if(ESMF_STDERRORCHECK(rc)) return ! bail out
         case ('infxsrt')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%infxsrt, &
@@ -811,6 +827,82 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
+  subroutine channel_volume_to_depth(did, volume_depth, rc)
+    integer, intent(in)                 :: did
+    real(ESMF_KIND_FIELD), intent(out)  :: volume_depth(:,:)
+    integer, intent(out)                :: rc
+    integer                             :: n
+    integer                             :: link
+    integer                             :: irt, jrt
+    integer                             :: i, j
+    integer                             :: ihalo, jhalo
+    integer                             :: aggfact
+    real(ESMF_KIND_FIELD)               :: cell_area
+    character(len=23), parameter        :: method = &
+      "channel_volume_to_depth"
+
+    rc = ESMF_SUCCESS
+    volume_depth = 0.0_ESMF_KIND_FIELD
+
+    ! A zero field is the correct export when channel routing is disabled.
+    if (.not.allocated(rt_domain(did)%CVOL)) return
+    if (.not.allocated(rt_domain(did)%CHANXI)) return
+    if (.not.allocated(rt_domain(did)%CHANYJ)) return
+    if (.not.allocated(rt_domain(did)%nlinks_index)) return
+    if (.not.allocated(rt_domain(did)%dist_lsm)) return
+
+    aggfact = nlst(did)%AGGFACTRT
+    if (aggfact .le. 0) then
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg=method//": AGGFACTRT must be greater than zero.", &
+        file=FILENAME, rcToReturn=rc)
+      return ! bail out
+    endif
+
+    if ((size(volume_depth,1) .ne. rt_domain(did)%IX) .or. &
+        (size(volume_depth,2) .ne. rt_domain(did)%JX)) then
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg=method//": Export field and WRF-Hydro LSM grid sizes differ.", &
+        file=FILENAME, rcToReturn=rc)
+      return ! bail out
+    endif
+
+    ! Fine routing arrays contain one halo cell on an internal lower edge.
+    ! nlinks_index contains only locally owned links, so each channel volume
+    ! is accumulated exactly once even when WRF-Hydro uses multiple PETs.
+    ihalo = 0
+    jhalo = 0
+    if (left_id .ge. 0) ihalo = 1
+    if (down_id .ge. 0) jhalo = 1
+
+    do n=1, rt_domain(did)%yw_mpp_nlinks
+      link = rt_domain(did)%nlinks_index(n)
+      if ((link .lt. 1) .or. (link .gt. size(rt_domain(did)%CVOL))) cycle
+
+      irt = rt_domain(did)%CHANXI(link)
+      jrt = rt_domain(did)%CHANYJ(link)
+      i = (irt - 1 - ihalo) / aggfact + 1
+      j = (jrt - 1 - jhalo) / aggfact + 1
+      if ((i .lt. 1) .or. (i .gt. size(volume_depth,1))) cycle
+      if ((j .lt. 1) .or. (j .gt. size(volume_depth,2))) cycle
+
+      cell_area = real(rt_domain(did)%dist_lsm(i,j,9), &
+        ESMF_KIND_FIELD)
+      if (cell_area .le. 0.0_ESMF_KIND_FIELD) then
+        call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=method//": WRF-Hydro LSM grid cell area must be positive.", &
+          file=FILENAME, rcToReturn=rc)
+        return ! bail out
+      endif
+
+      volume_depth(i,j) = volume_depth(i,j) + &
+        real(rt_domain(did)%CVOL(link), ESMF_KIND_FIELD) / cell_area
+    enddo
+
+  end subroutine channel_volume_to_depth
+
+  !-----------------------------------------------------------------------------
+
   subroutine state_update_sfchead_export(state, did, rc)
     type(ESMF_State), intent(inout)      :: state
     integer, intent(in)                  :: did
@@ -852,6 +944,49 @@ module wrfhydro_nuopc_fields
     if (ESMF_STDERRORCHECK(rc)) return ! bail out
 
   end subroutine state_update_sfchead_export
+
+  !-----------------------------------------------------------------------------
+
+  subroutine state_update_volrmch_export(state, did, rc)
+    type(ESMF_State), intent(inout)      :: state
+    integer, intent(in)                  :: did
+    integer, intent(out)                 :: rc
+    integer                              :: n
+    integer                              :: dimCount
+    logical                              :: realized
+    type(ESMF_Field)                     :: field
+    real(ESMF_KIND_FIELD), pointer       :: farrayPtr2d(:,:)
+    character(len=28), parameter         :: method = &
+      "state_update_volrmch_export"
+
+    rc = ESMF_SUCCESS
+    realized = .false.
+
+    do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
+      if (trim(cap_fld_list(n)%st_name) .eq. 'volrmch') then
+        realized = cap_fld_list(n)%rl_export
+        exit
+      endif
+    enddo
+
+    if (.not.realized) return
+
+    call ESMF_StateGet(state, itemName='volrmch', field=field, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call ESMF_FieldGet(field, dimCount=dimCount, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    if (dimCount .ne. 2) then
+      call ESMF_LogSetError(ESMF_FAILURE, &
+        msg=method//": volrmch export field must be two dimensional.", &
+        file=FILENAME, rcToReturn=rc)
+      return ! bail out
+    endif
+    call ESMF_FieldGet(field, farrayPtr=farrayPtr2d, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+    call channel_volume_to_depth(did, farrayPtr2d, rc)
+    if (ESMF_STDERRORCHECK(rc)) return ! bail out
+
+  end subroutine state_update_volrmch_export
 
   !-----------------------------------------------------------------------------
 
@@ -1216,6 +1351,9 @@ module wrfhydro_nuopc_fields
             farrayPtr2d = rt_domain(did)%vegtyp
           case ('sfchead')
             call sfchead_to_flood(did, farrayPtr2d, rc)
+            if (ESMF_STDERRORCHECK(rc)) return ! bail out
+          case ('volrmch')
+            call channel_volume_to_depth(did, farrayPtr2d, rc)
             if (ESMF_STDERRORCHECK(rc)) return ! bail out
           case ('infxsrt')
             farrayPtr2d = rt_domain(did)%infxsrt

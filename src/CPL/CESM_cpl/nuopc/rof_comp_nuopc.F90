@@ -1186,6 +1186,9 @@ subroutine CheckImport(gcomp, rc)
       call state_update_sfchead_export(is%wrap%NStateExp(1), &
         is%wrap%did, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+      call state_update_volrmch_export(is%wrap%NStateExp(1), &
+        is%wrap%did, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
     endif
 
     if (is%wrap%reset_import) then
