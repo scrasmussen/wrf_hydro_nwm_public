@@ -841,11 +841,11 @@ contains
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     ! bilinear regridding
     call read_mesh_var_and_regrid('ter', hgt, ncid, nCells, &
-         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('latCell', lat, ncid, nCells, &
-         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('lonCell', lon, ncid, nCells, &
-         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
 
     stat = nf90_close(ncid)
     call check_nf(stat)
@@ -987,6 +987,9 @@ contains
          dstFile=hires_file, &
          weightFile=weights_dir//'setup_'//st_name//'.nc', &
          regridmethod=regrid_method, &
+         srcRegionalFlag=.true., &
+         dstRegionalFlag=.true., &
+         normType=ESMF_NORMTYPE_FRACAREA, &
          rc=rc)
     ! Precompute Field sparse matrix multiplication with local factors
     call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
@@ -1163,6 +1166,7 @@ contains
                   dstFileType=ESMF_FILEFORMAT_SCRIP, &
                   srcRegionalFlag=.true., &
                   dstRegionalFlag=.true., &
+                  normType=ESMF_NORMTYPE_FRACAREA, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors
@@ -1381,6 +1385,7 @@ contains
                   dstFileType=ESMF_FILEFORMAT_SCRIP, &
                   srcRegionalFlag=.true., &
                   dstRegionalFlag=.true., &
+                  normType=ESMF_NORMTYPE_FRACAREA, &
                   rc=rc)
              call check(rc, __LINE__, file)
              ! Precompute Field sparse matrix multiplication with local factors

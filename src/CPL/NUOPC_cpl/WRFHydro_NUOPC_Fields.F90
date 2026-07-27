@@ -68,13 +68,13 @@ module wrfhydro_nuopc_fields
 
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content","smc", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
     cap_fld_type("inst_soil_moisture_content","slc", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
     cap_fld_type("inst_soil_temperature","stc", &
-                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
                  TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
@@ -109,19 +109,19 @@ module wrfhydro_nuopc_fields
                  "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
-                 "K", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "K", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_F, 288.d0),                 &
     cap_fld_type("soil_temperature_layer_2","stc2", &
-                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_temperature_layer_3","stc3", &
-                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_temperature_layer_4","stc4", &
-                 "K     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_F, 288.d0),             &
     cap_fld_type("soil_porosity","smcmax1", &
-                 "1     ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "1     ", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_F, EXPORT_F, 0.45d0),                 &
     cap_fld_type("vegetation_type","vegtyp", &
                  ! "1     ", ESMF_REGRIDMETHOD_NEAREST_DTOS, &
@@ -144,10 +144,10 @@ module wrfhydro_nuopc_fields
     ! it could be they are pointing to the same variable
     ! as infxsrt and soldrain on the MPAS side
     cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
-                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_F, EXPORT_F, 0.00d0),             &
     cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
-                 "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
                  ! IMPORT_F, EXPORT_SMC, 0.00d0)              &
                  IMPORT_F, EXPORT_F, 0.00d0)              &
     /)
@@ -575,9 +575,9 @@ contains
     check_lsm_forcings = c_smc .and. c_slc .and. c_stc .and. &
                          c_infxsrt .and. c_soldrain
 
-    print *, "WRFH NUOPC TODO: fix check_lsm_forcings"
-    ! check_lsm_forcings = .false.
-    check_lsm_forcings = .true.
+    ! print *, "WRFH NUOPC TODO: fix check_lsm_forcings"
+    ! ! check_lsm_forcings = .false.
+    ! check_lsm_forcings = .true.
   end function
 
   !-----------------------------------------------------------------------------

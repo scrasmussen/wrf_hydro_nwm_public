@@ -309,7 +309,7 @@ module WRFHydro_NUOPC
   type(ESMF_Grid)            :: wrfhydro_grid
   type(ESMF_Mesh)            :: wrfhydro_mesh
   type(ESMF_RouteHandle)     :: regrid_handle_nn_stod, regrid_handle_bl
-  type(ESMF_RouteHandle)     :: regrid_handle_nn_dtos
+  type(ESMF_RouteHandle)     :: regrid_handle_nn_dtos, regrid_handle_con
 
   !-----------------------------------------------------------------------------
   contains
@@ -886,6 +886,7 @@ module WRFHydro_NUOPC
             is%wrap%NStateImp(1), &
             vm, rc)
        call check(rc, __LINE__, file)
+
        regrid_handle_nn_dtos = wrfhydro_regrid_mesh( &
             wrfhydro_grid_p1, &
             wrfhydro_mesh, &
@@ -895,9 +896,18 @@ module WRFHydro_NUOPC
             vm, rc)
        call check(rc, __LINE__, file)
 
+       regrid_handle_con = wrfhydro_regrid_mesh( &
+            wrfhydro_grid_p1, &
+            wrfhydro_mesh, &
+            ESMF_REGRIDMETHOD_CONSERVE, &
+            is%wrap%did, &
+            is%wrap%NStateImp(1), &
+            vm, rc)
+       call check(rc, __LINE__, file)
+
        ! write to hydro.fullres.nc
        call wrfhydro_write_full_resolution_file(wrfhydro_grid_p1, &
-            wrfhydro_mesh, regrid_handle_bl, regrid_handle_nn_stod, &
+            wrfhydro_mesh, regrid_handle_con, regrid_handle_nn_stod, &
             regrid_handle_nn_dtos)
        print*, "CREATED LOW-RES GRID"
        stop "Full Resolution File Created, Restart Hydro With Any NP"
