@@ -82,7 +82,7 @@ module wrfhydro_nuopc_gluecode
   character(len=27), parameter :: modname = "WRFHydro_NUOPC_Gluecode.F90"
 
   ! Debugging Parameter
-  logical, parameter :: debug = .FALSE.
+  logical, parameter :: debug = .false.
   logical :: show_import_once = .true.
   logical :: show_export_once = .true.
   logical :: print_import_statelog_once = .true.
@@ -648,6 +648,7 @@ contains
 
 
     call check_nf(nf90_close(ncid))
+    print *, "=== wrote to ", full_resolution_file, " ==="
     print *, "=== exiting write_netcdf_full_resolution_file ==="
   end subroutine write_netcdf_full_resolution_file
 
@@ -750,11 +751,11 @@ contains
   end subroutine read_mesh_var_and_regrid_i
 
   subroutine wrfhydro_write_full_resolution_file(wrfhydro_grid, wrfhydro_mesh, &
-       regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
+       regrid_handle_con, regrid_handle_nn_stod, regrid_handle_nn_dtos)
     use netcdf
     type(ESMF_Grid), intent(in) :: wrfhydro_grid
     type(ESMF_Mesh), intent(in) :: wrfhydro_mesh
-    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_bl
+    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_con
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_stod
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_dtos
     ! type(ESMF_Mesh)            :: wrfhydro_mesh
@@ -771,11 +772,6 @@ contains
     real(ESMF_KIND_R8), pointer :: srcPtr(:) => null()
     real(ESMF_KIND_R8), pointer :: dstPtr(:,:) => null()
     integer :: rc
-
-    ! result
-    character(len=*), parameter :: items(2) = [ "foo", "bar" ]
-    ! integer, allocatable :: outvar_i(:,:)
-    ! real, allocatable :: outvar_r(:,:)
 
     ! vars to write
     real, dimension(:,:), allocatable :: hgt, lat, lon
@@ -920,7 +916,7 @@ contains
     type(ESMF_Field) :: import_field, new_field
     character(:), allocatable :: file
 
-    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file, hires_scrip_file
 
     ! testing variables
     logical :: realizeImport, connected
@@ -937,14 +933,14 @@ contains
 
     if (regrid_method == ESMF_REGRIDMETHOD_BILINEAR) then
        st_name = "bilinear"
-    end if
-    if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_STOD) then
+    else if (regrid_method == ESMF_REGRIDMETHOD_CONSERVE) then
+       st_name = "conserve"
+    else if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_STOD) then
        st_name = "nn_stod"
-       ! stop "GOOOD stod"
-    end if
-    if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_DTOS) then
+    else if (regrid_method == ESMF_REGRIDMETHOD_NEAREST_DTOS) then
        st_name = "nn_dtos"
-       ! stop "GOOOD dtos"
+    else
+       error stop "regridding method not supported"
     end if
     ! check for import field
 
@@ -982,19 +978,27 @@ contains
 
     mpas_grid_file = get_mpas_grid_filename()
     scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
+    hires_scrip_file = fulldom_to_scrip_filename(hires_file)
+    print *, "mpas_grid_file =", trim(mpas_grid_file)
+    print *, "scrip_grid_file =", trim(scrip_mesh_file)
+    print *, "hires_scrip_file =", trim(hires_scrip_file)
     call ESMF_RegridWeightGen(&
          srcFile=scrip_mesh_file, &
-         dstFile=hires_file, &
+         dstFile=hires_scrip_file, &
          weightFile=weights_dir//'setup_'//st_name//'.nc', &
          regridmethod=regrid_method, &
+         srcFileType=ESMF_FILEFORMAT_SCRIP, &
+         dstFileType=ESMF_FILEFORMAT_SCRIP, &
          srcRegionalFlag=.true., &
          dstRegionalFlag=.true., &
          normType=ESMF_NORMTYPE_FRACAREA, &
          rc=rc)
+    call check(rc, __LINE__, file)
     ! Precompute Field sparse matrix multiplication with local factors
     call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
          filename=weights_dir//'setup_'//st_name//'.nc', &
          routehandle=route_handle, rc=rc)
+    call check(rc, __LINE__, file)
 
     ! generate regrid weights in to handle
     ! call ESMF_FieldRegridStore(srcfield=import_field, dstfield=new_field, &
@@ -1369,7 +1373,7 @@ contains
                   error stop "hires_file variable not defined"
              hires_scrip_file = fulldom_to_scrip_filename(hires_file)
 
-             ! ARTLESS : hires_scrip_file needs grid corner, grid
+             ! hires_scrip_file needs grid corner, grid
              ! center, dims and imask
 
              mpas_grid_file = get_mpas_grid_filename()
