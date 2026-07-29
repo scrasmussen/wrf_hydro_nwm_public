@@ -1,7 +1,14 @@
 module wrfhydro_nuopc_gluecode
+! !MODULE: wrfhydro_nuopc_gluecode
+!
 ! !DESCRIPTION:
 !   This module connects NUOPC initialize, advance,
 !   and finalize to WRFHYDRO.
+!
+! !REVISION HISTORY:
+!  13Oct15    Dan Rosen  Initial Specification
+!
+! !USES:
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use ESMF
   use NUOPC
@@ -441,8 +448,16 @@ contains
         ! CMEPS supplies the time-averaged runoff rates in kg m-2 s-1.
         ! For liquid water these are numerically mm s-1. WRF-Hydro expects
         ! accumulated depths in mm for the current coupling step.
+        call report_coupled_infiltration( &
+          "after mediator import", rt_domain(did)%infxsrt, rc)
+        if (ESMF_STDERRORCHECK(rc)) return
+
         rt_domain(did)%infxsrt = rt_domain(did)%infxsrt * nlst(did)%dt
         rt_domain(did)%soldrain = rt_domain(did)%soldrain * nlst(did)%dt
+
+        call report_coupled_infiltration( &
+          "after timestep conversion", rt_domain(did)%infxsrt, rc)
+        if (ESMF_STDERRORCHECK(rc)) return
       endif
     endif
 
@@ -461,6 +476,53 @@ contains
 #endif
 
   end subroutine
+
+  !-----------------------------------------------------------------------------
+
+  subroutine report_coupled_infiltration(stage, values, rc)
+    character(len=*), intent(in) :: stage
+    real, intent(in)             :: values(:,:)
+    integer, intent(out)         :: rc
+
+    integer :: i
+    integer :: j
+    integer :: max_i
+    integer :: max_j
+    real    :: max_abs
+    real    :: max_value
+
+    rc = ESMF_SUCCESS
+    max_abs = -1.0
+    max_value = 0.0
+    max_i = lbound(values, 1)
+    max_j = lbound(values, 2)
+
+    do j = lbound(values, 2), ubound(values, 2)
+      do i = lbound(values, 1), ubound(values, 1)
+        if (.not. ieee_is_finite(values(i,j))) then
+          write(6,*) "INFILTRATION_DIAG_NONFINITE PET=", my_id, &
+            " stage=", trim(stage), " value=", values(i,j), &
+            " local_i=", i, " local_j=", j
+          call flush(6)
+          call ESMF_LogSetError(ESMF_FAILURE, &
+            msg="WRF-Hydro received nonfinite infiltration excess", &
+            file=FILENAME, rcToReturn=rc)
+          return
+        endif
+        if (abs(values(i,j)) > max_abs) then
+          max_abs = abs(values(i,j))
+          max_value = values(i,j)
+          max_i = i
+          max_j = j
+        endif
+      enddo
+    enddo
+
+    write(6,*) "INFILTRATION_DIAG PET=", my_id, &
+      " stage=", trim(stage), " max_abs=", max_abs, &
+      " value=", max_value, " local_i=", max_i, " local_j=", max_j
+    call flush(6)
+  end subroutine report_coupled_infiltration
 
   !-----------------------------------------------------------------------------
 

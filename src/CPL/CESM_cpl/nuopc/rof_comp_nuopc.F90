@@ -1168,9 +1168,15 @@ subroutine CheckImport(gcomp, rc)
       if (btest(verbosity,16)) then
         call LogAdvance(nIndex=1,nStr=nStr)
       endif
+      call check_channel_volume_finite(is%wrap%did, &
+        "before wrfhydro_nuopc_run", rc)
+      if (ESMF_STDERRORCHECK(rc)) return ! bail out
       call wrfhydro_nuopc_run(is%wrap%did,is%wrap%lsm_forcings(1), &
         is%wrap%clock(1),is%wrap%NStateImp(1),is%wrap%NStateExp(1),rc)
       if(ESMF_STDERRORCHECK(rc)) return ! bail out
+      call check_channel_volume_finite(is%wrap%did, &
+        "after wrfhydro_nuopc_run", rc)
+      if (ESMF_STDERRORCHECK(rc)) return ! bail out
       call ESMF_ClockAdvance(is%wrap%clock(1),rc=rc)
         if (ESMF_STDERRORCHECK(rc)) return  ! bail out
       is%wrap%stepTimer(1) = &

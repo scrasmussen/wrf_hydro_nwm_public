@@ -1,4 +1,5 @@
 module module_HYDRO_drv
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
 #ifdef MPP_LAND
     use module_HYDRO_io, only:  output_rt, mpp_output_chrt, mpp_output_lakes, mpp_output_chrtgrd, &
         restart_out_bi, restart_in_bi, mpp_output_chrt2, mpp_output_lakes2, &
@@ -596,6 +597,8 @@ contains
 
                 if(nlst(did)%SUBRTSWCRT .ne. 0 .or. nlst(did)%OVRTSWCRT .ne. 0) then
                     call disaggregateDomain_drv(did)
+                    call report_routing_infiltration("after disaggregation", &
+                        rt_domain(did)%overland%control%infiltration_excess)
                 endif
                 if(nlst(did)%OVRTSWCRT .eq. 0) then
                     if(nlst(did)%UDMP_OPT .eq. 1) then
@@ -615,6 +618,8 @@ contains
             if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
                 if(nlst(did)%SUBRTSWCRT .ne.0) then
                     call SubsurfaceRouting_drv(did)
+                    call report_routing_infiltration("after subsurface routing", &
+                        rt_domain(did)%overland%control%infiltration_excess)
                 endif
 #ifdef HYDRO_D
                 call system_clock(count=clock_count_2, count_rate=clock_rate)
@@ -750,6 +755,54 @@ contains
 
 
     end subroutine HYDRO_exe
+
+
+    subroutine report_routing_infiltration(stage, values)
+        implicit none
+
+        character(len=*), intent(in) :: stage
+        real, intent(in)             :: values(:,:)
+
+        integer :: i
+        integer :: j
+        integer :: max_i
+        integer :: max_j
+        integer :: pet
+        real    :: max_abs
+        real    :: max_value
+
+        pet = 0
+#ifdef MPP_LAND
+        pet = my_id
+#endif
+        max_abs = -1.0
+        max_value = 0.0
+        max_i = lbound(values, 1)
+        max_j = lbound(values, 2)
+
+        do j = lbound(values, 2), ubound(values, 2)
+            do i = lbound(values, 1), ubound(values, 1)
+                if (.not. ieee_is_finite(values(i,j))) then
+                    write(6,*) "INFILTRATION_DIAG_NONFINITE PET=", pet, &
+                        " stage=", trim(stage), " value=", values(i,j), &
+                        " local_i=", i, " local_j=", j
+                    call flush(6)
+                    call HYDRO_stop("nonfinite infiltration excess")
+                endif
+                if (abs(values(i,j)) > max_abs) then
+                    max_abs = abs(values(i,j))
+                    max_value = values(i,j)
+                    max_i = i
+                    max_j = j
+                endif
+            enddo
+        enddo
+
+        write(6,*) "INFILTRATION_DIAG PET=", pet, &
+            " stage=", trim(stage), " max_abs=", max_abs, &
+            " value=", max_value, " local_i=", max_i, " local_j=", max_j
+        call flush(6)
+    end subroutine report_routing_infiltration
 
 
 

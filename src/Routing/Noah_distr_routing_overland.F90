@@ -220,6 +220,8 @@ subroutine ov_rtng( &
         mpp_land_sync
 #endif
     use overland_data
+    use module_hydro_stop, only: hydro_stop
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
     IMPLICIT NONE
 
     !DJG --------DECLARATIONS----------------------------
@@ -277,6 +279,7 @@ subroutine ov_rtng( &
 
     !DJG Assign all infiltration excess to surface head...
     ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
+    call report_overland_input()
 
     !DJG Divide infiltration excess over all routing time-steps
     !	     INFXS_FRAC=INFXSUBRT/(DT/DTRT_TER)
@@ -402,6 +405,8 @@ subroutine ov_rtng( &
                 q_sfcflx_x,q_sfcflx_y)
         end if
 
+        call report_overland_substep(KRT)
+
     END DO          ! END routing time steps
 
 #ifdef HYDRO_D
@@ -412,6 +417,103 @@ subroutine ov_rtng( &
     ! END OVERLAND FLOW ROUTING LOOP
     !     CHANNEL ROUTING TO FOLLOW
     !----------------------------------------------------------------------
+
+    !DJG ----------------------------------------------------------------
+contains
+
+    subroutine report_overland_input()
+        real    :: max_abs
+        real    :: value
+        integer :: imax, jmax
+
+        call find_max_abs(ovrt_data%control%infiltration_excess, &
+            "infiltration_excess", "before overland routing", 0, &
+            max_abs, value, imax, jmax)
+#ifdef MPP_LAND
+        write(6,*) "OVERLAND_INPUT PET=", my_id, &
+            " max_abs_infiltration_excess=", max_abs, &
+            " value=", value, " i=", imax, " j=", jmax
+#else
+        write(6,*) "OVERLAND_INPUT max_abs_infiltration_excess=", max_abs, &
+            " value=", value, " i=", imax, " j=", jmax
+#endif
+        flush(6)
+
+    end subroutine report_overland_input
+
+    subroutine report_overland_substep(krt)
+        integer, intent(in) :: krt
+        real                :: head_max_abs, head_value
+        real                :: channel_max_abs, channel_value
+        integer             :: head_i, head_j
+        integer             :: channel_i, channel_j
+
+        call find_max_abs( &
+            ovrt_data%control%surface_water_head_routing, &
+            "surface_water_head_routing", "after overland substep", krt, &
+            head_max_abs, head_value, head_i, head_j)
+        call find_max_abs( &
+            ovrt_data%streams_and_lakes%surface_water_to_channel, &
+            "surface_water_to_channel", "after overland substep", krt, &
+            channel_max_abs, channel_value, channel_i, channel_j)
+#ifdef MPP_LAND
+        write(6,*) "OVERLAND_SUBSTEP PET=", my_id, " krt=", krt, &
+            " max_abs_head=", head_max_abs, " value=", head_value, &
+            " i=", head_i, " j=", head_j, &
+            " max_abs_channel=", channel_max_abs, &
+            " value=", channel_value, &
+            " i=", channel_i, " j=", channel_j
+#else
+        write(6,*) "OVERLAND_SUBSTEP krt=", krt, &
+            " max_abs_head=", head_max_abs, " value=", head_value, &
+            " i=", head_i, " j=", head_j, &
+            " max_abs_channel=", channel_max_abs, &
+            " value=", channel_value, &
+            " i=", channel_i, " j=", channel_j
+#endif
+        flush(6)
+
+    end subroutine report_overland_substep
+
+    subroutine find_max_abs(array, field_name, stage, krt, &
+        max_abs, value, imax, jmax)
+        real, intent(in)             :: array(:,:)
+        character(len=*), intent(in) :: field_name
+        character(len=*), intent(in) :: stage
+        integer, intent(in)          :: krt
+        real, intent(out)            :: max_abs
+        real, intent(out)            :: value
+        integer, intent(out)         :: imax, jmax
+        integer                      :: i, j
+
+        max_abs = -1.0
+        value = 0.0
+        imax = lbound(array,1)
+        jmax = lbound(array,2)
+
+        do j=lbound(array,2),ubound(array,2)
+            do i=lbound(array,1),ubound(array,1)
+                if (.not.ieee_is_finite(array(i,j))) then
+                    write(6,*) "FATAL: nonfinite overland-routing state"
+#ifdef MPP_LAND
+                    write(6,*) "PET=", my_id
+#endif
+                    write(6,*) "stage=", trim(stage), " krt=", krt
+                    write(6,*) "field=", trim(field_name), &
+                        " value=", array(i,j), " i=", i, " j=", j
+                    flush(6)
+                    call hydro_stop("Nonfinite state in overland routing")
+                endif
+                if (abs(array(i,j)) .gt. max_abs) then
+                    max_abs = abs(array(i,j))
+                    value = array(i,j)
+                    imax = i
+                    jmax = j
+                endif
+            enddo
+        enddo
+
+    end subroutine find_max_abs
 
     !DJG ----------------------------------------------------------------
 END SUBROUTINE OV_RTNG
