@@ -5,6 +5,7 @@ module wrfhydro_nuopc_fields
 !   This module connects NUOPC field information for WRFHYDRO
   use ESMF
   use NUOPC
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use wrfhydro_esmf_extensions
   use wrfhydro_nuopc_flags
   use wrfhydro_nuopc_macros
@@ -100,6 +101,7 @@ module wrfhydro_nuopc_fields
   public state_copy_frhyd
   public state_update_sfchead_export
   public state_update_volrmch_export
+  public check_channel_volume_finite
   public state_check_missing
   public state_prescribe_missing
   public model_debug
@@ -827,6 +829,50 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 
+  subroutine check_channel_volume_finite(did, stage, rc)
+    integer, intent(in)                 :: did
+    character(len=*), intent(in)        :: stage
+    integer, intent(out)                :: rc
+    integer                             :: n
+    integer                             :: link
+    integer                             :: irt, jrt
+    real(ESMF_KIND_FIELD)               :: channel_volume
+    character(len=512)                  :: message
+    character(len=27), parameter        :: method = &
+      "check_channel_volume_finite"
+
+    rc = ESMF_SUCCESS
+
+    if (.not.allocated(rt_domain(did)%CVOL)) return
+    if (.not.allocated(rt_domain(did)%CHANXI)) return
+    if (.not.allocated(rt_domain(did)%CHANYJ)) return
+    if (.not.allocated(rt_domain(did)%nlinks_index)) return
+
+    do n=1, rt_domain(did)%yw_mpp_nlinks
+      link = rt_domain(did)%nlinks_index(n)
+      if ((link .lt. 1) .or. (link .gt. size(rt_domain(did)%CVOL))) cycle
+
+      channel_volume = real(rt_domain(did)%CVOL(link), ESMF_KIND_FIELD)
+      if (.not.ieee_is_finite(channel_volume)) then
+        irt = rt_domain(did)%CHANXI(link)
+        jrt = rt_domain(did)%CHANYJ(link)
+        write(message,'(a,i0,a,i0,a,i0,a,i0,a,es24.16)') &
+          trim(method)//": "//trim(stage)// &
+          "; nonfinite CVOL; owned_link=", n, ", link=", link, &
+          ", routing_i=", irt, ", routing_j=", jrt, &
+          ", CVOL=", channel_volume
+        write(6,'(a)') trim(message)
+        call flush(6)
+        call ESMF_LogSetError(ESMF_FAILURE, msg=trim(message), &
+          file=FILENAME, rcToReturn=rc)
+        return ! bail out
+      endif
+    enddo
+
+  end subroutine check_channel_volume_finite
+
+  !-----------------------------------------------------------------------------
+
   subroutine channel_volume_to_depth(did, volume_depth, rc)
     integer, intent(in)                 :: did
     real(ESMF_KIND_FIELD), intent(out)  :: volume_depth(:,:)
@@ -838,6 +884,8 @@ module wrfhydro_nuopc_fields
     integer                             :: ihalo, jhalo
     integer                             :: aggfact
     real(ESMF_KIND_FIELD)               :: cell_area
+    real(ESMF_KIND_FIELD)               :: channel_volume
+    character(len=512)                  :: message
     character(len=23), parameter        :: method = &
       "channel_volume_to_depth"
 
@@ -886,17 +934,32 @@ module wrfhydro_nuopc_fields
       if ((i .lt. 1) .or. (i .gt. size(volume_depth,1))) cycle
       if ((j .lt. 1) .or. (j .gt. size(volume_depth,2))) cycle
 
+      channel_volume = real(rt_domain(did)%CVOL(link), ESMF_KIND_FIELD)
+      if (.not.ieee_is_finite(channel_volume)) then
+        write(message,'(a,i0,a,i0,a,i0,a,i0,a,i0,a,i0,a,es24.16)') &
+          trim(method)//": nonfinite CVOL; owned_link=", n, &
+          ", link=", link, ", routing_i=", irt, ", routing_j=", jrt, &
+          ", lsm_i=", i, ", lsm_j=", j, ", CVOL=", channel_volume
+        call ESMF_LogSetError(ESMF_FAILURE, msg=trim(message), &
+          file=FILENAME, rcToReturn=rc)
+        return ! bail out
+      endif
+
       cell_area = real(rt_domain(did)%dist_lsm(i,j,9), &
         ESMF_KIND_FIELD)
-      if (cell_area .le. 0.0_ESMF_KIND_FIELD) then
-        call ESMF_LogSetError(ESMF_FAILURE, &
-          msg=method//": WRF-Hydro LSM grid cell area must be positive.", &
+      if ((.not.ieee_is_finite(cell_area)) .or. &
+          (cell_area .le. 0.0_ESMF_KIND_FIELD)) then
+        write(message,'(a,i0,a,i0,a,i0,a,i0,a,i0,a,i0,a,es24.16)') &
+          trim(method)//": invalid cell area; owned_link=", n, &
+          ", link=", link, ", routing_i=", irt, ", routing_j=", jrt, &
+          ", lsm_i=", i, ", lsm_j=", j, ", cell_area=", cell_area
+        call ESMF_LogSetError(ESMF_FAILURE, msg=trim(message), &
           file=FILENAME, rcToReturn=rc)
         return ! bail out
       endif
 
       volume_depth(i,j) = volume_depth(i,j) + &
-        real(rt_domain(did)%CVOL(link), ESMF_KIND_FIELD) / cell_area
+        channel_volume / cell_area
     enddo
 
   end subroutine channel_volume_to_depth
