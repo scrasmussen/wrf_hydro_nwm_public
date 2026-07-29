@@ -34,9 +34,6 @@ module wrfhydro_nuopc_fields
     logical                     :: rl_export = .FALSE. ! realize export
   end type cap_fld_type
 
-  logical, parameter :: IMPORT_T = .true., IMPORT_F = .false.
-  logical, parameter :: EXPORT_T = .true., EXPORT_F = .false.
-
   type(cap_fld_type), target, dimension(21) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
