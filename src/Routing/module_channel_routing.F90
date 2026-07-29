@@ -1,4 +1,5 @@
 MODULE module_channel_routing
+use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
 #ifdef MPP_LAND
 use module_mpp_land
 use MODULE_mpp_ReachLS, only : updatelinkv,                   &
@@ -675,6 +676,10 @@ END SUBROUTINE SUBMUSKINGCUNGE
         integer flag
 
         integer :: n, kk2, nt, nsteps  ! tmp
+        integer(kind=int64) :: qlateral_link
+        integer(kind=int64) :: from_node_index, to_node_index
+        integer(kind=int64) :: lake_node_index
+        integer :: lake_mask_index
 
 #ifdef MPP_LAND
        if(my_id == io_id) then
@@ -928,11 +933,53 @@ END SUBROUTINE SUBMUSKINGCUNGE
 !-- vectorize
 !---------------------
 #ifdef MPP_LAND
+         if ((yw_MPP_NLINKS .lt. 0) .or. &
+             (yw_MPP_NLINKS .gt. size(nlinks_index))) then
+           write(6,*) "FATAL: yw_MPP_NLINKS exceeds nlinks_index size"
+           write(6,*) "PET=", my_id, " yw_MPP_NLINKS=", yw_MPP_NLINKS, &
+             " size(nlinks_index)=", size(nlinks_index)
+           flush(6)
+           call hydro_stop("Invalid owned-link count in drive_CHANNEL")
+         endif
          DO iyw = 1,yw_MPP_NLINKS
          i = nlinks_index(iyw)
 #else
          DO i = 1,NLINKS
 #endif
+
+           if ((i .lt. 1) .or. (i .gt. NLINKS)) then
+             write(6,*) "FATAL: invalid nlinks_index in drive_CHANNEL"
+#ifdef MPP_LAND
+             write(6,*) "PET=", my_id, " owned_link=", iyw
+#endif
+             write(6,*) "link=", i, " NLINKS=", NLINKS
+             flush(6)
+             call hydro_stop("Invalid link index in drive_CHANNEL")
+           endif
+           if ((CHANXI(i) .lt. 1) .or. (CHANXI(i) .gt. IXRT) .or. &
+               (CHANYJ(i) .lt. 1) .or. (CHANYJ(i) .gt. JXRT)) then
+             write(6,*) "FATAL: invalid channel coordinates in drive_CHANNEL"
+#ifdef MPP_LAND
+             write(6,*) "PET=", my_id
+#endif
+             write(6,*) "link=", i, " CHANXI=", CHANXI(i), &
+               " CHANYJ=", CHANYJ(i), " IXRT=", IXRT, " JXRT=", JXRT
+             flush(6)
+             call hydro_stop("Invalid channel coordinates in drive_CHANNEL")
+           endif
+           qlateral_link = CH_NETLNK(CHANXI(i),CHANYJ(i))
+           if ((qlateral_link .lt. 1) .or. &
+               (qlateral_link .gt. int(size(QLateral),kind=int64))) then
+             write(6,*) "FATAL: invalid QLateral index in drive_CHANNEL"
+#ifdef MPP_LAND
+             write(6,*) "PET=", my_id
+#endif
+             write(6,*) "link=", i, " routing_i=", CHANXI(i), &
+               " routing_j=", CHANYJ(i), " CH_NETLNK=", qlateral_link, &
+               " size(QLateral)=", size(QLateral)
+             flush(6)
+             call hydro_stop("Invalid QLateral index in drive_CHANNEL")
+           endif
 
            if(node_area(i) .eq. 0) then
                write(6,*) "FATAL ERROR: node_area(i) is zero. i=", i
@@ -996,6 +1043,12 @@ gwOption:   if(gwBaseSwCRT == 3) then
                 ((QSTRMVOLRT(CHANXI(i),CHANYJ(i))+&
                  QINFLOWBASE(CHANXI(i),CHANYJ(i))) &
                    /DT_STEPS*node_area(i)/1000/DTCT)
+              if (.not.ieee_is_finite( &
+                  QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))) then
+                call stop_nonfinite_channel( &
+                  "after lateral-flow construction", i, "QLateral", &
+                  QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+              endif
 	       if((QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))).lt.0.) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
                print*, "i, CHANXI(i),CHANYJ(i) = ", i, CHANXI(i),CHANYJ(i)
@@ -1013,14 +1066,27 @@ gwOption:   if(gwBaseSwCRT == 3) then
          elseif(LAKE_MSKRT(CHANXI(i),CHANYJ(i)) .gt. 0 .and. &
 !               (LAKE_MSKRT(CHANXI(i),CHANYJ(i)) .ne. -9999)) then !--a lake node
                 (CH_NETRT(CHANXI(i),CHANYJ(i)) .le. 0)) then !--a lake node
-              QLLAKE8(LAKE_MSKRT(CHANXI(i),CHANYJ(i))) = &
-                 QLLAKE8(LAKE_MSKRT(CHANXI(i),CHANYJ(i))) + &
+              lake_mask_index = LAKE_MSKRT(CHANXI(i),CHANYJ(i))
+              if (lake_mask_index .gt. NLAKES) then
+                call stop_invalid_channel_index( &
+                  "lateral lake inflow", i, "LAKE_MSKRT", &
+                  int(lake_mask_index,kind=int64), NLAKES)
+                cycle
+              endif
+              QLLAKE8(lake_mask_index) = &
+                 QLLAKE8(lake_mask_index) + &
                  (LAKEINFLORT(CHANXI(i),CHANYJ(i))+ &
                  QINFLOWBASE(CHANXI(i),CHANYJ(i))) &
                  /DT_STEPS*node_area(i)/1000/DTCT
          elseif(CH_NETRT(CHANXI(i),CHANYJ(i)) .gt. 0) then  !pour out of lake
-                 QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) =  &
-                   QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))  !-- previous timestep
+                 lake_mask_index = CH_NETRT(CHANXI(i),CHANYJ(i))
+                 if (lake_mask_index .gt. NLAKES) then
+                   call stop_invalid_channel_index( &
+                     "lake outflow", i, "CH_NETRT", &
+                     int(lake_mask_index,kind=int64), NLAKES)
+                   cycle
+                 endif
+                 QLateral(qlateral_link) = QLAKEO(lake_mask_index)
          endif nodeType
 
         ENDDO
@@ -1045,13 +1111,34 @@ gwOption:   if(gwBaseSwCRT == 3) then
 #else
            DO i = 1,NLINKS
 #endif
-           if (TYPEL(i) .eq. 0 .AND. HLINKTMP(FROM_NODE(i)) .gt. RETDEP_CHAN) then
-               if(from_node(i) .ne. to_node(i) .and. (to_node(i) .gt. 0) .and.(from_node(i) .gt. 0) ) &  ! added by Wei Yu
-                   QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
-                     HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
-            else !--  we are just computing critical depth for outflow points
-               QLINK(i,1) =0.
+           from_node_index = FROM_NODE(i)
+           to_node_index = TO_NODE(i)
+           if (from_node_index .gt. NLINKS) then
+             call stop_invalid_channel_index( &
+               "initial DIFFUSION", i, "FROM_NODE", &
+               from_node_index, NLINKS)
+             cycle
+           endif
+           if (to_node_index .gt. NLINKS) then
+             call stop_invalid_channel_index( &
+               "initial DIFFUSION", i, "TO_NODE", to_node_index, NLINKS)
+             cycle
+           endif
+
+           QLINK(i,1) = 0.
+           if (TYPEL(i) .eq. 0 .and. &
+               from_node_index .gt. 0 .and. to_node_index .gt. 0 .and. &
+               from_node_index .ne. to_node_index) then
+             if (HLINKTMP(from_node_index) .gt. RETDEP_CHAN) then
+               QLINK(i,1)=DIFFUSION(i,ZELEV(from_node_index), &
+                 ZELEV(to_node_index), HLINKTMP(from_node_index), &
+                 HLINKTMP(to_node_index), CHANLEN(i), MannN(i), Bw(i), &
+                 ChSSlp(i))
+             endif
+            endif
+            if (.not.ieee_is_finite(QLINK(i,1))) then
+              call stop_nonfinite_channel( &
+                "after initial DIFFUSION", i, "QLINK", QLINK(i,1))
             endif
           ENDDO
 
@@ -1068,7 +1155,15 @@ gwOption:   if(gwBaseSwCRT == 3) then
           DO i = 1,NLINKS                                                 !-- inflow to node across each face
 #endif
            if(TYPEL(i) .eq. 0) then                                       !-- only regular nodes have to attribute
-              QSUM8(TO_NODE(i)) = QSUM8(TO_NODE(i)) + QLINK(i,1)
+              to_node_index = TO_NODE(i)
+              if (to_node_index .gt. NLINKS) then
+                call stop_invalid_channel_index( &
+                  "flow summation", i, "TO_NODE", to_node_index, NLINKS)
+                cycle
+              endif
+              if (to_node_index .gt. 0) then
+                QSUM8(to_node_index) = QSUM8(to_node_index) + QLINK(i,1)
+              endif
            endif
           END DO
 
@@ -1085,7 +1180,15 @@ gwOption:   if(gwBaseSwCRT == 3) then
 #else
          do i = 1,NLINKS                                                 !-- outflow from node across each face
 #endif
-            QSUM(FROM_NODE(i)) = QSUM(FROM_NODE(i)) - QLINK(i,1)
+            from_node_index = FROM_NODE(i)
+            if (from_node_index .gt. NLINKS) then
+              call stop_invalid_channel_index( &
+                "flow summation", i, "FROM_NODE", from_node_index, NLINKS)
+              cycle
+            endif
+            if (from_node_index .gt. 0) then
+              QSUM(from_node_index) = QSUM(from_node_index) - QLINK(i,1)
+            endif
          end do
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,qsum,NLINKS,99)
@@ -1101,6 +1204,11 @@ gwOption:   if(gwBaseSwCRT == 3) then
 #else
          do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
+
+           if (.not.ieee_is_finite(QSUM(i))) then
+             call stop_nonfinite_channel( &
+               "after flow summation", i, "QSUM", QSUM(i))
+           endif
 
            if( TYPEL(i).eq.0 .and. CVOLTMP(i) .ge. 0.001 .and.(CVOLTMP(i)-QSUM(i)*DTCT)/CVOLTMP(i) .le. -0.01 ) then
             flag = -99
@@ -1160,6 +1268,19 @@ gwOption:   if(gwBaseSwCRT == 3) then
         do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
 
+           if (.not.ieee_is_finite(CVOLTMP(i))) then
+             call stop_nonfinite_channel( &
+               "before volume update", i, "CVOLTMP", CVOLTMP(i))
+           endif
+           if (.not.ieee_is_finite(QLateral(i))) then
+             call stop_nonfinite_channel( &
+               "before volume update", i, "QLateral", QLateral(i))
+           endif
+           if (.not.ieee_is_finite(DTCT)) then
+             call stop_nonfinite_channel( &
+               "before volume update", i, "DTCT", DTCT)
+           endif
+
            if(TYPEL(i) .eq. 0) then                   !--  regular channel grid point, compute volume
               CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) )* DTCT
               if((CVOLTMP(i) .lt. 0) .and. (gwChanCondSw == 0)) then
@@ -1203,15 +1324,40 @@ gwOption:   if(gwBaseSwCRT == 3) then
               call hydro_stop("In drive_CHANNEL() - error TYPEL")
           endif
 
+          if (.not.ieee_is_finite(CVOLTMP(i))) then
+            call stop_nonfinite_channel( &
+              "after volume update", i, "CVOLTMP", CVOLTMP(i))
+          endif
+
           if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
               HLINKTMP(i) = HEAD(i, CVOLTMP(i)/CHANLEN(i),Bw(i),1/ChSSlp(i))  !--updated depth
           else
               HLINKTMP(i) = CD(i)  !!!   CRITICALDEPTH(i,QSUM(i)+QLateral(i), Bw(i), 1./ChSSlp(i)) !--critical depth is head
           endif
 
-          if(TO_NODE(i) .gt. 0) then
-             if(LAKENODE(TO_NODE(i)) .gt. 0) then
-                  QLAKEI8(LAKENODE(TO_NODE(i))) = QLAKEI8(LAKENODE(TO_NODE(i))) + QLINK(i,1)
+          if (.not.ieee_is_finite(HLINKTMP(i))) then
+            call stop_nonfinite_channel( &
+              "after HEAD", i, "HLINKTMP", HLINKTMP(i))
+          endif
+
+          to_node_index = TO_NODE(i)
+          if (to_node_index .gt. NLINKS) then
+            call stop_invalid_channel_index( &
+              "lake inflow accumulation", i, "TO_NODE", &
+              to_node_index, NLINKS)
+            cycle
+          endif
+          if(to_node_index .gt. 0) then
+             lake_node_index = LAKENODE(to_node_index)
+             if (lake_node_index .gt. NLAKES) then
+               call stop_invalid_channel_index( &
+                 "lake inflow accumulation", i, "LAKENODE", &
+                 lake_node_index, NLAKES)
+               cycle
+             endif
+             if(lake_node_index .gt. 0) then
+                  QLAKEI8(lake_node_index) = &
+                    QLAKEI8(lake_node_index) + QLINK(i,1)
              endif
           endif
 
@@ -1281,10 +1427,30 @@ gwOption:   if(gwBaseSwCRT == 3) then
 #else
          do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
+            from_node_index = FROM_NODE(i)
+            to_node_index = TO_NODE(i)
+            if (from_node_index .gt. NLINKS) then
+              call stop_invalid_channel_index( &
+                "final DIFFUSION", i, "FROM_NODE", &
+                from_node_index, NLINKS)
+              cycle
+            endif
+            if (to_node_index .gt. NLINKS) then
+              call stop_invalid_channel_index( &
+                "final DIFFUSION", i, "TO_NODE", to_node_index, NLINKS)
+              cycle
+            endif
+
             if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
-                   QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
-                      HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
+               QLINK(i,1) = 0.
+               if (from_node_index .gt. 0 .and. &
+                   to_node_index .gt. 0 .and. &
+                   from_node_index .ne. to_node_index) then
+                 QLINK(i,1)=DIFFUSION(i,ZELEV(from_node_index), &
+                   ZELEV(to_node_index), HLINKTMP(from_node_index), &
+                   HLINKTMP(to_node_index), CHANLEN(i), MannN(i), Bw(i), &
+                   ChSSlp(i))
+               endif
             endif
          enddo
 
@@ -1317,6 +1483,68 @@ gwOption:   if(gwBaseSwCRT == 3) then
            if(allocated(tmpQLAKEI))  deallocate(tmpQLAKEI)
        endif
 #endif
+
+contains
+
+  subroutine stop_invalid_channel_index(stage, link, index_name, &
+    index_value, upper_bound)
+    character(len=*), intent(in) :: stage
+    integer, intent(in)          :: link
+    character(len=*), intent(in) :: index_name
+    integer(kind=int64), intent(in) :: index_value
+    integer, intent(in)          :: upper_bound
+
+    write(6,*) "FATAL: invalid diffusive-wave channel index"
+#ifdef MPP_LAND
+    write(6,*) "PET=", my_id
+#endif
+    write(6,*) "stage=", trim(stage), " link=", link
+    write(6,*) "index_name=", trim(index_name), &
+      " index_value=", index_value, " upper_bound=", upper_bound
+    flush(6)
+    call hydro_stop("Invalid index in diffusive-wave channel routing")
+
+  end subroutine stop_invalid_channel_index
+
+  ! ----------------------------------------------------------------
+
+  subroutine stop_nonfinite_channel(stage, link, value_name, bad_value)
+    character(len=*), intent(in) :: stage
+    integer, intent(in)          :: link
+    character(len=*), intent(in) :: value_name
+    real, intent(in)             :: bad_value
+    integer                      :: irt, jrt
+
+    irt = CHANXI(link)
+    jrt = CHANYJ(link)
+
+    write(6,*) "FATAL: nonfinite diffusive-wave channel state"
+#ifdef MPP_LAND
+    write(6,*) "PET=", my_id
+#endif
+    write(6,*) "stage=", trim(stage)
+    write(6,*) "value_name=", trim(value_name), " value=", bad_value
+    write(6,*) "link=", link, " routing_i=", irt, " routing_j=", jrt
+    write(6,*) "TYPEL=", TYPEL(link), " FROM_NODE=", FROM_NODE(link), &
+      " TO_NODE=", TO_NODE(link)
+    write(6,*) "CVOLTMP=", CVOLTMP(link), " HLINKTMP=", HLINKTMP(link)
+    write(6,*) "QSUM=", QSUM(link), " QLateral=", QLateral(link), &
+      " QLINK=", QLINK(link,1)
+    write(6,*) "QSTRMVOLRT=", QSTRMVOLRT(irt,jrt), &
+      " QINFLOWBASE=", QINFLOWBASE(irt,jrt)
+    write(6,*) "Q_GW_CHAN_FLUX=", Q_GW_CHAN_FLUX(link), &
+      " node_area=", node_area(link)
+    write(6,*) "DT=", DT, " DTCT=", DTCT, " DTRT_CH=", DTRT_CH, &
+      " DT_STEPS=", DT_STEPS
+    write(6,*) "ZELEV=", ZELEV(link), " CHANLEN=", CHANLEN(link), &
+      " MannN=", MannN(link)
+    write(6,*) "Bw=", Bw(link), " ChSSlp=", ChSSlp(link), &
+      " So=", So(link)
+    flush(6)
+    call hydro_stop("Nonfinite state in diffusive-wave channel routing")
+
+  end subroutine stop_nonfinite_channel
+
 end subroutine drive_CHANNEL
 ! ----------------------------------------------------------------
 
