@@ -1,14 +1,8 @@
 module wrfhydro_nuopc_gluecode
-! !MODULE: wrfhydro_nuopc_gluecode
-!
 ! !DESCRIPTION:
 !   This module connects NUOPC initialize, advance,
 !   and finalize to WRFHYDRO.
-!
-! !REVISION HISTORY:
-!  13Oct15    Dan Rosen  Initial Specification
-!
-! !USES:
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
   use ESMF
   use NUOPC
   use wrfhydro_esmf_extensions
@@ -1250,7 +1244,8 @@ contains
     character(len=*), parameter :: default_fulldom = './DOMAIN/Fulldom_hires.nc'
 
     character(len=2048) :: fsurdat_file, mesh_file
-    character(len=2048) :: geogrid_path, metadata_file, fulldom_file
+    character(len=2048) :: geogrid_path, scrip_path
+    character(len=2048) :: metadata_file, fulldom_file
     logical :: found, exists
 
     integer :: ncid, crs_varid
@@ -1290,6 +1285,7 @@ contains
 
     call read_case_value('hydro.namelist', 'geo_static_flnm', geogrid_path, found)
     if (.not. found) geogrid_path = default_geogrid
+    scrip_path = geogrid_scrip_filename(geogrid_path)
     call read_case_value('hydro.namelist', 'land_spatial_meta_flnm', metadata_file, found)
     if (.not. found) metadata_file = default_metadata
     call read_case_value('hydro.namelist', 'geo_finegrid_flnm', fulldom_file, found)
@@ -1299,6 +1295,7 @@ contains
     if (exists) then
       call ESMF_LogWrite(method//': using existing '//trim(geogrid_path), &
         ESMF_LOGMSG_INFO)
+      call create_scrip_from_geogrid(trim(geogrid_path), trim(scrip_path))
       return
     end if
 
@@ -1499,6 +1496,7 @@ contains
     call aggregate_fulldom_topography(trim(fulldom_file), x, y, hgt)
 
     call write_geogrid(trim(geogrid_path))
+    call create_scrip_from_geogrid(trim(geogrid_path), trim(scrip_path))
 
     call ESMF_RouteHandleDestroy(bilinear_handle, rc=rc)
     call check_esmf(rc, 'destroying geogrid route handle')
@@ -1644,6 +1642,169 @@ contains
       call check_nf(nf90_get_var(file_id, variable_id, values), &
         'reading variable '//trim(name))
     end subroutine read_variable_3d
+
+    function geogrid_scrip_filename(path) result(scrip_filename)
+      character(len=*), intent(in) :: path
+      character(len=2048) :: scrip_filename
+      integer :: suffix
+
+      suffix = index(trim(path), '.nc', back=.true.)
+      if (suffix == len_trim(path)-2) then
+        scrip_filename = path(:suffix-1)//'.scrip.nc'
+      else
+        scrip_filename = trim(path)//'.scrip.nc'
+      end if
+    end function geogrid_scrip_filename
+
+    subroutine create_scrip_from_geogrid(geogrid, scrip)
+      character(len=*), intent(in) :: geogrid, scrip
+
+      integer :: input_id, output_id, variable_id
+      integer :: scrip_nx, scrip_ny, corner_nx, corner_ny
+      integer :: grid_size, i_cell, i_scrip, j_scrip
+      integer :: dim_grid_size, dim_grid_corners, dim_grid_rank
+      integer :: var_grid_dims, var_grid_center_lat, var_grid_center_lon
+      integer :: var_grid_corner_lat, var_grid_corner_lon, var_grid_imask
+      integer :: grid_dims(2)
+      logical :: scrip_exists
+      real(ESMF_KIND_R8), allocatable :: center_lat(:,:,:), center_lon(:,:,:)
+      real(ESMF_KIND_R8), allocatable :: corner_lat(:,:,:), corner_lon(:,:,:)
+      real(ESMF_KIND_R8), allocatable :: grid_center_lat(:), grid_center_lon(:)
+      real(ESMF_KIND_R8), allocatable :: grid_corner_lat(:,:), grid_corner_lon(:,:)
+      integer, allocatable :: landmask_geogrid(:,:,:), grid_imask(:)
+
+      inquire(file=trim(scrip), exist=scrip_exists)
+      if (scrip_exists) then
+        call ESMF_LogWrite(method//': using existing '//trim(scrip), &
+          ESMF_LOGMSG_INFO)
+        return
+      end if
+
+      call check_nf(nf90_open(trim(geogrid), NF90_NOWRITE, input_id), &
+        'opening geogrid for SCRIP conversion')
+      call get_dimension(input_id, 'west_east', scrip_nx)
+      call get_dimension(input_id, 'south_north', scrip_ny)
+      call get_dimension(input_id, 'west_east_stag', corner_nx)
+      call get_dimension(input_id, 'south_north_stag', corner_ny)
+      if (corner_nx /= scrip_nx+1 .or. corner_ny /= scrip_ny+1) then
+        call fatal('Geogrid corner dimensions do not enclose the center grid')
+      end if
+
+      allocate(center_lat(scrip_nx,scrip_ny,1))
+      allocate(center_lon(scrip_nx,scrip_ny,1))
+      allocate(corner_lat(corner_nx,corner_ny,1))
+      allocate(corner_lon(corner_nx,corner_ny,1))
+      allocate(landmask_geogrid(scrip_nx,scrip_ny,1))
+
+      call check_nf(nf90_inq_varid(input_id, 'XLAT_M', variable_id), &
+        'finding XLAT_M for SCRIP conversion')
+      call check_nf(nf90_get_var(input_id, variable_id, center_lat, &
+        start=(/1,1,1/), count=(/scrip_nx,scrip_ny,1/)), &
+        'reading XLAT_M for SCRIP conversion')
+      call check_nf(nf90_inq_varid(input_id, 'XLONG_M', variable_id), &
+        'finding XLONG_M for SCRIP conversion')
+      call check_nf(nf90_get_var(input_id, variable_id, center_lon, &
+        start=(/1,1,1/), count=(/scrip_nx,scrip_ny,1/)), &
+        'reading XLONG_M for SCRIP conversion')
+      call check_nf(nf90_inq_varid(input_id, 'XLAT_C', variable_id), &
+        'finding XLAT_C for SCRIP conversion')
+      call check_nf(nf90_get_var(input_id, variable_id, corner_lat, &
+        start=(/1,1,1/), count=(/corner_nx,corner_ny,1/)), &
+        'reading XLAT_C for SCRIP conversion')
+      call check_nf(nf90_inq_varid(input_id, 'XLONG_C', variable_id), &
+        'finding XLONG_C for SCRIP conversion')
+      call check_nf(nf90_get_var(input_id, variable_id, corner_lon, &
+        start=(/1,1,1/), count=(/corner_nx,corner_ny,1/)), &
+        'reading XLONG_C for SCRIP conversion')
+      call check_nf(nf90_inq_varid(input_id, 'LANDMASK', variable_id), &
+        'finding LANDMASK for SCRIP conversion')
+      call check_nf(nf90_get_var(input_id, variable_id, landmask_geogrid, &
+        start=(/1,1,1/), count=(/scrip_nx,scrip_ny,1/)), &
+        'reading LANDMASK for SCRIP conversion')
+      call check_nf(nf90_close(input_id), 'closing geogrid after SCRIP conversion')
+
+      grid_size = scrip_nx*scrip_ny
+      grid_dims = (/scrip_nx,scrip_ny/)
+      allocate(grid_center_lat(grid_size), grid_center_lon(grid_size))
+      allocate(grid_corner_lat(4,grid_size), grid_corner_lon(4,grid_size))
+      allocate(grid_imask(grid_size))
+
+      i_cell = 0
+      do j_scrip = 1, scrip_ny
+        do i_scrip = 1, scrip_nx
+          i_cell = i_cell+1
+          grid_center_lat(i_cell) = center_lat(i_scrip,j_scrip,1)
+          grid_center_lon(i_cell) = center_lon(i_scrip,j_scrip,1)
+          grid_imask(i_cell) = merge(1, 0, &
+            landmask_geogrid(i_scrip,j_scrip,1) /= 0)
+
+          ! Counterclockwise corners: southwest, southeast, northeast, northwest.
+          grid_corner_lat(:,i_cell) = (/ &
+            corner_lat(i_scrip,  j_scrip,  1), &
+            corner_lat(i_scrip+1,j_scrip,  1), &
+            corner_lat(i_scrip+1,j_scrip+1,1), &
+            corner_lat(i_scrip,  j_scrip+1,1) /)
+          grid_corner_lon(:,i_cell) = (/ &
+            corner_lon(i_scrip,  j_scrip,  1), &
+            corner_lon(i_scrip+1,j_scrip,  1), &
+            corner_lon(i_scrip+1,j_scrip+1,1), &
+            corner_lon(i_scrip,  j_scrip+1,1) /)
+        end do
+      end do
+
+      call check_nf(nf90_create(trim(scrip), &
+        ior(NF90_CLOBBER,NF90_NETCDF4), output_id), 'creating SCRIP file')
+      call check_nf(nf90_def_dim(output_id, 'grid_size', grid_size, &
+        dim_grid_size), 'defining SCRIP grid_size')
+      call check_nf(nf90_def_dim(output_id, 'grid_corners', 4, &
+        dim_grid_corners), 'defining SCRIP grid_corners')
+      call check_nf(nf90_def_dim(output_id, 'grid_rank', 2, &
+        dim_grid_rank), 'defining SCRIP grid_rank')
+
+      call check_nf(nf90_def_var(output_id, 'grid_dims', NF90_INT, &
+        (/dim_grid_rank/), var_grid_dims), 'defining SCRIP grid_dims')
+      call check_nf(nf90_def_var(output_id, 'grid_center_lat', NF90_DOUBLE, &
+        (/dim_grid_size/), var_grid_center_lat), &
+        'defining SCRIP grid_center_lat')
+      call check_nf(nf90_put_att(output_id, var_grid_center_lat, &
+        'units', 'degrees'), 'writing grid_center_lat units')
+      call check_nf(nf90_def_var(output_id, 'grid_center_lon', NF90_DOUBLE, &
+        (/dim_grid_size/), var_grid_center_lon), &
+        'defining SCRIP grid_center_lon')
+      call check_nf(nf90_put_att(output_id, var_grid_center_lon, &
+        'units', 'degrees'), 'writing grid_center_lon units')
+      call check_nf(nf90_def_var(output_id, 'grid_corner_lat', NF90_DOUBLE, &
+        (/dim_grid_corners,dim_grid_size/), var_grid_corner_lat), &
+        'defining SCRIP grid_corner_lat')
+      call check_nf(nf90_put_att(output_id, var_grid_corner_lat, &
+        'units', 'degrees'), 'writing grid_corner_lat units')
+      call check_nf(nf90_def_var(output_id, 'grid_corner_lon', NF90_DOUBLE, &
+        (/dim_grid_corners,dim_grid_size/), var_grid_corner_lon), &
+        'defining SCRIP grid_corner_lon')
+      call check_nf(nf90_put_att(output_id, var_grid_corner_lon, &
+        'units', 'degrees'), 'writing grid_corner_lon units')
+      call check_nf(nf90_def_var(output_id, 'grid_imask', NF90_INT, &
+        (/dim_grid_size/), var_grid_imask), 'defining SCRIP grid_imask')
+      call check_nf(nf90_put_att(output_id, var_grid_imask, &
+        'units', 'unitless'), 'writing grid_imask units')
+      call check_nf(nf90_enddef(output_id), 'ending SCRIP define mode')
+
+      call check_nf(nf90_put_var(output_id, var_grid_dims, grid_dims), &
+        'writing SCRIP grid_dims')
+      call check_nf(nf90_put_var(output_id, var_grid_center_lat, grid_center_lat), &
+        'writing SCRIP grid_center_lat')
+      call check_nf(nf90_put_var(output_id, var_grid_center_lon, grid_center_lon), &
+        'writing SCRIP grid_center_lon')
+      call check_nf(nf90_put_var(output_id, var_grid_corner_lat, grid_corner_lat), &
+        'writing SCRIP grid_corner_lat')
+      call check_nf(nf90_put_var(output_id, var_grid_corner_lon, grid_corner_lon), &
+        'writing SCRIP grid_corner_lon')
+      call check_nf(nf90_put_var(output_id, var_grid_imask, grid_imask), &
+        'writing SCRIP grid_imask')
+      call check_nf(nf90_close(output_id), 'closing SCRIP file')
+
+      call ESMF_LogWrite(method//': created '//trim(scrip), ESMF_LOGMSG_INFO)
+    end subroutine create_scrip_from_geogrid
 
     subroutine centers_to_corners(center, corner)
       real(ESMF_KIND_R8), intent(in) :: center(:)
