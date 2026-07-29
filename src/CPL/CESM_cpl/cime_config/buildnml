@@ -113,6 +113,18 @@ def _stage_routing_stack(rundir):
     os.symlink(routing_stack, domain_link)
 
 
+def _stage_run_sequence(srcroot, caseroot):
+    """Install the WRF-Hydro run sequence unless the case has an override."""
+    runseq_src = os.path.join(
+        srcroot, "cime_config", "nuopc.runseq.template"
+    )
+    runseq_case = os.path.join(caseroot, "nuopc.runseq")
+
+    if not os.path.exists(runseq_case):
+        print(f"   - installing WRF-Hydro run sequence at {runseq_case}")
+        shutil.copy2(runseq_src, runseq_case)
+
+
 def buildnml(case, caseroot, compname):
     """Build the wrfhydro control file """
 
@@ -123,6 +135,7 @@ def buildnml(case, caseroot, compname):
     src_root = case.get_value("COMP_ROOT_DIR_ROF")
     run_dir = case.get_value("RUNDIR")
 
+    _stage_run_sequence(src_root, caseroot)
     _stage_routing_stack(run_dir)
 
     hydro_table_dir = os.path.normpath(
