@@ -1,0 +1,23 @@
+runSeq::
+@30
+  ATM
+  ATM -> MED :remapMethod=redist
+  MED med_phases_post_atm
+
+  MED med_phases_prep_lnd
+  MED -> LND :remapMethod=redist
+  LND
+  LND -> MED :remapMethod=redist
+  MED med_phases_post_lnd
+
+  MED med_phases_prep_rof
+  MED -> ROF :remapMethod=redist
+  ROF
+  ROF -> MED :remapMethod=redist
+  MED med_phases_post_rof
+
+  MED med_phases_history_write
+  MED med_phases_restart_write
+  MED med_phases_profile
+@
+::
