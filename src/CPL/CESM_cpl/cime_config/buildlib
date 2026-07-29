@@ -49,7 +49,9 @@ def _main_func():
         wrfh_lib = rof_lib
         wrfh_root = Path(rof_root).parents[1]
 
-        gmake_j = case.get_value("GMAKE_J")
+        # Limit parallelism because legacy WRF-Hydro object recipes update
+        # a shared libHYDRO.a.
+        gmake_j = 4
         gmake = case.get_value("GMAKE")
         driver = case.get_value("COMP_INTERFACE").lower()
         expect( driver == "nuopc", "wrfhydro only has a nuopc COMP_INTERFACE" )
