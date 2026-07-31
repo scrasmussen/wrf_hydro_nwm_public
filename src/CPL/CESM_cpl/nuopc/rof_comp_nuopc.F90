@@ -701,6 +701,10 @@ module rof_comp_nuopc
     character(len=32)                      :: initTypeStr
     logical                                :: mdlRestart
     integer                                :: stat
+    integer                                :: fieldCount
+    integer                                :: n
+    character(ESMF_MAXSTR), allocatable    :: fieldNameList(:)
+    type(ESMF_Field)                       :: field
 
     rc = ESMF_SUCCESS
 
@@ -848,6 +852,20 @@ module rof_comp_nuopc
       return  ! bail out
       exportUpdated = .FALSE.
     endif
+
+    ! Mark initialized exports so the initialization connector sends them.
+    call ESMF_StateGet(is%wrap%NStateExp(1), itemCount=fieldCount, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return
+    allocate(fieldNameList(fieldCount))
+    call ESMF_StateGet(is%wrap%NStateExp(1), itemNameList=fieldNameList, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return
+    do n = 1, fieldCount
+      call ESMF_StateGet(is%wrap%NStateExp(1), itemName=fieldNameList(n), field=field, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+      call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return
+    enddo
+    deallocate(fieldNameList)
 
     ! set InitializeDataComplete Attribute to "true", indicating to the
     ! generic code that all inter-model data dependencies are satisfied
