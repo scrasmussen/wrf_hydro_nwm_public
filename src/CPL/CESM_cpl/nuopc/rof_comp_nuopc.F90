@@ -545,7 +545,7 @@ module rof_comp_nuopc
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 
     ! create geogrid from CESM input files
-    call wrfhydro_create_geogrid_file()
+    call wrfhydro_create_geogrid_file(vm)
 
     call wrfhydro_nuopc_ini(is%wrap%did,vm,clock,is%wrap%forcingDir,rc=rc)
     if(ESMF_STDERRORCHECK(rc)) return ! bail out

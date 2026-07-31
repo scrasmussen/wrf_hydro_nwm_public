@@ -1296,8 +1296,10 @@ contains
   end function esmf_stderrorcheck
 
 
-  subroutine wrfhydro_create_geogrid_file()
+  subroutine wrfhydro_create_geogrid_file(vm)
     use netcdf
+
+    type(ESMF_VM), intent(in) :: vm
 
     character(len=*), parameter :: method = 'wrfhydro_create_geogrid_file'
     character(len=*), parameter :: default_geogrid = './DOMAIN/geo_em.d01.nc'
@@ -1307,13 +1309,19 @@ contains
 
     character(len=2048) :: fsurdat_file, mesh_file
     character(len=2048) :: geogrid_path, scrip_path
+    character(len=2048) :: geogrid_tmp, scrip_tmp
     character(len=2048) :: metadata_file, fulldom_file
     logical :: found, exists
 
     integer :: ncid, crs_varid
     integer :: nx, ny, nx_src, ny_src
     integer :: natpft_count, numurbl_count, nlevsoi_count
-    integer :: i, j, rc
+    integer :: i, j, k, global_index, rc
+    integer :: local_pet, pet_count
+    integer :: file_exists_flag(1)
+    integer :: source_local_count, target_local_count
+    integer :: source_local_de_count, target_local_de_count
+    integer :: local_count(1), global_count(1)
 
     real(ESMF_KIND_R8) :: standard_parallel(2)
     real(ESMF_KIND_R8) :: central_lon, origin_lat
@@ -1328,18 +1336,22 @@ contains
     real(ESMF_KIND_R8), allocatable :: lake_src(:,:), glacier_src(:,:)
     real(ESMF_KIND_R8), allocatable :: pft_src(:,:,:), urban_src(:,:,:)
     real(ESMF_KIND_R8), allocatable :: work_src(:,:), work_dst(:,:), max_fraction(:,:)
+    real(ESMF_KIND_R8), allocatable :: target_local_flat(:), target_global_flat(:)
     integer, allocatable :: lu_index(:,:), soil_category(:,:), landmask(:,:)
+    integer, allocatable :: source_dof(:), target_dof(:)
 
     type(ESMF_Mesh) :: source_mesh
     type(ESMF_Grid) :: target_grid
+    type(ESMF_DistGrid) :: source_distgrid, target_distgrid
     type(ESMF_Field) :: source_field, target_field
     type(ESMF_RouteHandle) :: bilinear_handle
     real(ESMF_KIND_R8), pointer :: source_ptr(:) => null()
     real(ESMF_KIND_R8), pointer :: target_ptr(:,:) => null()
     real(ESMF_KIND_R8), pointer :: grid_lon(:,:) => null()
     real(ESMF_KIND_R8), pointer :: grid_lat(:,:) => null()
-    real(ESMF_KIND_R8), pointer :: grid_lon_corner(:,:) => null()
-    real(ESMF_KIND_R8), pointer :: grid_lat_corner(:,:) => null()
+
+    call ESMF_VMGet(vm, localPet=local_pet, petCount=pet_count, rc=rc)
+    call check_esmf(rc, 'querying the WRF-Hydro VM')
 
     geogrid_path = default_geogrid
     metadata_file = default_metadata
@@ -1353,11 +1365,27 @@ contains
     call read_case_value('hydro.namelist', 'geo_finegrid_flnm', fulldom_file, found)
     if (.not. found) fulldom_file = default_fulldom
 
-    inquire(file=trim(geogrid_path), exist=exists)
-    if (exists) then
-      call ESMF_LogWrite(method//': using existing '//trim(geogrid_path), &
-        ESMF_LOGMSG_INFO)
-      call create_scrip_from_geogrid(trim(geogrid_path), trim(scrip_path))
+    file_exists_flag(1) = 0
+    if (local_pet == 0) then
+      inquire(file=trim(geogrid_path), exist=exists)
+      if (exists) file_exists_flag(1) = 1
+    end if
+    call ESMF_VMBroadcast(vm, file_exists_flag, 1, 0, rc=rc)
+    call check_esmf(rc, 'broadcasting geogrid file status')
+    if (file_exists_flag(1) == 1) then
+      if (local_pet == 0) then
+        call ESMF_LogWrite(method//': using existing '//trim(geogrid_path), &
+          ESMF_LOGMSG_INFO)
+        inquire(file=trim(scrip_path), exist=exists)
+        if (.not. exists) then
+          scrip_tmp = trim(scrip_path)//'.tmp'
+          call remove_file_if_exists(trim(scrip_tmp))
+          call create_scrip_from_geogrid(trim(geogrid_path), trim(scrip_tmp))
+          call atomic_rename_file(trim(scrip_tmp), trim(scrip_path))
+        end if
+      end if
+      call ESMF_VMBarrier(vm, rc=rc)
+      call check_esmf(rc, 'waiting for existing geogrid setup')
       return
     end if
 
@@ -1450,15 +1478,59 @@ contains
     call read_variable_3d(ncid, 'PCT_CLAY', clay_src)
     call check_nf(nf90_close(ncid), 'closing CTSM surface dataset')
 
-    ! Build a serial ESMF destination grid and a reusable bilinear route from
-    ! the CTSM land mesh.  This routine is called during the one-PET setup run.
+    ! Build a distributed ESMF destination grid and a reusable bilinear route
+    ! from the CTSM land mesh.  Every PET participates in the regridding.
     source_mesh = ESMF_MeshCreate(filename=trim(mesh_file), &
       fileformat=ESMF_FILEFORMAT_ESMFMESH, rc=rc)
     call check_esmf(rc, 'creating CTSM source mesh')
-    target_grid = ESMF_GridCreate(maxIndex=(/nx,ny/), regDecomp=(/1,1/), &
+    call ESMF_MeshGet(source_mesh, elementDistGrid=source_distgrid, rc=rc)
+    call check_esmf(rc, 'getting CTSM source mesh decomposition')
+    call ESMF_DistGridGet(source_distgrid, localDeCount=source_local_de_count, rc=rc)
+    call check_esmf(rc, 'getting CTSM source local DE count')
+    if (source_local_de_count /= 1) then
+      call fatal('CTSM source mesh must have exactly one local DE per PET')
+    end if
+    call ESMF_DistGridGet(source_distgrid, localDe=0, &
+      elementCount=source_local_count, rc=rc)
+    call check_esmf(rc, 'getting local CTSM source element count')
+    allocate(source_dof(source_local_count))
+    call ESMF_DistGridGet(source_distgrid, localDe=0, &
+      seqIndexList=source_dof, rc=rc)
+    call check_esmf(rc, 'getting local CTSM source indices')
+
+    target_grid = ESMF_GridCreate(maxIndex=(/nx,ny/), &
       decompflag=(/ESMF_DECOMP_BALANCED,ESMF_DECOMP_BALANCED/), &
       coordSys=ESMF_COORDSYS_SPH_DEG, coordTypeKind=ESMF_TYPEKIND_R8, rc=rc)
     call check_esmf(rc, 'creating geogrid destination grid')
+    call ESMF_GridGet(target_grid, localDeCount=target_local_de_count, &
+      distgrid=target_distgrid, rc=rc)
+    call check_esmf(rc, 'getting geogrid destination decomposition')
+    if (target_local_de_count /= 1) then
+      call fatal('Geogrid destination must have exactly one local DE per PET')
+    end if
+    call ESMF_DistGridGet(target_distgrid, localDe=0, &
+      elementCount=target_local_count, rc=rc)
+    call check_esmf(rc, 'getting local geogrid destination count')
+    allocate(target_dof(target_local_count))
+    call ESMF_DistGridGet(target_distgrid, localDe=0, &
+      seqIndexList=target_dof, rc=rc)
+    call check_esmf(rc, 'getting local geogrid destination indices')
+
+    local_count(1) = source_local_count
+    call ESMF_VMAllReduce(vm, local_count, global_count, 1, &
+      ESMF_REDUCE_SUM, rc=rc)
+    call check_esmf(rc, 'checking global CTSM source element count')
+    if (global_count(1) /= nx_src*ny_src) then
+      call fatal('CTSM mesh element count does not match fsurdat lsmlon*lsmlat')
+    end if
+    local_count(1) = target_local_count
+    call ESMF_VMAllReduce(vm, local_count, global_count, 1, &
+      ESMF_REDUCE_SUM, rc=rc)
+    call check_esmf(rc, 'checking global geogrid destination count')
+    if (global_count(1) /= nx*ny) then
+      call fatal('ESMF target element count does not match routing-stack metadata')
+    end if
+
     call ESMF_GridAddCoord(target_grid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
     call check_esmf(rc, 'adding destination center coordinates')
     call ESMF_GridGetCoord(target_grid, coordDim=1, &
@@ -1467,18 +1539,24 @@ contains
     call ESMF_GridGetCoord(target_grid, coordDim=2, &
       staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=grid_lat, rc=rc)
     call check_esmf(rc, 'getting destination center latitudes')
-    grid_lon = longitude
-    grid_lat = latitude
-    call ESMF_GridAddCoord(target_grid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
-    call check_esmf(rc, 'adding destination corner coordinates')
-    call ESMF_GridGetCoord(target_grid, coordDim=1, &
-      staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=grid_lon_corner, rc=rc)
-    call check_esmf(rc, 'getting destination corner longitudes')
-    call ESMF_GridGetCoord(target_grid, coordDim=2, &
-      staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=grid_lat_corner, rc=rc)
-    call check_esmf(rc, 'getting destination corner latitudes')
-    grid_lon_corner = longitude_corner
-    grid_lat_corner = latitude_corner
+    if (size(grid_lon) /= target_local_count .or. &
+        size(grid_lat) /= target_local_count) then
+      call fatal('ESMF target coordinate storage does not match its decomposition')
+    end if
+    k = 0
+    do j = lbound(grid_lon,2), ubound(grid_lon,2)
+      do i = lbound(grid_lon,1), ubound(grid_lon,1)
+        k = k+1
+        global_index = target_dof(k)
+        if (global_index < 1 .or. global_index > nx*ny) then
+          call fatal('Invalid global index in geogrid destination decomposition')
+        end if
+        grid_lon(i,j) = longitude(mod(global_index-1,nx)+1, &
+          (global_index-1)/nx+1)
+        grid_lat(i,j) = latitude(mod(global_index-1,nx)+1, &
+          (global_index-1)/nx+1)
+      end do
+    end do
 
     source_field = ESMF_FieldCreate(mesh=source_mesh, &
       typekind=ESMF_TYPEKIND_R8, meshloc=ESMF_MESHLOC_ELEMENT, &
@@ -1492,11 +1570,11 @@ contains
     call check_esmf(rc, 'getting CTSM source field storage')
     call ESMF_FieldGet(target_field, farrayPtr=target_ptr, rc=rc)
     call check_esmf(rc, 'getting geogrid destination field storage')
-    if (size(source_ptr) /= nx_src*ny_src) then
-      call fatal('CTSM mesh element count does not match fsurdat lsmlon*lsmlat')
+    if (size(source_ptr) /= source_local_count) then
+      call fatal('ESMF source field storage does not match its decomposition')
     end if
-    if (size(target_ptr,1) /= nx .or. size(target_ptr,2) /= ny) then
-      call fatal('ESMF target field shape does not match routing-stack metadata')
+    if (size(target_ptr) /= target_local_count) then
+      call fatal('ESMF target field storage does not match its decomposition')
     end if
     call ESMF_FieldRegridStore(source_field, target_field, &
       routehandle=bilinear_handle, regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
@@ -1505,6 +1583,7 @@ contains
     call check_esmf(rc, 'building CTSM-to-geogrid bilinear weights')
 
     allocate(work_src(nx_src,ny_src), work_dst(nx,ny), max_fraction(nx,ny))
+    allocate(target_local_flat(nx*ny), target_global_flat(nx*ny))
     allocate(sand(nx,ny), clay(nx,ny), lu_index(nx,ny))
     allocate(soil_category(nx,ny), landmask(nx,ny), hgt(nx,ny))
 
@@ -1541,24 +1620,37 @@ contains
       1.0_ESMF_KIND_R8-landfrac_src) + landfrac_src * lake_src
     call consider_usgs_category(16, work_src)
 
-    landmask = 1
-    where (lu_index == 16) landmask = 0
-    do j = 1, ny
-      do i = 1, nx
-        if (landmask(i,j) == 0) then
-          soil_category(i,j) = 14
-        else
-          soil_category(i,j) = usda_soil_category(sand(i,j), clay(i,j))
-        end if
+    if (local_pet == 0) then
+      landmask = 1
+      where (lu_index == 16) landmask = 0
+      do j = 1, ny
+        do i = 1, nx
+          if (landmask(i,j) == 0) then
+            soil_category(i,j) = 14
+          else
+            soil_category(i,j) = usda_soil_category(sand(i,j), clay(i,j))
+          end if
+        end do
       end do
-    end do
 
-    ! Fulldom_hires is projection-aligned with the target geogrid.  Block
-    ! averaging preserves the available 100-m terrain information at 1 km.
-    call aggregate_fulldom_topography(trim(fulldom_file), x, y, hgt)
+      ! Fulldom_hires is projection-aligned with the target geogrid.  Block
+      ! averaging preserves the available 100-m terrain information at 1 km.
+      call aggregate_fulldom_topography(trim(fulldom_file), x, y, hgt)
 
-    call write_geogrid(trim(geogrid_path))
-    call create_scrip_from_geogrid(trim(geogrid_path), trim(scrip_path))
+      ! Publish complete files atomically.  The final geo_em file is the
+      ! readiness marker seen by later runs and by the other PETs.
+      geogrid_tmp = trim(geogrid_path)//'.tmp'
+      scrip_tmp = trim(scrip_path)//'.tmp'
+      call remove_file_if_exists(trim(geogrid_tmp))
+      call remove_file_if_exists(trim(scrip_tmp))
+      call write_geogrid(trim(geogrid_tmp))
+      call create_scrip_from_geogrid(trim(geogrid_tmp), trim(scrip_tmp))
+      call atomic_rename_file(trim(scrip_tmp), trim(scrip_path))
+      call atomic_rename_file(trim(geogrid_tmp), trim(geogrid_path))
+    end if
+
+    call ESMF_VMBarrier(vm, rc=rc)
+    call check_esmf(rc, 'waiting for PET0 to publish geogrid files')
 
     call ESMF_RouteHandleDestroy(bilinear_handle, rc=rc)
     call check_esmf(rc, 'destroying geogrid route handle')
@@ -1571,7 +1663,10 @@ contains
     call ESMF_GridDestroy(target_grid, rc=rc)
     call check_esmf(rc, 'destroying geogrid destination grid')
 
-    call ESMF_LogWrite(method//': created '//trim(geogrid_path), ESMF_LOGMSG_INFO)
+    if (local_pet == 0) then
+      call ESMF_LogWrite(method//': created '//trim(geogrid_path)// &
+        ' with '//trim(integer_string(pet_count))//' PETs', ESMF_LOGMSG_INFO)
+    end if
 
   contains
 
@@ -1605,6 +1700,48 @@ contains
       inquire(file=trim(path), exist=file_exists)
       if (.not. file_exists) call fatal('Required file does not exist: '//trim(path))
     end subroutine require_file
+
+    subroutine remove_file_if_exists(path)
+      character(len=*), intent(in) :: path
+      integer :: unit_number, ios
+      logical :: file_exists
+
+      inquire(file=trim(path), exist=file_exists)
+      if (.not. file_exists) return
+      open(newunit=unit_number, file=trim(path), status='old', iostat=ios)
+      if (ios /= 0) call fatal('Could not open temporary file for removal: '//trim(path))
+      close(unit_number, status='delete', iostat=ios)
+      if (ios /= 0) call fatal('Could not remove temporary file: '//trim(path))
+    end subroutine remove_file_if_exists
+
+    subroutine atomic_rename_file(old_path, new_path)
+      use iso_c_binding, only : c_char, c_int, c_null_char
+
+      character(len=*), intent(in) :: old_path, new_path
+      character(kind=c_char,len=:), allocatable :: old_path_c, new_path_c
+      integer(c_int) :: rename_status
+
+      interface
+        function c_rename(old_name, new_name) bind(C, name='rename') result(status)
+          import :: c_char, c_int
+          character(kind=c_char), intent(in) :: old_name(*), new_name(*)
+          integer(c_int) :: status
+        end function c_rename
+      end interface
+
+      old_path_c = trim(old_path)//c_null_char
+      new_path_c = trim(new_path)//c_null_char
+      rename_status = c_rename(old_path_c, new_path_c)
+      if (rename_status /= 0_c_int) then
+        call fatal('Could not rename '//trim(old_path)//' to '//trim(new_path))
+      end if
+    end subroutine atomic_rename_file
+
+    function integer_string(value) result(string)
+      integer, intent(in) :: value
+      character(len=32) :: string
+      write(string,'(I0)') value
+    end function integer_string
 
     subroutine read_case_value(path, key, value, was_found)
       character(len=*), intent(in) :: path, key
@@ -1928,22 +2065,56 @@ contains
     subroutine apply_regrid(source_values, target_values)
       real(ESMF_KIND_R8), intent(in) :: source_values(:,:)
       real(ESMF_KIND_R8), intent(out) :: target_values(:,:)
-      integer :: local_rc
-      source_ptr = reshape(source_values, (/size(source_ptr)/))
+      integer :: local_rc, local_i, local_j, local_k, source_index
+
+      do local_k = 1, source_local_count
+        source_index = source_dof(local_k)
+        if (source_index < 1 .or. source_index > nx_src*ny_src) then
+          call fatal('Invalid global index in CTSM source decomposition')
+        end if
+        local_i = mod(source_index-1,nx_src)+1
+        local_j = (source_index-1)/nx_src+1
+        source_ptr(local_k) = source_values(local_i,local_j)
+      end do
+
       target_ptr = 0.0_ESMF_KIND_R8
       call ESMF_FieldRegrid(source_field, target_field, bilinear_handle, rc=local_rc)
       call check_esmf(local_rc, 'applying CTSM-to-geogrid weights')
-      target_values = target_ptr
+
+      target_local_flat = 0.0_ESMF_KIND_R8
+      local_k = 0
+      do local_j = lbound(target_ptr,2), ubound(target_ptr,2)
+        do local_i = lbound(target_ptr,1), ubound(target_ptr,1)
+          local_k = local_k+1
+          global_index = target_dof(local_k)
+          if (global_index < 1 .or. global_index > nx*ny) then
+            call fatal('Invalid global index in geogrid destination decomposition')
+          end if
+          target_local_flat(global_index) = target_ptr(local_i,local_j)
+        end do
+      end do
+
+      target_global_flat = 0.0_ESMF_KIND_R8
+      call ESMF_VMReduce(vm, target_local_flat, target_global_flat, nx*ny, &
+        ESMF_REDUCE_SUM, 0, rc=local_rc)
+      call check_esmf(local_rc, 'gathering the regridded geogrid field on PET0')
+      if (local_pet == 0) then
+        target_values = reshape(target_global_flat, shape(target_values))
+      else
+        target_values = 0.0_ESMF_KIND_R8
+      end if
     end subroutine apply_regrid
 
     subroutine consider_usgs_category(category, source_fraction)
       integer, intent(in) :: category
       real(ESMF_KIND_R8), intent(in) :: source_fraction(:,:)
       call apply_regrid(source_fraction, work_dst)
-      where (work_dst > max_fraction)
-        max_fraction = work_dst
-        lu_index = category
-      end where
+      if (local_pet == 0) then
+        where (work_dst > max_fraction)
+          max_fraction = work_dst
+          lu_index = category
+        end where
+      end if
     end subroutine consider_usgs_category
 
     integer function usda_soil_category(sand_percent, clay_percent) result(category)
