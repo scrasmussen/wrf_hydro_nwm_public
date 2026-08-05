@@ -16,6 +16,7 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
+import re
 
 CIMEROOT = os.environ.get("CIMEROOT")
 if CIMEROOT is None:
@@ -145,17 +146,43 @@ def buildnml(case, caseroot, compname):
         table_run = os.path.join(run_dir, table_name)
         if not os.path.isfile(table_src):
             raise RuntimeError(f"WRF-Hydro parameter table not found: {table_src}")
-        print(f"   - copying {table_src} to {table_run}")
-        shutil.copy2(table_src, table_run)
+        
+        if not os.path.exists(table_run):
+            print(f"   - copying {table_src} to {table_run}")
+            shutil.copy2(table_src, table_run)
+        else:
+            print(f"   - {table_run} already exists, skipping copy.")
+
+    start_year, start_month, start_day = case.get_value("RUN_STARTDATE").split("-")
 
     for nml_file in ("hydro.namelist", "namelist.hrldas"):
         nml_template = f"{nml_file}.template"
         nml_src = os.path.join(src_root, "cime_config", nml_template)
         case_nml = os.path.join(caseroot, nml_file)
         run_nml = os.path.join(run_dir, nml_file)
+        
+        if not os.path.exists(case_nml):
+            print(f"   - copying namelist {nml_template} to {case_nml}")
+            shutil.copy(nml_src, case_nml)
+        else:
+            print(f"   - {case_nml} already exists, skipping copy.")
 
-        print(f"   - copying namelist {nml_template} to {case_nml}")
-        shutil.copy(nml_src, case_nml)
+        # To Syncronize the Noah-MP start date with CLM
+        if nml_file == "namelist.hrldas":
+                with open(case_nml, 'r') as f:
+                    content = f.read()
+
+                # Use regex to find and replace the variables, preserving spaces around the '='
+                # The (?i) makes it case-insensitive in case the namelist uses lowercase
+                content = re.sub(r'(?i)(START_YEAR\s*=\s*)\d+', rf'\g<1>{start_year}', content)
+                content = re.sub(r'(?i)(START_MONTH\s*=\s*)\d+', rf'\g<1>{start_month}', content)
+                content = re.sub(r'(?i)(START_DAY\s*=\s*)\d+', rf'\g<1>{start_day}', content)
+
+                # Write the modified content back out
+                with open(case_nml, 'w') as f:
+                    f.write(content)
+                    
+                print(f"   - updated START_YEAR/MONTH/DAY in {case_nml} to {case.get_value("RUN_STARTDATE")}")
 
         # The case copy is user-visible and persistent. Keep only a link in
         # the run directory so both locations always refer to the same file.
