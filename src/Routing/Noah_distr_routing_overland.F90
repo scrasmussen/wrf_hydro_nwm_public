@@ -65,6 +65,13 @@ subroutine OverlandRouting( &
     print *, "Routing method is ",rt_option, " direction."
 #endif
 
+    ! Refresh host copies when device residency is active (no-op otherwise):
+    ! the mass balance sums and the sfcrt_flag scan below read these on the
+    ! host, and disagg / the previous overland call last wrote them on the
+    ! device.
+    call hydro_acc_upd_host_2d(IXRT, JXRT, ovrt_data%control%infiltration_excess)
+    call hydro_acc_upd_host_2d(IXRT, JXRT, ovrt_data%properties%retention_depth)
+
     !DJG debug...OV Routing...
     ovrt_data%mass_balance%pre_infiltration_excess = 0.
     chan_in1=0.
@@ -128,6 +135,8 @@ subroutine OverlandRouting( &
             q_sfcflx_y)
     else
         ovrt_data%control%surface_water_head_routing = ovrt_data%control%infiltration_excess
+        ! Mirror the host assignment to the device copy when residency is active
+        call hydro_acc_upd_dev_2d(IXRT, JXRT, ovrt_data%control%surface_water_head_routing)
 #ifdef HYDRO_D
         print *, "No water to route overland..."
 #endif
@@ -138,6 +147,10 @@ subroutine OverlandRouting( &
 #ifdef HYDRO_D
     print *, "OV routing called and returned..."
 #endif
+
+    ! Refresh the host copy of the updated surface head for the mass balance
+    ! sums below and downstream host readers (no-op without residency)
+    call hydro_acc_upd_host_2d(IXRT, JXRT, ovrt_data%control%surface_water_head_routing)
 
     !DJG Debug...OV Routing...
     ovrt_data%mass_balance%post_infiltration_excess = 0.

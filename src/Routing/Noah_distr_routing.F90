@@ -1039,7 +1039,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                                SMCWLT1, VEGTYP, LKSAT, NEXP, dist(:,:,9), INFXSWGT, &
                                LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
                                SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT, &
-                               SLDPTH, soiltypRT, soiltyp, iswater)
+                               SLDPTH, soiltypRT, soiltyp, ELRT, iswater)
    else
 
    do J=1,JX ! Start coarse grid j loop
@@ -1198,14 +1198,21 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
       end do ! end coarse grid i loop
    end do ! end coarse fine grid j loop
 
-   endif ! acc_single_rank
-
    ! AD: Add new zeroing out of -9999 elevation cells which are ocean
+   ! (the ACC twin does this zeroing on the device)
    where (ELRT .lt. -9998)
       OCEAN_INFXSUBRT = INFXSUBRT
       INFXSUBRT = 0.0
    endwhere
 
+   endif ! acc_single_rank
+
+#ifdef HYDRO_D
+   ! Refresh host copies for the water balance diagnostics below when
+   ! device residency is active (no-op otherwise).
+   call hydro_acc_upd_host_2d(IXRT, JXRT, INFXSUBRT)
+   call hydro_acc_upd_host_3d(IXRT, JXRT, NSOIL, SMCRT)
+#endif
 #ifdef HYDRO_D
    ! ADCHANGE: START Final water balance variables
    ! ALL VARS in MM
@@ -1278,7 +1285,7 @@ subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                                   SMCWLT1, VEGTYP, LKSAT, NEXP, area_rt, INFXSWGT, &
                                   LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
                                   SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT, &
-                                  SLDPTH, soiltypRT, soiltyp, iswater)
+                                  SLDPTH, soiltypRT, soiltyp, ELRT, iswater)
    use module_hydro_stop, only: HYDRO_stop
 
    implicit none
@@ -1301,6 +1308,7 @@ subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real, intent(in),  dimension(IX,JX)           :: INFXSRT ! infiltration excess on coarse grid (mm)
    real, intent(in), dimension(IXRT,JXRT)        :: area_rt ! fine grid cell area, dist(:,:,9) (m2)
    real, intent(in), dimension(IXRT,JXRT)        :: LKSATFAC ! lateral ksat adj factor
+   real, intent(in), dimension(IXRT,JXRT)        :: ELRT ! elevation grid (m)
    integer, intent(in), dimension(IXRT,JXRT)     :: CH_NETRT ! channel network routing grid
    real, intent(in), dimension(IXRT,JXRT)        :: INFXSWGT ! infiltration excess weighting grid
    real, intent(in), dimension(IXRT,JXRT,NSOIL)  :: SH2OWGT ! soil moisture weighting grid
@@ -1329,7 +1337,7 @@ subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 
 !$acc data copyin(SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, SMCWLT1, &
 !$acc&            VEGTYP, LKSAT, NEXP, area_rt, INFXSWGT, LKSATFAC, CH_NETRT, &
-!$acc&            SH2OWGT, SLDPTH, soiltyp) &
+!$acc&            SH2OWGT, SLDPTH, soiltyp, ELRT) &
 !$acc&     copy(SICE, LAKE_MSKRT) &
 !$acc&     copyout(SMCMAXRT, SMCREFRT, SMCWLTRT, SMCRT, INFXSUBRT, LKSATRT, &
 !$acc&             NEXPRT, soiltypRT)
@@ -1456,6 +1464,18 @@ subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
          end do ! end disagg fine grid j loop
       end do ! end coarse grid i loop
    end do ! end coarse grid j loop
+
+   ! AD: Add new zeroing out of -9999 elevation cells which are ocean
+   ! (device version of the caller's where(ELRT) block; the unused
+   ! OCEAN_INFXSUBRT dump variable is not maintained here)
+!$acc parallel loop collapse(2) private(i,j)
+   do j=1,JXRT
+      do i=1,IXRT
+         if (ELRT(i,j) .lt. -9998) then
+            INFXSUBRT(i,j) = 0.0
+         end if
+      end do
+   end do
 
 !$acc end data
 
@@ -1596,6 +1616,165 @@ subroutine aggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    endif
 
 end subroutine aggregateDomain_acc
+
+!===================================================================================================
+! GPU residency helpers for the routing-grid state.
+!
+! hydro_acc_residency_init registers the fine-grid arrays used by the
+! disagg -> overland -> subsurface -> agg OpenACC phases on the device once
+! (unstructured enter data).  Because OpenACC copy/copyin/copyout clauses
+! have present-or-copy semantics, the existing per-phase data regions then
+! become no-transfer reference-count hits with no clause changes, and
+! configurations where residency is not enabled keep their current behavior.
+!
+! After residency is enabled the HOST copies of these arrays go stale, so
+! every remaining host read must be preceded by an update self and every
+! host write followed by an update device.  Those touchpoints are wired via
+! the small helpers below (dummy-argument form so no derived-type refs
+! appear in directives); "if_present" makes them no-ops when residency is
+! off, so callers never need to know whether it is active.
+!===================================================================================================
+
+subroutine hydro_acc_upd_host_2d(nx, ny, a)
+   implicit none
+   integer, intent(in) :: nx, ny
+   real, intent(inout) :: a(nx,ny)
+!$acc update self(a) if_present
+end subroutine hydro_acc_upd_host_2d
+
+subroutine hydro_acc_upd_host_3d(nx, ny, nz, a)
+   implicit none
+   integer, intent(in) :: nx, ny, nz
+   real, intent(inout) :: a(nx,ny,nz)
+!$acc update self(a) if_present
+end subroutine hydro_acc_upd_host_3d
+
+subroutine hydro_acc_upd_dev_2d(nx, ny, a)
+   implicit none
+   integer, intent(in) :: nx, ny
+   real, intent(in) :: a(nx,ny)
+!$acc update device(a) if_present
+end subroutine hydro_acc_upd_dev_2d
+
+subroutine hydro_acc_enter_arrays(ixrt, jxrt, nsoil, dist, rough, so8rt, so8rt_d, &
+      ch_netrt, lksatfac, elrt, soldeprt, sldpth, zsoil, &
+      retdep, infxsubrt, sfchead, zwattablrt, lksatrt, nexprt, &
+      smcrt, smcmaxrt, smcrefrt, smcwltrt, sh2owgt, infxswgt, &
+      qsubrt, qsubbdryrt, qsfx, qsfy)
+   implicit none
+   integer, intent(in) :: ixrt, jxrt, nsoil
+   real, intent(in)    :: dist(ixrt,jxrt,9), rough(ixrt,jxrt), so8rt(ixrt,jxrt,8)
+   integer, intent(in) :: so8rt_d(ixrt,jxrt,3), ch_netrt(ixrt,jxrt)
+   real, intent(in)    :: lksatfac(ixrt,jxrt), elrt(ixrt,jxrt), soldeprt(ixrt,jxrt)
+   real, intent(in)    :: sldpth(nsoil), zsoil(nsoil)
+   real, intent(in)    :: retdep(ixrt,jxrt), infxsubrt(ixrt,jxrt), sfchead(ixrt,jxrt)
+   real, intent(in)    :: zwattablrt(ixrt,jxrt), lksatrt(ixrt,jxrt), nexprt(ixrt,jxrt)
+   real, intent(in)    :: smcrt(ixrt,jxrt,nsoil), smcmaxrt(ixrt,jxrt,nsoil)
+   real, intent(in)    :: smcrefrt(ixrt,jxrt,nsoil), smcwltrt(ixrt,jxrt,nsoil)
+   real, intent(in)    :: sh2owgt(ixrt,jxrt,nsoil), infxswgt(ixrt,jxrt)
+   real, intent(in)    :: qsubrt(ixrt,jxrt), qsubbdryrt(ixrt,jxrt)
+   real, intent(in)    :: qsfx(ixrt,jxrt), qsfy(ixrt,jxrt)
+!$acc enter data copyin(dist, rough, so8rt, so8rt_d, ch_netrt, lksatfac, elrt, &
+!$acc&    soldeprt, sldpth, zsoil, retdep, infxsubrt, sfchead, zwattablrt, &
+!$acc&    lksatrt, nexprt, smcrt, smcmaxrt, smcrefrt, smcwltrt, sh2owgt, &
+!$acc&    infxswgt, qsubrt, qsubbdryrt, qsfx, qsfy)
+end subroutine hydro_acc_enter_arrays
+
+subroutine hydro_acc_update_host_arrays(ixrt, jxrt, nsoil, &
+      retdep, infxsubrt, sfchead, zwattablrt, lksatrt, nexprt, &
+      smcrt, smcmaxrt, smcrefrt, smcwltrt, sh2owgt, infxswgt, &
+      qsubrt, qsubbdryrt, qsfx, qsfy)
+   implicit none
+   integer, intent(in)    :: ixrt, jxrt, nsoil
+   real, intent(inout)    :: retdep(ixrt,jxrt), infxsubrt(ixrt,jxrt), sfchead(ixrt,jxrt)
+   real, intent(inout)    :: zwattablrt(ixrt,jxrt), lksatrt(ixrt,jxrt), nexprt(ixrt,jxrt)
+   real, intent(inout)    :: smcrt(ixrt,jxrt,nsoil), smcmaxrt(ixrt,jxrt,nsoil)
+   real, intent(inout)    :: smcrefrt(ixrt,jxrt,nsoil), smcwltrt(ixrt,jxrt,nsoil)
+   real, intent(inout)    :: sh2owgt(ixrt,jxrt,nsoil), infxswgt(ixrt,jxrt)
+   real, intent(inout)    :: qsubrt(ixrt,jxrt), qsubbdryrt(ixrt,jxrt)
+   real, intent(inout)    :: qsfx(ixrt,jxrt), qsfy(ixrt,jxrt)
+!$acc update self(retdep, infxsubrt, sfchead, zwattablrt, lksatrt, nexprt, &
+!$acc&    smcrt, smcmaxrt, smcrefrt, smcwltrt, sh2owgt, infxswgt, &
+!$acc&    qsubrt, qsubbdryrt, qsfx, qsfy) if_present
+end subroutine hydro_acc_update_host_arrays
+
+! Enable device residency for domain did (once, single rank, gridded
+! subsurface+overland routing without UDMP or gw2d, mirroring the configs
+! the OpenACC routing twins support).
+subroutine hydro_acc_residency_init(did)
+   use module_RT_data, only: rt_domain
+   use config_base, only: nlst
+#ifdef MPP_LAND
+   use module_mpp_land, only: numprocs
+#endif
+   implicit none
+   integer, intent(in) :: did
+   logical, save :: entered(10) = .false.
+
+   if (entered(did)) return
+#ifdef MPP_LAND
+   if (numprocs .ne. 1) return
+#endif
+   if (nlst(did)%channel_only .ne. 0 .or. nlst(did)%channelBucket_only .ne. 0) return
+   if (nlst(did)%SUBRTSWCRT .eq. 0 .or. nlst(did)%OVRTSWCRT .eq. 0) return
+   if (nlst(did)%UDMP_OPT .ne. 0) return
+   if (nlst(did)%GWBASESWCRT .ge. 3) return
+   entered(did) = .true.
+
+   call hydro_acc_enter_arrays(rt_domain(did)%ixrt, rt_domain(did)%jxrt, nlst(did)%nsoil, &
+        rt_domain(did)%overland%properties%distance_to_neighbor, &
+        rt_domain(did)%overland%properties%roughness, &
+        rt_domain(did)%overland%properties%surface_slope, &
+        rt_domain(did)%overland%properties%max_surface_slope_index, &
+        rt_domain(did)%overland%streams_and_lakes%ch_netrt, &
+        rt_domain(did)%LKSATFAC, rt_domain(did)%ELRT, &
+        rt_domain(did)%subsurface%properties%soldeprt, &
+        rt_domain(did)%subsurface%properties%sldpth, &
+        rt_domain(did)%subsurface%properties%zsoil, &
+        rt_domain(did)%overland%properties%retention_depth, &
+        rt_domain(did)%overland%control%infiltration_excess, &
+        rt_domain(did)%overland%control%surface_water_head_routing, &
+        rt_domain(did)%subsurface%properties%zwattablrt, &
+        rt_domain(did)%subsurface%properties%lksatrt, &
+        rt_domain(did)%subsurface%properties%nexprt, &
+        rt_domain(did)%subsurface%grid_transform%smcrt, &
+        rt_domain(did)%subsurface%grid_transform%smcmaxrt, &
+        rt_domain(did)%subsurface%grid_transform%smcrefrt, &
+        rt_domain(did)%subsurface%grid_transform%smcwltrt, &
+        rt_domain(did)%SH2OWGT, rt_domain(did)%INFXSWGT, &
+        rt_domain(did)%subsurface%state%qsubrt, &
+        rt_domain(did)%subsurface%state%qsubbdryrt, &
+        rt_domain(did)%q_sfcflx_x, rt_domain(did)%q_sfcflx_y)
+end subroutine hydro_acc_residency_init
+
+! Refresh the host copies of all resident dynamic routing-grid state.
+! Call before host code that reads them broadly (restart writes, gridded
+! routing output).  No-op when residency is not active.
+subroutine hydro_acc_update_host_state(did)
+   use module_RT_data, only: rt_domain
+   use config_base, only: nlst
+   implicit none
+   integer, intent(in) :: did
+
+   if (nlst(did)%channel_only .ne. 0 .or. nlst(did)%channelBucket_only .ne. 0) return
+   if (nlst(did)%SUBRTSWCRT .eq. 0 .or. nlst(did)%OVRTSWCRT .eq. 0) return
+
+   call hydro_acc_update_host_arrays(rt_domain(did)%ixrt, rt_domain(did)%jxrt, nlst(did)%nsoil, &
+        rt_domain(did)%overland%properties%retention_depth, &
+        rt_domain(did)%overland%control%infiltration_excess, &
+        rt_domain(did)%overland%control%surface_water_head_routing, &
+        rt_domain(did)%subsurface%properties%zwattablrt, &
+        rt_domain(did)%subsurface%properties%lksatrt, &
+        rt_domain(did)%subsurface%properties%nexprt, &
+        rt_domain(did)%subsurface%grid_transform%smcrt, &
+        rt_domain(did)%subsurface%grid_transform%smcmaxrt, &
+        rt_domain(did)%subsurface%grid_transform%smcrefrt, &
+        rt_domain(did)%subsurface%grid_transform%smcwltrt, &
+        rt_domain(did)%SH2OWGT, rt_domain(did)%INFXSWGT, &
+        rt_domain(did)%subsurface%state%qsubrt, &
+        rt_domain(did)%subsurface%state%qsubbdryrt, &
+        rt_domain(did)%q_sfcflx_x, rt_domain(did)%q_sfcflx_y)
+end subroutine hydro_acc_update_host_state
 !===================================================================================================
 
 

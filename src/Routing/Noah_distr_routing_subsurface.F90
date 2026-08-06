@@ -1,6 +1,6 @@
 subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_output)
 #ifdef MPP_LAND
-    use module_mpp_land, only:  mpp_land_com_real, mpp_land_com_integer
+    use module_mpp_land, only:  mpp_land_com_real, mpp_land_com_integer, numprocs
     use module_subsurface_data
     use module_subsurface_static_data
     use module_subsurface_input
@@ -11,6 +11,7 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     type (subsurface_static_interface), intent(inout) :: subrt_static
     type (subsurface_input_interface), intent(inout) :: subrt_input
     type (subsurface_output_interface), intent(inout) :: subrt_output
+    logical :: acc_single_rank ! use the single-rank OpenACC path
     !integer, INTENT(IN) :: ixrt, jxrt , nsoil, rt_option
     !REAL, INTENT(IN)                          :: DT
     !real,INTENT(IN), DIMENSION(NSOIL)      :: SLDPTH
@@ -29,6 +30,22 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     REAL, DIMENSION(subrt_static%ixrt,subrt_static%jxrt)   :: CWATAVAIL
     INTEGER, DIMENSION(subrt_static%ixrt,subrt_static%jxrt) :: SATLYRCHK
 
+#ifdef MPP_LAND
+    acc_single_rank = (numprocs .eq. 1)
+#else
+    acc_single_rank = .true.
+#endif
+
+    if (acc_single_rank) then
+    ! Single-rank OpenACC path: find the water table on the device so the
+    ! (possibly resident) soil moisture fields never round-trip to the host.
+    CALL FINDZWAT_ACC(subrt_static%ixrt,subrt_static%jxrt,subrt_static%NSOIL, &
+        subrt_data%grid_transform%smcrt, &
+        subrt_data%grid_transform%smcmaxrt, &
+        subrt_data%grid_transform%smcrefrt, &
+        subrt_data%grid_transform%smcwltrt, subrt_data%properties%zsoil,SATLYRCHK,subrt_data%properties%zwattablrt, &
+        CWATAVAIL,subrt_data%properties%sldpth)
+    else
     CWATAVAIL = 0.
     CALL FINDZWAT(subrt_static%ixrt,subrt_static%jxrt,subrt_static%NSOIL, &
         subrt_data%grid_transform%smcrt, &
@@ -36,6 +53,7 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
         subrt_data%grid_transform%smcrefrt, &
         subrt_data%grid_transform%smcwltrt, subrt_data%properties%zsoil,SATLYRCHK,subrt_data%properties%zwattablrt, &
         CWATAVAIL,subrt_data%properties%sldpth)
+    endif ! acc_single_rank
 #ifdef MPP_LAND
     call MPP_LAND_COM_REAL(subrt_data%properties%zwattablrt,subrt_static%ixrt,subrt_static%jxrt,99)
     call MPP_LAND_COM_REAL(CWATAVAIL,subrt_static%ixrt,subrt_static%jxrt,99)
@@ -898,6 +916,82 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
 
     !DJG ----------------------------------------------------------------
 END SUBROUTINE FINDZWAT
+!DJG ----------------------------------------------------------------
+
+!DJG ------------------------------------------------------------------------
+!DJG  SUBROUTINE FINDZWAT_ACC
+!DJG  OpenACC twin of FINDZWAT: one device thread per routing grid cell.
+!DJG  When the soil moisture fields are device-resident the copyin clauses
+!DJG  become no-transfer present hits; ZWATTABLRT stays on the device for
+!DJG  the routing kernels (SUBSFC_RTNG_ACC refreshes the host copy where it
+!DJG  needs it), while CWATAVAIL/SATLYRCHK are caller temporaries and are
+!DJG  copied out for the downstream data regions.
+!DJG ------------------------------------------------------------------------
+SUBROUTINE FINDZWAT_ACC(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
+        SMCWLTRT,ZSOIL,SATLYRCHK,ZWATTABLRT,CWATAVAIL,&
+        SLDPTH)
+
+    IMPLICIT NONE
+
+    !DJG -------- DECLARATIONS ------------------------
+
+    INTEGER, INTENT(IN) :: IXRT,JXRT,NSOIL
+    REAL, INTENT(IN), DIMENSION(IXRT,JXRT,NSOIL) :: SMCMAXRT
+    REAL, INTENT(IN), DIMENSION(IXRT,JXRT,NSOIL) :: SMCREFRT
+    REAL, INTENT(IN), DIMENSION(IXRT,JXRT,NSOIL) :: SMCRT
+    REAL, INTENT(IN), DIMENSION(IXRT,JXRT,NSOIL) :: SMCWLTRT
+    REAL, INTENT(IN), DIMENSION(NSOIL)        :: ZSOIL
+    REAL, INTENT(IN), DIMENSION(NSOIL)        :: SLDPTH
+    REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: ZWATTABLRT
+    REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: CWATAVAIL
+    INTEGER, INTENT(OUT), DIMENSION(IXRT,JXRT) :: SATLYRCHK
+
+    !DJG Local Variables
+    INTEGER :: KK,i,j
+
+!$acc data copyin(SMCRT, SMCMAXRT, SMCREFRT, SMCWLTRT, ZSOIL, SLDPTH) &
+!$acc&     copyout(ZWATTABLRT, CWATAVAIL, SATLYRCHK)
+
+!$acc parallel loop collapse(2) private(i,j,KK)
+    DO J=1,JXRT
+        DO I=1,IXRT
+
+            SATLYRCHK(I,J) = 0  !set flag for sat. layers
+            CWATAVAIL(I,J) = 0.  !set wat avail for subsfc rtng = 0.
+
+            ! Loop through soil layers from bottom to top
+            DO KK=NSOIL,1,-1
+                IF ( (SMCRT(I,J,KK).GE.SMCREFRT(I,J,KK)).AND.(SMCREFRT(I,J,KK) &
+                        .GT.SMCWLTRT(I,J,KK)) ) THEN
+                    ! Ensure saturation from bottom up only...8/8/05
+                    IF((SATLYRCHK(I,J).EQ.KK+1) .OR. (KK.EQ.NSOIL) ) SATLYRCHK(I,J) = KK
+                END IF
+            END DO
+
+            ! Designate ZWATTABLRT based on highest sat. layer and
+            ! define water avail for subsfc routing (CWATAVAIL)
+            IF (SATLYRCHK(I,J).ne.0) then
+                IF (SATLYRCHK(I,J).ne.1) then  ! soil column is partially sat.
+                    ZWATTABLRT(I,J) = -ZSOIL(SATLYRCHK(I,J)-1)
+                ELSE  ! soil column is fully saturated to sfc.
+                    ZWATTABLRT(I,J) = 0.
+                END IF
+                DO KK=SATLYRCHK(I,J),NSOIL
+                    CWATAVAIL(I,J) = CWATAVAIL(I,J)+(SMCRT(I,J,KK)- &
+                        SMCREFRT(I,J,KK))*SLDPTH(KK)
+                END DO
+            ELSE  ! no saturated layers...
+                ZWATTABLRT(I,J) = -ZSOIL(NSOIL)
+                SATLYRCHK(I,J) = NSOIL + 1
+            END IF
+
+        END DO
+    END DO
+
+!$acc end data
+
+    !DJG ----------------------------------------------------------------
+END SUBROUTINE FINDZWAT_ACC
 !DJG ----------------------------------------------------------------
 
 !===================================================================================================
