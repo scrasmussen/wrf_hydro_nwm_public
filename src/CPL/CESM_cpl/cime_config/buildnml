@@ -146,7 +146,7 @@ def buildnml(case, caseroot, compname):
         table_run = os.path.join(run_dir, table_name)
         if not os.path.isfile(table_src):
             raise RuntimeError(f"WRF-Hydro parameter table not found: {table_src}")
-        
+
         if not os.path.exists(table_run):
             print(f"   - copying {table_src} to {table_run}")
             shutil.copy2(table_src, table_run)
@@ -160,7 +160,7 @@ def buildnml(case, caseroot, compname):
         nml_src = os.path.join(src_root, "cime_config", nml_template)
         case_nml = os.path.join(caseroot, nml_file)
         run_nml = os.path.join(run_dir, nml_file)
-        
+
         if not os.path.exists(case_nml):
             print(f"   - copying namelist {nml_template} to {case_nml}")
             shutil.copy(nml_src, case_nml)
@@ -181,7 +181,7 @@ def buildnml(case, caseroot, compname):
                 # Write the modified content back out
                 with open(case_nml, 'w') as f:
                     f.write(content)
-                    
+
                 print(f"   - updated START_YEAR/MONTH/DAY in {case_nml} to {case.get_value("RUN_STARTDATE")}")
 
         # The case copy is user-visible and persistent. Keep only a link in
