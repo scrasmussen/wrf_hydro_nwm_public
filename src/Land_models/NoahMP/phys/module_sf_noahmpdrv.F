@@ -505,6 +505,44 @@ CONTAINS
     INTEGER, ALLOCATABLE                :: noahmp_batch_i(:)
     INTEGER, ALLOCATABLE                :: noahmp_batch_j(:)
     type(noahmp_type), ALLOCATABLE      :: noahmp_batch(:)
+    ! noahmp_type is ~8.5KB/column (fixed 20-soil/10-snow-layer ACC arrays),
+    ! so copying the whole CONUS-size batch to the device in one shot (~125GB
+    ! for a single unpartitioned domain) exceeds a 40GB A100. Process it in
+    ! fixed-size chunks instead; 500000 columns is ~4GB/chunk, well under
+    ! budget alongside the routing arrays hydro_acc_residency_init keeps
+    ! device-resident. Retune if profiling shows headroom either way.
+    !
+    ! TEMPORARILY REDUCED to 10000 to bisect a CUDA_ERROR_ILLEGAL_ADDRESS
+    ! fault: at 500000 the failure was localized to chunk 1000001:1500000
+    ! (I=[486,4268] J=[706,923]); 10000 narrows that 50x and tightens the
+    ! printed I/J ranges enough to identify the offending region. Restore to
+    ! 500000 once the faulting column(s) are identified — the small size
+    ! costs extra kernel launches for no memory benefit.
+    INTEGER, PARAMETER                  :: NOAHMP_ACC_BATCH_CHUNK = 10000
+    !
+    ! !!! DEBUG ONLY -- SET BACK TO 1 FOR ANY REAL RUN !!!
+    ! Skip-to-chunk guard for compute-sanitizer runs. memcheck instruments
+    ! every device memory access (10-100x slowdown), so grinding through all
+    ! ~1.13M columns that are already known-good before reaching the fault at
+    ! 1130001:1140000 is impractical. When this is > 1, chunks lying entirely
+    ! below it skip their GPU launch entirely, cutting sanitizer work ~99%.
+    !
+    ! Columns below this threshold never have NoahmpMain called, so their
+    ! physics results are INVALID and the downstream scatter loop propagates
+    ! that garbage into the (I,J) output arrays. Harmless here only because
+    ! the run faults before producing output.
+    INTEGER, PARAMETER                  :: NOAHMP_ACC_DEBUG_FIRST_COL = 1
+    INTEGER                             :: noahmp_batch_chunk_start
+    INTEGER                             :: noahmp_batch_chunk_end
+    INTEGER                             :: noahmp_chunk_imin, noahmp_chunk_imax
+    INTEGER                             :: noahmp_chunk_jmin, noahmp_chunk_jmax
+    ! Dedicated diagnostic log, independent of unit 6/stdout: this run is
+    ! launched under Linaro MAP, which wraps/captures the process's stdout,
+    ! and on an abrupt SIGABRT-style kill (e.g. a CUDA illegal-address fault)
+    ! MAP's own capture buffer may lose output the app already flush(6)'d.
+    ! Writing to a private file/unit sidesteps MAP's capture path entirely.
+    INTEGER, PARAMETER                  :: NOAHMP_ACC_LOG_UNIT = 92
+    LOGICAL, SAVE                       :: noahmp_acc_log_opened = .false.
 #endif
 
 
@@ -1993,13 +2031,49 @@ CONTAINS
 
 #ifdef NOAHMP_ACC_COLUMNS
    if (noahmp_batch_n > 0) then
-!$acc data copy(noahmp_batch(1:noahmp_batch_n))
-!$acc parallel loop gang present(noahmp_batch)
-      DO noahmp_batch_idx = 1, noahmp_batch_n
-         call NoahmpMain(noahmp_batch(noahmp_batch_idx))
+      DO noahmp_batch_chunk_start = 1, noahmp_batch_n, NOAHMP_ACC_BATCH_CHUNK
+         noahmp_batch_chunk_end = MIN(noahmp_batch_chunk_start + NOAHMP_ACC_BATCH_CHUNK - 1, noahmp_batch_n)
+
+         ! DEBUG ONLY: skip chunks entirely below the range under investigation
+         ! (see NOAHMP_ACC_DEBUG_FIRST_COL). No-op when that is 1.
+         if (noahmp_batch_chunk_end < NOAHMP_ACC_DEBUG_FIRST_COL) CYCLE
+
+#ifdef HYDRO_D
+         if (.not. noahmp_acc_log_opened) then
+            open(unit=NOAHMP_ACC_LOG_UNIT, file='noahmp_acc_chunks.log', status='replace', &
+                 form='formatted', action='write')
+            noahmp_acc_log_opened = .true.
+         endif
+
+         noahmp_chunk_imin = MINVAL(noahmp_batch_i(noahmp_batch_chunk_start:noahmp_batch_chunk_end))
+         noahmp_chunk_imax = MAXVAL(noahmp_batch_i(noahmp_batch_chunk_start:noahmp_batch_chunk_end))
+         noahmp_chunk_jmin = MINVAL(noahmp_batch_j(noahmp_batch_chunk_start:noahmp_batch_chunk_end))
+         noahmp_chunk_jmax = MAXVAL(noahmp_batch_j(noahmp_batch_chunk_start:noahmp_batch_chunk_end))
+         write(6,'(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A)') &
+              "[TIMING] noahmp_acc: launching chunk ", noahmp_batch_chunk_start, ":", noahmp_batch_chunk_end, &
+              " I=[", noahmp_chunk_imin, ",", noahmp_chunk_imax, "] J=[", noahmp_chunk_jmin, ",", noahmp_chunk_jmax, "]"
+         call flush(6)
+         write(NOAHMP_ACC_LOG_UNIT,'(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A)') &
+              "[TIMING] noahmp_acc: launching chunk ", noahmp_batch_chunk_start, ":", noahmp_batch_chunk_end, &
+              " I=[", noahmp_chunk_imin, ",", noahmp_chunk_imax, "] J=[", noahmp_chunk_jmin, ",", noahmp_chunk_jmax, "]"
+         call flush(NOAHMP_ACC_LOG_UNIT)
+#endif
+
+         ! The device region lives in noahmp_acc_run_chunk so the mapped array
+         ! is 1-based; mapping this non-1-based slice in place applied the
+         ! slice offset twice and produced wild addresses (see that routine).
+         call noahmp_acc_run_chunk(noahmp_batch_chunk_end - noahmp_batch_chunk_start + 1, &
+                                   noahmp_batch(noahmp_batch_chunk_start:noahmp_batch_chunk_end))
+
+#ifdef HYDRO_D
+         write(6,'(A,I0,A,I0,A)') "[TIMING] noahmp_acc: chunk ", noahmp_batch_chunk_start, ":", &
+              noahmp_batch_chunk_end, " completed"
+         call flush(6)
+         write(NOAHMP_ACC_LOG_UNIT,'(A,I0,A,I0,A)') "[TIMING] noahmp_acc: chunk ", noahmp_batch_chunk_start, ":", &
+              noahmp_batch_chunk_end, " completed"
+         call flush(NOAHMP_ACC_LOG_UNIT)
+#endif
       ENDDO
-!$acc end parallel loop
-!$acc end data
 
       DO noahmp_batch_idx = 1, noahmp_batch_n
          I = noahmp_batch_i(noahmp_batch_idx)
@@ -3323,6 +3397,47 @@ CALL LATERALFLOW(ISLTYP,WTD,QLAT,FDEPTH,TOPO,LANDMASK,DELTAT,AREA       &
    ENDDO
 
 END  SUBROUTINE EQSMOISTURE
+!
+!------------------------------------------------------------------------------------------
+!------------------------------------------------------------------------------------------
+!
+#ifdef NOAHMP_ACC_COLUMNS
+!------------------------------------------------------------------------------------------
+! Run one chunk of batched NoahMP columns on the device.
+!
+! Exists solely to make the device-mapped array 1-based. Mapping a non-1-based
+! slice directly at the call site --
+!     !$acc data copy(noahmp_batch(chunk_start:chunk_end))
+!     !$acc parallel loop gang present(noahmp_batch(chunk_start:chunk_end))
+!     do idx = chunk_start, chunk_end ; call NoahmpMain(noahmp_batch(idx)) ...
+! -- produced wild element addresses: compute-sanitizer showed reads roughly
+! 2*(chunk_start-1)*sizeof(noahmp_type) BELOW the device buffer, i.e. the slice
+! offset applied twice. Chunk 1 (offset 0) was correct, and later chunks
+! degraded with increasing chunk_start until the address left mapped memory
+! entirely and faulted.
+!
+! Passing the slice to an explicit-shape dummy re-bases it to 1 (the actual
+! argument is contiguous, so no copy is made), so the data/present clauses and
+! the loop all use 1:n and the offset is applied exactly once.
+!------------------------------------------------------------------------------------------
+SUBROUTINE noahmp_acc_run_chunk(n, batch)
+    USE NoahmpVarType
+    USE NoahmpMainMod, ONLY: NoahmpMain
+    implicit none
+    integer,           intent(in)    :: n
+    type(noahmp_type), intent(inout) :: batch(n)
+    integer :: k
+
+!$acc data copy(batch(1:n))
+!$acc parallel loop gang present(batch(1:n))
+    do k = 1, n
+       call NoahmpMain(batch(k))
+    end do
+!$acc end parallel loop
+!$acc end data
+
+END SUBROUTINE noahmp_acc_run_chunk
+#endif
 !
 !------------------------------------------------------------------------------------------
 !------------------------------------------------------------------------------------------

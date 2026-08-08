@@ -8323,9 +8323,17 @@ integer :: did
 
 !! local variables
 integer(kind=int64), dimension(NLAKES)         :: LAKELINKID !temporarily store the outlet index for each modeled lake
+integer(kind=8) :: timing_t0, timing_t1, timing_rate
+real(kind=8) :: timing_dt
 
 did = 1
 LAKELINKID = 0
+
+#ifdef HYDRO_D
+call system_clock(timing_t0, timing_rate)
+write(6,'(A)') "[TIMING] read_routelink: calling readLinkSL"
+call flush(6)
+#endif
 
 call readLinkSL( GNLINKSL,NLINKSL,route_link_f, route_lake_f,maxorder, &
      LINKID, TO_NODE, TYPEL, ORDER , &
@@ -8335,6 +8343,15 @@ call readLinkSL( GNLINKSL,NLINKSL,route_link_f, route_lake_f,maxorder, &
      ORIFICEA, ORIFICEE, reservoir_type_specified, reservoir_type, reservoir_parameter_file, &
      gages, gageMiss, LAKEIDM, NLAKES, latlake, lonlake,ELEVLAKE)
 
+#ifdef HYDRO_D
+call system_clock(timing_t1)
+timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+write(6,'(A,F10.3,A)') "[TIMING] read_routelink: readLinkSL total (incl. I/O) took ", timing_dt, " s"
+write(6,'(A)') "[TIMING] read_routelink: calling nhdLakeMap_mpp"
+call flush(6)
+timing_t0 = timing_t1
+#endif
+
 !--- get the lake configuration here.
 #ifdef MPP_LAND
 call nhdLakeMap_mpp(NLAKES,  NLINKSL, TYPEL,   LAKELINKID, LAKEIDX, &
@@ -8342,6 +8359,13 @@ call nhdLakeMap_mpp(NLAKES,  NLINKSL, TYPEL,   LAKELINKID, LAKEIDX, &
 !call nhdLakeMap(NLAKES, NLINKSL, TYPEL, LAKELINKID, LAKEIDX, TO_NODE,LINKID, LAKEIDM, LAKEIDA
 #else
 call nhdLakeMap(NLAKES, NLINKSL, TYPEL, LAKELINKID, LAKEIDX, TO_NODE,LINKID, LAKEIDM, LAKEIDA)
+#endif
+
+#ifdef HYDRO_D
+call system_clock(timing_t1)
+timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+write(6,'(A,F10.3,A)') "[TIMING] read_routelink: nhdLakeMap_mpp/nhdLakeMap took ", timing_dt, " s"
+call flush(6)
 #endif
 
 #ifdef MPP_LAND
@@ -8411,12 +8435,20 @@ end subroutine read_routelink
         character(len=256) :: route_link_f_r,route_lake_f_r
         integer :: lenRouteLinkFR,lenRouteLakeFR ! so the preceeding chan be changed without changing code
         logical :: routeLinkNetcdf, routeLakeNetcdf
+        integer(kind=8) :: timing_t0, timing_t1, timing_rate
+        real(kind=8) :: timing_dt
 
 #ifdef MPP_LAND
         real :: tmpQLINK(GNLINKSL,2)
         real, allocatable, dimension(:) ::  tmpCHLON, tmpCHLAT, tmpZELEV, tmpMUSK, tmpMUSX, tmpCHANLEN
         real, allocatable, dimension(:) ::  tmpMannN, tmpSo, tmpChSSlp, tmpBw, tmpTw, tmpTw_CC, tmpn_CC
         real, allocatable, dimension(:) ::  tmpChannK
+#endif
+
+#ifdef HYDRO_D
+        call system_clock(timing_t0, timing_rate)
+        write(6,'(A)') "[TIMING] readLinkSL: start"
+        call flush(6)
 #endif
 
         !! is RouteLink file netcdf (*.nc) or csv (*.csv)
@@ -8623,7 +8655,9 @@ end subroutine read_routelink
         end do
 
 #ifdef HYDRO_D
-       write(6,*) "finish read readLinkSL "
+       call system_clock(timing_t1)
+       timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+       write(6,'(A,F10.3,A)') "[TIMING] readLinkSL: finish read readLinkSL, took ", timing_dt, " s"
        call flush(6)
 
 #endif
@@ -10423,6 +10457,14 @@ end subroutine output_chrt2
         integer(kind=int64), allocatable, dimension(:) ::  tmpLAKELINKID, gOUTLAKEID, tmpTO_NODE, gto
 
       integer(kind=int64) tmpBuf(GNLINKSL)
+      integer(kind=8) :: timing_t0, timing_t1, timing_rate
+      real(kind=8) :: timing_dt
+
+#ifdef HYDRO_D
+      call system_clock(timing_t0, timing_rate)
+      write(6,'(A)') "[TIMING] nhdLakeMap_mpp: start"
+      call flush(6)
+#endif
 
       tmpSize = size(TO_NODE,1)
       allocate(OUTLAKEID(tmpSize))
@@ -10441,7 +10483,23 @@ end subroutine output_chrt2
      call nhdLakeMap_scan(NLAKES, NLINKSL, LAKELINKID, TO_NODE,LINKID, LAKEIDM, LAKEIDA,GNLINKSL)
 #endif
 
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: nhdLakeMap_scan took ", timing_dt, " s"
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
+
       call gBcastValue(TO_NODE,gto)
+
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: gBcastValue(TO_NODE) took ", timing_dt, " s"
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
 
       maxNum = 0
       kk = 0
@@ -10534,6 +10592,14 @@ end subroutine output_chrt2
 
       end block
 
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: hash-table build/lookup (gnlinksl loop) took ", timing_dt, " s"
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
+
       size2 = kk
       deallocate (gto)
 
@@ -10551,6 +10617,14 @@ end subroutine output_chrt2
             tmpLAKEIDA(i) = gLAKEIDA(k)
       enddo
       if(allocated(gLAKEIDA)) deallocate(gLAKEIDA)
+
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: gBcastValue(LINKID/LAKEIDA) + remap took ", timing_dt, " s"
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
 
 !yw LAKELINKID = 0
       tmpLAKELINKID = LAKELINKID
@@ -10584,6 +10658,15 @@ end subroutine output_chrt2
             END DO
           END DO
        END DO
+
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A,I0,A,I0)') "[TIMING] nhdLakeMap_mpp: NLAKES x NLINKSL lake-link search took ", &
+           timing_dt, " s, NLAKES=", NLAKES, " NLINKSL=", NLINKSL
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
 
 !yw       call sum_int1d(LAKELINKID, NLAKES)
        call updateLake_seqInt8(LAKELINKID,nlakes,tmpLAKELINKID)
@@ -10637,18 +10720,74 @@ end subroutine output_chrt2
       allocate(gOUTLAKEID(gNLINKSL))
       call gBcastValue(TYPEL,gTYPEL)
       call gBcastValue(OUTLAKEID,gOUTLAKEID)
-       DO i = 1, NLINKSL
-        DO j = 1, gNLINKSL
-            if(TYPEL(i) .eq. 3 .and. gTYPEL(j) .eq. 1 .and. (gOUTLAKEID(j) .eq. OUTLAKEID(i))) then
-              TO_NODE(i) = gLINKID(j)  !   OUTLAKEID(i)
-            endif
-        ENDDO
-       ENDDO
+
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: gBcastValue(TYPEL/OUTLAKEID) took ", timing_dt, " s"
+      write(6,'(A,I0,A,I0)') "[TIMING] nhdLakeMap_mpp: starting outlet-hash TO_NODE search, NLINKSL=", &
+           NLINKSL, " gNLINKSL=", gNLINKSL
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
+
+      ! Was previously a DO i=1,NLINKSL / DO j=1,gNLINKSL double loop (O(NLINKSL*gNLINKSL),
+      ! ~7.7e12 iterations for the full CONUS domain, taking well over an hour). Every
+      ! TYPEL==1 outlet link has a unique gOUTLAKEID, so bucket those into a hash table
+      ! once (O(gNLINKSL)) and look each TYPEL==3 inflow link up in it (O(NLINKSL)) instead.
+      block
+        type(hash_t) :: outlet_hash
+        integer(kind=int64), allocatable :: outletKeys(:), outletVals(:)
+        integer(kind=int64) :: outVal
+        integer :: nOutlets
+        logical :: outletFound
+
+        nOutlets = count(gTYPEL(1:gNLINKSL) .eq. 1)
+        allocate(outletKeys(max(nOutlets,1)))
+        allocate(outletVals(max(nOutlets,1)))
+        nOutlets = 0
+        do j = 1, gNLINKSL
+           if (gTYPEL(j) .eq. 1) then
+              nOutlets = nOutlets + 1
+              outletKeys(nOutlets) = gOUTLAKEID(j)
+              outletVals(nOutlets) = gLINKID(j)
+           endif
+        end do
+
+        if (nOutlets .gt. 0) then
+           call outlet_hash%set_all(outletKeys(1:nOutlets), outletVals(1:nOutlets))
+           do i = 1, NLINKSL
+              if (TYPEL(i) .eq. 3) then
+                 call outlet_hash%get(OUTLAKEID(i), outVal, outletFound)
+                 if (outletFound) TO_NODE(i) = outVal
+              endif
+           end do
+           call outlet_hash%clear()
+        endif
+
+        deallocate(outletKeys, outletVals)
+      end block
+
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: outlet-hash TO_NODE search took ", timing_dt, " s"
+      call flush(6)
+      timing_t0 = timing_t1
+#endif
+
       deallocate(gLINKID)
       deallocate(gTYPEL)
       deallocate(gOUTLAKEID)
 
       deallocate(tmpTYPEL,tmpLINKID, tmpTO_NODE, tmpLAKEIDA, tmpOUTLAKEID,OUTLAKEID)
+
+#ifdef HYDRO_D
+      call system_clock(timing_t1)
+      timing_dt = real(timing_t1 - timing_t0, kind=8) / real(timing_rate, kind=8)
+      write(6,'(A,F10.3,A)') "[TIMING] nhdLakeMap_mpp: end (cleanup took ", timing_dt, " s)"
+      call flush(6)
+#endif
 
 
 !     do k = 1, NLINKSL

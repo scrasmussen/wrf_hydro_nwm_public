@@ -48,6 +48,22 @@ subroutine channel_acc_enter(NLINKSL, TYPEL, LINKID, So, CHANLEN, MannN, ChSSlp,
 #else
 !$acc enter data copyin(TO_NODE(1:NLINKSL))
 #endif
+
+#ifdef HYDRO_D
+  write(6,'(A,I0)') "[TIMING] channel_acc_enter: enter data completed, NLINKSL=", NLINKSL
+  call flush(6)
+  block
+    integer, parameter :: CHANNEL_ACC_LOG_UNIT = 96
+    logical, save :: channel_acc_log_opened = .false.
+    if (.not. channel_acc_log_opened) then
+       open(unit=CHANNEL_ACC_LOG_UNIT, file='channel_acc_checkpoints.log', status='replace', &
+            form='formatted', action='write')
+       channel_acc_log_opened = .true.
+    endif
+    write(CHANNEL_ACC_LOG_UNIT,'(A,I0)') "[TIMING] channel_acc_enter: enter data completed, NLINKSL=", NLINKSL
+    call flush(CHANNEL_ACC_LOG_UNIT)
+  end block
+#endif
 end subroutine channel_acc_enter
 
 subroutine channel_acc_exit(NLINKSL, TYPEL, LINKID, So, CHANLEN, MannN, ChSSlp, &
@@ -1318,6 +1334,23 @@ END SUBROUTINE SUBMUSKINGCUNGE_ACC
                     CHANLEN(k), MannN(k), ChSSlp(k), Bw(k), Tw(k),Tw_CC(k), n_CC(k),  HLINK(k), ChannK(k) )
              endif
           end do
+#endif
+
+#ifdef HYDRO_D
+          write(6,'(A,I0)') "[TIMING] drive_CHANNEL: acc parallel loop completed, NLINKSL=", NLINKSL
+          call flush(6)
+          block
+            integer, parameter :: CHANNEL_ACC_LOG_UNIT = 96
+            logical :: channel_acc_log_is_open
+            inquire(unit=CHANNEL_ACC_LOG_UNIT, opened=channel_acc_log_is_open)
+            if (.not. channel_acc_log_is_open) then
+               open(unit=CHANNEL_ACC_LOG_UNIT, file='channel_acc_checkpoints.log', status='unknown', &
+                    form='formatted', action='write', position='append')
+            endif
+            write(CHANNEL_ACC_LOG_UNIT,'(A,I0)') &
+                 "[TIMING] drive_CHANNEL: acc parallel loop completed, NLINKSL=", NLINKSL
+            call flush(CHANNEL_ACC_LOG_UNIT)
+          end block
 #endif
 
           do k = 1,NLINKSL

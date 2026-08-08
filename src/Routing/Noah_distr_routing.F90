@@ -1332,8 +1332,25 @@ subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real    :: SMCEXCS ! excess soil moisture (m3/m3)
    real    :: WATHOLDCAP ! water holding capacity, smcmax - smcwlt (m3/m3)
    real    :: smScaleFact ! soil moisture scaling factor for ksat (0-1)
+#ifdef HYDRO_D
+   integer, parameter :: DISAGG_ACC_LOG_UNIT = 94
+   logical, save :: disagg_acc_log_opened = .false.
+#endif
 
    errFlag = 0
+
+#ifdef HYDRO_D
+   if (.not. disagg_acc_log_opened) then
+      open(unit=DISAGG_ACC_LOG_UNIT, file='disaggregate_acc_checkpoints.log', status='replace', &
+           form='formatted', action='write')
+      disagg_acc_log_opened = .true.
+   endif
+   write(6,'(A,I0,A,I0)') "[TIMING] disaggregateDomain_acc: about to enter data region, IXRT=", IXRT, " JXRT=", JXRT
+   call flush(6)
+   write(DISAGG_ACC_LOG_UNIT,'(A,I0,A,I0)') &
+        "[TIMING] disaggregateDomain_acc: about to enter data region, IXRT=", IXRT, " JXRT=", JXRT
+   call flush(DISAGG_ACC_LOG_UNIT)
+#endif
 
 !$acc data copyin(SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, SMCWLT1, &
 !$acc&            VEGTYP, LKSAT, NEXP, area_rt, INFXSWGT, LKSATFAC, CH_NETRT, &
@@ -1478,6 +1495,13 @@ subroutine disaggregateDomain_acc(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    end do
 
 !$acc end data
+
+#ifdef HYDRO_D
+   write(6,'(A,I0)') "[TIMING] disaggregateDomain_acc: data region completed, errFlag=", errFlag
+   call flush(6)
+   write(DISAGG_ACC_LOG_UNIT,'(A,I0)') "[TIMING] disaggregateDomain_acc: data region completed, errFlag=", errFlag
+   call flush(DISAGG_ACC_LOG_UNIT)
+#endif
 
    if (errFlag .eq. 1) then
       call hydro_stop("In disaggregateDomain() - SMCMAX exceeded upon disaggregation3")
@@ -1710,6 +1734,10 @@ subroutine hydro_acc_residency_init(did)
    implicit none
    integer, intent(in) :: did
    logical, save :: entered(10) = .false.
+#ifdef HYDRO_D
+   integer, parameter :: ROUTING_ACC_LOG_UNIT = 93
+   logical, save :: routing_acc_log_opened = .false.
+#endif
 
    if (entered(did)) return
 #ifdef MPP_LAND
@@ -1720,6 +1748,21 @@ subroutine hydro_acc_residency_init(did)
    if (nlst(did)%UDMP_OPT .ne. 0) return
    if (nlst(did)%GWBASESWCRT .ge. 3) return
    entered(did) = .true.
+
+#ifdef HYDRO_D
+   if (.not. routing_acc_log_opened) then
+      open(unit=ROUTING_ACC_LOG_UNIT, file='routing_acc_checkpoints.log', status='replace', &
+           form='formatted', action='write')
+      routing_acc_log_opened = .true.
+   endif
+   write(6,'(A,I0,A,I0,A,I0)') "[TIMING] hydro_acc_residency_init: about to enter_arrays, did=", did, &
+        " ixrt=", rt_domain(did)%ixrt, " jxrt=", rt_domain(did)%jxrt
+   call flush(6)
+   write(ROUTING_ACC_LOG_UNIT,'(A,I0,A,I0,A,I0)') &
+        "[TIMING] hydro_acc_residency_init: about to enter_arrays, did=", did, &
+        " ixrt=", rt_domain(did)%ixrt, " jxrt=", rt_domain(did)%jxrt
+   call flush(ROUTING_ACC_LOG_UNIT)
+#endif
 
    call hydro_acc_enter_arrays(rt_domain(did)%ixrt, rt_domain(did)%jxrt, nlst(did)%nsoil, &
         rt_domain(did)%overland%properties%distance_to_neighbor, &
@@ -1745,6 +1788,13 @@ subroutine hydro_acc_residency_init(did)
         rt_domain(did)%subsurface%state%qsubrt, &
         rt_domain(did)%subsurface%state%qsubbdryrt, &
         rt_domain(did)%q_sfcflx_x, rt_domain(did)%q_sfcflx_y)
+
+#ifdef HYDRO_D
+   write(6,'(A,I0)') "[TIMING] hydro_acc_residency_init: enter_arrays completed, did=", did
+   call flush(6)
+   write(ROUTING_ACC_LOG_UNIT,'(A,I0)') "[TIMING] hydro_acc_residency_init: enter_arrays completed, did=", did
+   call flush(ROUTING_ACC_LOG_UNIT)
+#endif
 end subroutine hydro_acc_residency_init
 
 ! Refresh the host copies of all resident dynamic routing-grid state.
@@ -1786,11 +1836,17 @@ subroutine SubsurfaceRouting_drv(did)
     implicit none
     integer :: did
     IF (nlst(did)%SUBRTSWCRT.EQ.1) THEN
+        ! NOTE: this call previously passed a 5th actual argument
+        ! (overland%control%infiltration_excess) to a 4-argument subroutine.
+        ! subsurfaceRouting is an external procedure with no explicit
+        ! interface, so the extra argument was silently ignored rather than
+        ! flagged; the routine gets infiltration_excess from subrt_input.
+        ! It is replaced here by ELRT, which the OpenACC path needs.
         call subsurfaceRouting ( rt_domain(did)%subsurface, &
             rt_domain(did)%subsurface_static, &
             rt_domain(did)%subsurface_input, &
             rt_domain(did)%subsurface_output, &
-            rt_domain(did)%overland%control%infiltration_excess)
+            rt_domain(did)%ELRT)
     endif
 
 end subroutine SubsurfaceRouting_drv

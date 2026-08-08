@@ -1,4 +1,4 @@
-subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_output)
+subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_output, ELRT)
 #ifdef MPP_LAND
     use module_mpp_land, only:  mpp_land_com_real, mpp_land_com_integer, numprocs
     use module_subsurface_data
@@ -11,6 +11,8 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     type (subsurface_static_interface), intent(inout) :: subrt_static
     type (subsurface_input_interface), intent(inout) :: subrt_input
     type (subsurface_output_interface), intent(inout) :: subrt_output
+    ! Terrain elevation, threaded through to the OpenACC path (see SUBSFC_RTNG)
+    REAL, INTENT(IN), DIMENSION(subrt_static%ixrt,subrt_static%jxrt) :: ELRT
     logical :: acc_single_rank ! use the single-rank OpenACC path
     !integer, INTENT(IN) :: ixrt, jxrt , nsoil, rt_option
     !REAL, INTENT(IN)                          :: DT
@@ -73,7 +75,7 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     ! This subroutine returns: ZWATTABLRT, CWATAVAIL and SATLYRCHK
 
 
-    CALL SUBSFC_RTNG( subrt_data, subrt_static, subrt_input, subrt_output, CWATAVAIL, SATLYRCHK)
+    CALL SUBSFC_RTNG( subrt_data, subrt_static, subrt_input, subrt_output, CWATAVAIL, SATLYRCHK, ELRT)
 
 #ifdef HYDRO_D
     print *, "SUBROUTE routing called and returned..."
@@ -85,7 +87,7 @@ end subroutine subsurfaceRouting
 !DJG   SUBROUTINE SUBSFC_RTNG
 !DJG ------------------------------------------------
 
-SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWATAVAIL, SATLYRCHK)
+SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWATAVAIL, SATLYRCHK, ELRT)
 
     !       use module_mpp_land, only: write_restart_rt_3, write_restart_rt_2, &
         !            my_id
@@ -106,6 +108,11 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     type (subsurface_static_interface), intent(inout) :: subrt_static
     type (subsurface_input_interface), intent(inout) :: subrt_input
     type (subsurface_output_interface), intent(inout) :: subrt_output
+    ! Terrain elevation, used only by the single-rank OpenACC path, which
+    ! recomputes the terrain slopes from it rather than staging the SO8RT /
+    ! SO8RT_D arrays on the device. Not part of the subsurface structs
+    ! (it lives in rt_domain), so it is threaded down from the driver.
+    REAL, INTENT(IN), DIMENSION(subrt_static%ixrt,subrt_static%jxrt) :: ELRT
 
     !INTEGER, INTENT(IN) :: IXRT,JXRT,NSOIL
     !INTEGER, INTENT(IN) :: IXRT,JXRT
@@ -278,8 +285,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                          subrt_data%properties%lksatrt, &
                          subrt_data%properties%nexprt, &
                          subrt_data%properties%soldeprt, &
-                         subrt_data%properties%surface_slope, &
-                         subrt_data%properties%max_surface_slope_index, &
+                         ELRT, &
                          CWATAVAIL, SATLYRCHK, SUBDT, &
                          subrt_data%properties%sldpth, &
                          subrt_data%grid_transform%smcrt, &
@@ -511,7 +517,7 @@ END SUBROUTINE SUBSFC_RTNG
 !DJG ----------------------------------------------------------------
 
 SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
-        SO8RT, SO8RT_D, CWATAVAIL, SATLYRCHK, SUBDT, sldpth, &
+        ELRT, CWATAVAIL, SATLYRCHK, SUBDT, sldpth, &
         smcrt, smcmaxrt, smcrefrt, infiltration_excess, &
         QSUBDRY, QSUBDRYT, qsub)
 
@@ -525,8 +531,10 @@ SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
     REAL, INTENT(IN), DIMENSION(XX,YY) :: latksat ! lateral saturated hydraulic conductivity (m/s)
     REAL, INTENT(IN), DIMENSION(XX,YY) :: nexp ! latksat decay coefficient
     REAL, INTENT(IN), DIMENSION(XX,YY) :: soldep ! soil depth (m)
-    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT ! terrain slope in all directions (m/m)
-    INTEGER, INTENT(IN), DIMENSION(XX,YY,3) :: SO8RT_D ! steepest terrain slope cell (i, j, index)
+    ! Terrain elevation, from which the terrain slopes (formerly SO8RT) and
+    ! the steepest-terrain neighbor (formerly SO8RT_D) are recomputed inside
+    ! the kernel instead of being staged on the device.
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: ELRT ! terrain elevation (m)
     REAL, INTENT(IN), DIMENSION(XX,YY) :: CWATAVAIL ! water available for routing (m)
     INTEGER, INTENT(IN), DIMENSION(XX,YY) :: SATLYRCHK ! highest saturated layer index
     REAL, INTENT(IN) :: SUBDT ! subsurface routing timestep (s)
@@ -572,13 +580,16 @@ SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
 
     errFlag = 0
 
-!$acc data copyin(dist, z, latksat, nexp, soldep, SO8RT, SO8RT_D, &
+    ! ELRT (1 plane) replaces SO8RT (8) + SO8RT_D (3) here: a net 10-plane
+    ! reduction, ~10.6 GB at CONUS resolution, which is what brings this
+    ! region back under the 40 GB A100 limit.
+!$acc data copyin(dist, z, latksat, nexp, soldep, ELRT, &
 !$acc&            CWATAVAIL, SATLYRCHK, sldpth, smcmaxrt, smcrefrt, hh_pre) &
 !$acc&     copy(smcrt, infiltration_excess, QSUBDRY, qsub) &
 !$acc&     create(qsub_tmp, QSUBDRY_tmp)
 
     CALL ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, XX, YY, &
-        SO8RT, SO8RT_D, CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
+        ELRT, CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
         hh_pre, qsub_tmp, QSUBDRY_tmp, errFlag)
 
     if (errFlag .eq. 1) then
@@ -670,7 +681,7 @@ END SUBROUTINE SUBSFC_RTNG_ACC
 !DJG ----------------------------------------------------------------
 
 SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
-                                 XX, YY, SO8RT, SO8RT_D, &
+                                 XX, YY, ELRT, &
                                  CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
                                  hh_pre, qsub_tmp, QSUBDRY_tmp, errFlag)
 
@@ -684,8 +695,13 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
                                               ! lateral saturated hydraulic conductivity (m/s)
    real, intent(in), dimension(XX,YY)      :: nexp ! latksat decay coefficient
    real, intent(in), dimension(XX,YY)      :: soldep ! soil depth (m)
-   real, intent(in), dimension(XX,YY,8)    :: SO8RT ! terrain slope in all directions (m/m)
-   integer, intent(in), dimension(XX,YY,3) :: SO8RT_D ! steepest terrain slope cell (i, j, index)
+   ! Terrain elevation. Replaces the SO8RT (8 planes) / SO8RT_D (3 planes)
+   ! arrays, which are recomputed from it below rather than copied to the
+   ! device -- those 11 full-domain planes are ~11.6 GB at CONUS resolution
+   ! and pushed this region past the 40 GB A100. The host arrays still exist
+   ! and are still used by the non-ACC and overland paths; only the device
+   ! copy is avoided.
+   real, intent(in), dimension(XX,YY)      :: ELRT ! terrain elevation (m)
    real, intent(in), dimension(XX,YY)      :: CWATAVAIL ! water available for routing (m)
    real, intent(in)                        :: SUBDT ! subsurface routing timestep (s)
    real, intent(inout), dimension(XX,YY)   :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
@@ -713,6 +729,10 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
    real    :: qqsub ! net subsurface flow out of cell (m3/s)
    real    :: waterToRoute ! total water to route from cell (m)
    real    :: qsubdryt_delta ! accumulated boundary flow this call (m3/s)
+   real    :: so8rt_k ! terrain slope toward neighbor k, recomputed from ELRT (m/m)
+   real    :: vmax_terr ! steepest terrain slope found so far (m/m)
+   integer :: index_terr ! direction index of steepest terrain slope (the old SO8RT_D seed)
+   integer :: index_beta ! direction index of steepest terrain+head slope, 0 if none
 
    ! Initialize temp variables
 !$acc parallel loop collapse(2) private(i,j)
@@ -726,31 +746,56 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
    qsubdryt_delta = 0.0
 
 !$acc parallel loop collapse(2) &
-!$acc&     private(IXX0,JYY0,index,k,beta,dzdx,neighSlp,hh,ksat,gamma,qqsub,waterToRoute) &
+!$acc&     private(IXX0,JYY0,index,k,beta,dzdx,neighSlp,hh,ksat,gamma,qqsub,waterToRoute, &
+!$acc&             so8rt_k,vmax_terr,index_terr,index_beta) &
 !$acc&     reduction(+:qsubdryt_delta) reduction(max:errFlag)
    do j=2,YY-1 ! start j loop
 
       do i=2,XX-1 ! start i loop
 
-         ! Set initial guess values for steepest slope neighbor based on terrain
-         IXX0 = SO8RT_D(i,j,1)
-         JYY0 = SO8RT_D(i,j,2)
-         index = SO8RT_D(i,j,3)
-
          ! Inlined GETSUB8: check all 8 neighbors for the steepest
          ! elev+head slope.  beta stays -1 if none can be found.
+         !
+         ! The terrain slope toward neighbor k -- formerly the stored
+         ! SO8RT(i,j,k) -- is recomputed here from ELRT, exactly as
+         ! module_RT.F90 builds it:
+         !     SO8RT(i,j,k) = (ELRT(i,j) - ELRT(neighbor_k)) / dist(i,j,k)
+         ! The steepest-terrain seed -- formerly SO8RT_D(i,j,:) -- is the
+         ! argmax of that over k. module_RT.F90 seeds the scan with k=1 and
+         ! uses a strict ">", so the same order and comparison are used here
+         ! to select the identical neighbor when slopes tie.
+         index_terr = 1
+         vmax_terr  = 0.0
+         index_beta = 0
          beta = -1.0
 !$acc loop seq
          do k = 1, 8
+            so8rt_k = ( ELRT(i,j) - ELRT(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist(i,j,k)
+            if ( k .eq. 1 ) then
+               vmax_terr = so8rt_k
+            else if ( so8rt_k .gt. vmax_terr ) then
+               vmax_terr  = so8rt_k
+               index_terr = k
+            end if
+
             dzdx = ( z(i,j) - z(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist(i,j,k)
-            neighSlp = SO8RT(i,j,k) - dzdx
+            neighSlp = so8rt_k - dzdx
             if ( beta < neighSlp ) then
-               IXX0 = i + NEIGH_DI(k)
-               JYY0 = j + NEIGH_DJ(k)
                beta = neighSlp
-               index = k
+               index_beta = k
             end if
          end do
+
+         ! Fall back to the terrain-only steepest neighbor when no direction
+         ! beat the initial beta, matching the original use of SO8RT_D as the
+         ! seed that survived only when the loop never fired.
+         if ( index_beta .gt. 0 ) then
+            index = index_beta
+         else
+            index = index_terr
+         end if
+         IXX0 = i + NEIGH_DI(index)
+         JYY0 = j + NEIGH_DJ(index)
 
          if (dist(i,j,index) .le. 0) then
             errFlag = max(errFlag, 1)
@@ -948,6 +993,23 @@ SUBROUTINE FINDZWAT_ACC(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
 
     !DJG Local Variables
     INTEGER :: KK,i,j
+#ifdef HYDRO_D
+    INTEGER, PARAMETER :: FINDZWAT_ACC_LOG_UNIT = 95
+    LOGICAL, SAVE :: findzwat_acc_log_opened = .false.
+#endif
+
+#ifdef HYDRO_D
+    if (.not. findzwat_acc_log_opened) then
+       open(unit=FINDZWAT_ACC_LOG_UNIT, file='findzwat_acc_checkpoints.log', status='replace', &
+            form='formatted', action='write')
+       findzwat_acc_log_opened = .true.
+    endif
+    write(6,'(A,I0,A,I0)') "[TIMING] FINDZWAT_ACC: about to enter data region, IXRT=", IXRT, " JXRT=", JXRT
+    call flush(6)
+    write(FINDZWAT_ACC_LOG_UNIT,'(A,I0,A,I0)') &
+         "[TIMING] FINDZWAT_ACC: about to enter data region, IXRT=", IXRT, " JXRT=", JXRT
+    call flush(FINDZWAT_ACC_LOG_UNIT)
+#endif
 
 !$acc data copyin(SMCRT, SMCMAXRT, SMCREFRT, SMCWLTRT, ZSOIL, SLDPTH) &
 !$acc&     copyout(ZWATTABLRT, CWATAVAIL, SATLYRCHK)
@@ -989,6 +1051,13 @@ SUBROUTINE FINDZWAT_ACC(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
     END DO
 
 !$acc end data
+
+#ifdef HYDRO_D
+    write(6,'(A)') "[TIMING] FINDZWAT_ACC: data region completed"
+    call flush(6)
+    write(FINDZWAT_ACC_LOG_UNIT,'(A)') "[TIMING] FINDZWAT_ACC: data region completed"
+    call flush(FINDZWAT_ACC_LOG_UNIT)
+#endif
 
     !DJG ----------------------------------------------------------------
 END SUBROUTINE FINDZWAT_ACC
