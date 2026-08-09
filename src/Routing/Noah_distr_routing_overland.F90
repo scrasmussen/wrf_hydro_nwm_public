@@ -18,7 +18,8 @@ subroutine OverlandRouting( &
     ixrt, &       ! routing grid x size
     jxrt, &      ! routing grid y size
     q_sfcflx_x, &! accumulated x flux
-    q_sfcflx_y  &! accumulated y flux
+    q_sfcflx_y, &! accumulated y flux
+    ELRT        &! terrain elevation, for the OpenACC path
     )
 #ifdef MPP_LAND
     use module_mpp_land, only:  mpp_land_max_int1,  sum_real1, my_id, io_id, numprocs
@@ -31,6 +32,11 @@ subroutine OverlandRouting( &
     integer, INTENT(IN) :: ixrt, jxrt, rt_option
     !REAL, INTENT(out), DIMENSION(IXRT,JXRT)   :: SFCHEADSUBRT  ! moved into overland_data%control
     real, dimension(IXRT,JXRT), intent(inout) :: q_sfcflx_x,q_sfcflx_y
+    ! Terrain elevation. The OpenACC path recomputes the terrain slopes
+    ! (SO8RT) and steepest-terrain neighbour (SO8RT_D) from this instead of
+    ! staging those 11 full-domain planes on the device. Not part of the
+    ! overland struct (it lives in rt_domain), so it is passed down.
+    real, dimension(IXRT,JXRT), intent(in) :: ELRT
 
     ! REMOVED VARIABLES
     !INTEGER, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: LAKE_MSKRT
@@ -132,7 +138,8 @@ subroutine OverlandRouting( &
             JXRT,                 &
             rt_option,            &
             q_sfcflx_x,           &
-            q_sfcflx_y)
+            q_sfcflx_y,           &
+            ELRT)
     else
         ovrt_data%control%surface_water_head_routing = ovrt_data%control%infiltration_excess
         ! Mirror the host assignment to the device copy when residency is active
@@ -223,7 +230,8 @@ subroutine ov_rtng( &
         JXRT, &
         rt_option, &
         q_sfcflx_x, &
-        q_sfcflx_y &
+        q_sfcflx_y, &
+        ELRT &
         )
 
     !yyww
@@ -241,6 +249,16 @@ subroutine ov_rtng( &
     INTEGER, INTENT(IN)			:: IXRT,JXRT
     REAL, INTENT(IN)			:: DT,DTRT_TER
     integer, intent(in) :: rt_option
+    ! Terrain elevation. The OpenACC path recomputes the terrain slopes
+    ! (formerly SO8RT) and the steepest-terrain neighbour (formerly SO8RT_D)
+    ! from this rather than staging those 11 full-domain planes on the device.
+    REAL, INTENT(IN), DIMENSION(IXRT,JXRT) :: ELRT
+    !-- gsize(:,:,1:9) collapsed to 9 scalars for the ACC path. Saved because
+    !-- it is fixed grid geometry: verify uniformity once, then reuse.
+    LOGICAL, SAVE :: gsize_checked = .false.
+    LOGICAL, SAVE :: gsize_uniform = .false.
+    REAL,    SAVE :: gsize_k(9)
+    INTEGER :: gi, gj, gk
 
     !INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETRT
     !INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: LAKE_MSKRT
@@ -296,21 +314,52 @@ subroutine ov_rtng( &
     !DJG Execute routing time-step loop...
 
 
+    ! gsize (= distance_to_neighbor) is 9 full-domain planes, ~9.5 GB at CONUS
+    ! resolution, and on a map-projected grid every interior cell holds the
+    ! same 9 values (get_dxdy_mp builds them from dx/dy alone). Collapse it to
+    ! scalars for the ACC path, exactly as done for the subsurface path in
+    ! Noah_distr_routing_subsurface.F90. Verified once at runtime rather than
+    ! assumed, since get_dist_ll (lat/lon grids) does produce a varying array;
+    ! if non-uniform the ACC path is skipped and the host path runs.
+    if (.not. gsize_checked) then
+        gsize_checked = .true.
+        gsize_uniform = .true.
+        gsize_k(:) = ovrt_data%properties%distance_to_neighbor(2,2,:)
+    check_gsize: do gj = 2, JXRT-1
+            do gi = 2, IXRT-1
+                do gk = 1, 9
+                    if (ovrt_data%properties%distance_to_neighbor(gi,gj,gk) &
+                        .ne. gsize_k(gk)) then
+                        gsize_uniform = .false.
+                        exit check_gsize
+                    endif
+                end do
+            end do
+        end do check_gsize
+#ifdef HYDRO_D
+        if (gsize_uniform) then
+            print *, "gsize is uniform; ACC overland path uses scalars ", gsize_k
+        else
+            print *, "gsize is NOT uniform (lat/lon grid?); ACC overland path disabled"
+        endif
+        call flush(6)
+#endif
+    endif
+
 #ifdef MPP_LAND
-    if (rt_option .eq. 1 .and. numprocs .eq. 1) then
+    if (rt_option .eq. 1 .and. numprocs .eq. 1 .and. gsize_uniform) then
 #else
-    if (rt_option .eq. 1) then
+    if (rt_option .eq. 1 .and. gsize_uniform) then
 #endif
         CALL OV_RTNG_ROUTE1_ACC(DTRT_TER, DT_FRAC, IXRT, JXRT, &
             ovrt_data%control%infiltration_excess, &
             ovrt_data%control%surface_water_head_routing, &
-            ovrt_data%properties%distance_to_neighbor, &
+            gsize_k, &
             ovrt_data%properties%retention_depth, &
             ovrt_data%properties%roughness, &
             ovrt_data%control%boundary_flux, &
             ovrt_data%control%boundary_flux_total, &
-            ovrt_data%properties%surface_slope, &
-            ovrt_data%properties%max_surface_slope_index, &
+            ELRT, &
             ovrt_data%streams_and_lakes%CH_NETRT, &
             ovrt_data%streams_and_lakes%lake_mask, &
             ovrt_data%streams_and_lakes%surface_water_to_channel, &
@@ -466,8 +515,8 @@ END SUBROUTINE OV_RTNG
 !DJG ----------------------------------------------------------------
 
 SUBROUTINE OV_RTNG_ROUTE1_ACC(dt, dt_frac, XX, YY, &
-        infiltration_excess, h, gsize, retent_dep, dist_rough, &
-        QBDRY, QBDRYT, SO8RT, SO8RT_D, CH_NETRT, lake_mask, &
+        infiltration_excess, h, gsize_k, retent_dep, dist_rough, &
+        QBDRY, QBDRYT, ELRT, CH_NETRT, lake_mask, &
         surface_water_to_channel, surface_water_to_lake, &
         accumulated_surface_water_to_channel, accumulated_surface_water_to_lake, &
         q_sfcflx_x, q_sfcflx_y)
@@ -478,9 +527,14 @@ SUBROUTINE OV_RTNG_ROUTE1_ACC(dt, dt_frac, XX, YY, &
     REAL, INTENT(IN) :: dt
     REAL, INTENT(IN), DIMENSION(XX,YY) :: infiltration_excess
     REAL, INTENT(IN), DIMENSION(XX,YY) :: dist_rough
-    REAL, INTENT(IN), DIMENSION(XX,YY,9) :: gsize
-    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
-    INTEGER, INTENT(IN), DIMENSION(XX,YY,3) :: SO8RT_D
+    ! Per-direction neighbour distances (m), uniform across the grid, cell
+    ! area (m2) in element 9. Replaces gsize(XX,YY,9) -- 9 full planes.
+    REAL, INTENT(IN), DIMENSION(9) :: gsize_k
+    ! Terrain elevation, from which the terrain slopes (formerly SO8RT, 8
+    ! planes) and the steepest-terrain neighbour (formerly SO8RT_D, 3 planes)
+    ! are recomputed in the kernel. Together with gsize_k this removes 20
+    ! full-domain planes (~21 GB at CONUS resolution) from this data region.
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: ELRT
     INTEGER, INTENT(IN), DIMENSION(XX,YY) :: CH_NETRT, lake_mask
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: h
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: retent_dep
@@ -498,7 +552,7 @@ SUBROUTINE OV_RTNG_ROUTE1_ACC(dt, dt_frac, XX, YY, &
     REAL*8, DIMENSION(XX,YY) :: DH_tmp
     REAL, DIMENSION(XX,YY) :: edge_adjust
 
-!$acc data copyin(infiltration_excess, gsize, dist_rough, SO8RT, SO8RT_D, CH_NETRT, lake_mask) &
+!$acc data copyin(infiltration_excess, gsize_k, dist_rough, ELRT, CH_NETRT, lake_mask) &
 !$acc&     copy(retent_dep, QBDRY, surface_water_to_channel, surface_water_to_lake) &
 !$acc&     copyout(h, q_sfcflx_x, q_sfcflx_y) &
 !$acc&     create(QBDRY_tmp, DH, DH_tmp, edge_adjust)
@@ -543,8 +597,8 @@ SUBROUTINE OV_RTNG_ROUTE1_ACC(dt, dt_frac, XX, YY, &
         accumulated_surface_water_to_channel = accumulated_surface_water_to_channel + acc_channel
         accumulated_surface_water_to_lake = accumulated_surface_water_to_lake + acc_lake
 
-        CALL ROUTE_OVERLAND1_ACC(dt, gsize, h, retent_dep, dist_rough, XX, YY, &
-            QBDRY, QBDRYT, SO8RT, SO8RT_D, q_sfcflx_x, q_sfcflx_y, &
+        CALL ROUTE_OVERLAND1_ACC(dt, gsize_k, h, retent_dep, dist_rough, XX, YY, &
+            QBDRY, QBDRYT, ELRT, q_sfcflx_x, q_sfcflx_y, &
             QBDRY_tmp, DH, DH_tmp, edge_adjust)
 
     END DO
@@ -555,22 +609,23 @@ END SUBROUTINE OV_RTNG_ROUTE1_ACC
 
 !DJG ----------------------------------------------------------------
 
-SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize, h, retent_dep, dist_rough, &
-        XX, YY, QBDRY, QBDRYT, SO8RT, SO8RT_D, q_sfcflx_x, q_sfcflx_y, &
+SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize_k, h, retent_dep, dist_rough, &
+        XX, YY, QBDRY, QBDRYT, ELRT, q_sfcflx_x, q_sfcflx_y, &
         QBDRY_tmp, DH, DH_tmp, edge_adjust)
 
     IMPLICIT NONE
 
     INTEGER, INTENT(IN) :: XX,YY
-    REAL, INTENT(IN) :: dt, gsize(xx,yy,9)
+    ! gsize collapsed to 9 uniform scalars, and the terrain slopes/steepest
+    ! neighbour recomputed from ELRT -- see OV_RTNG_ROUTE1_ACC.
+    REAL, INTENT(IN) :: dt, gsize_k(9)
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: h
     REAL, INTENT(IN), DIMENSION(XX,YY) :: retent_dep
     REAL, INTENT(IN), DIMENSION(XX,YY) :: dist_rough
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: QBDRY
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: q_sfcflx_x, q_sfcflx_y
     REAL, INTENT(INOUT) :: QBDRYT
-    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
-    INTEGER, INTENT(IN), DIMENSION(XX,YY,3) :: SO8RT_D
+    REAL, INTENT(IN), DIMENSION(XX,YY) :: ELRT ! terrain elevation (m)
     REAL*8, INTENT(INOUT), DIMENSION(XX,YY) :: QBDRY_tmp, DH
     REAL*8, INTENT(INOUT), DIMENSION(XX,YY) :: DH_tmp
     REAL, INTENT(INOUT), DIMENSION(XX,YY) :: edge_adjust
@@ -585,6 +640,16 @@ SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize, h, retent_dep, dist_rough, &
     INTEGER :: IXX0,JYY0,index
     REAL :: tmp_gsize, tmp_sfx
 
+    ! Neighbour i/j offsets for direction indices 1-8, matching the order in
+    ! which module_RT.F90 builds surface_slope / max_surface_slope_index.
+    INTEGER, PARAMETER :: NEIGH_DI(8) = (/ 0, 1, 1, 1, 0, -1, -1, -1 /)
+    INTEGER, PARAMETER :: NEIGH_DJ(8) = (/ 1, 1, 0, -1, -1, -1, 0, 1 /)
+    ! Per-cell terrain slopes, recomputed from ELRT in place of the stored
+    ! SO8RT array, plus the running argmax that replaces SO8RT_D.
+    REAL    :: so8rt_loc(8)
+    REAL    :: vmax_terr
+    INTEGER :: k
+
 !$acc parallel loop collapse(2) private(i,j)
     do j=1,YY
         do i=1,XX
@@ -598,72 +663,92 @@ SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize, h, retent_dep, dist_rough, &
     qbdryt_delta = 0.0
 
 !$acc parallel loop collapse(2) &
-!$acc&     private(IXX0,JYY0,index,tmp_gsize,sfx,tmp_sfx,hmax,alfax,hh,hh13,hh53,qqsfc,tmp_adjust) &
+!$acc&     private(IXX0,JYY0,index,tmp_gsize,sfx,tmp_sfx,hmax,alfax,hh,hh13,hh53,qqsfc,tmp_adjust, &
+!$acc&             so8rt_loc,vmax_terr,k) &
 !$acc&     reduction(+:qbdryt_delta)
     do j=2,YY-1
         do i=2,XX-1
             if (h(I,J).GT.retent_dep(I,J)) then
-                IXX0 = SO8RT_D(i,j,1)
-                JYY0 = SO8RT_D(i,j,2)
-                index = SO8RT_D(i,j,3)
-                tmp_gsize = 1.0/gsize(i,j,index)
-                sfx = so8RT(i,j,index)-(h(IXX0,JYY0)-h(i,j))*0.001*tmp_gsize
+                ! Rebuild the terrain slopes and the steepest-terrain
+                ! neighbour from ELRT, in place of the stored SO8RT /
+                ! SO8RT_D arrays. module_RT.F90 builds them as
+                !   surface_slope(i,j,k) = (ELRT(i,j) - ELRT(nbr_k)) / gsize(i,j,k)
+                ! and takes the argmax scanning k ascending from k=1 with a
+                ! strict ">", so the same order and comparison are used here
+                ! to pick the identical neighbour when slopes tie.
+                index     = 1
+                vmax_terr = 0.0
+!$acc loop seq
+                do k = 1, 8
+                    so8rt_loc(k) = ( ELRT(i,j) &
+                        - ELRT(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / gsize_k(k)
+                    if ( k .eq. 1 ) then
+                        vmax_terr = so8rt_loc(k)
+                    else if ( so8rt_loc(k) .gt. vmax_terr ) then
+                        vmax_terr = so8rt_loc(k)
+                        index     = k
+                    end if
+                end do
+                IXX0 = i + NEIGH_DI(index)
+                JYY0 = j + NEIGH_DJ(index)
+                tmp_gsize = 1.0/gsize_k(index)
+                sfx = so8rt_loc(index)-(h(IXX0,JYY0)-h(i,j))*0.001*tmp_gsize
                 hmax = h(i,j)*0.001
                 if(sfx .lt. 1E-20) then
                     IXX0 = -1
                     JYY0 = -1
                     sfx = 0.0
 
-                    tmp_sfx = so8RT(i,j,1)-(h(i,j+1)-h(i,j))*0.001/gsize(i,j,1)
+                    tmp_sfx = so8rt_loc(1)-(h(i,j+1)-h(i,j))*0.001/gsize_k(1)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I
                         JYY0 = J+1
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,2)-(h(i+1,j+1)-h(i,j))*0.001/gsize(i,j,2)
+                    tmp_sfx = so8rt_loc(2)-(h(i+1,j+1)-h(i,j))*0.001/gsize_k(2)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I+1
                         JYY0 = J+1
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,3)-(h(i+1,j)-h(i,j))*0.001/gsize(i,j,3)
+                    tmp_sfx = so8rt_loc(3)-(h(i+1,j)-h(i,j))*0.001/gsize_k(3)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I+1
                         JYY0 = J
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,4)-(h(i+1,j-1)-h(i,j))*0.001/gsize(i,j,4)
+                    tmp_sfx = so8rt_loc(4)-(h(i+1,j-1)-h(i,j))*0.001/gsize_k(4)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I+1
                         JYY0 = J-1
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,5)-(h(i,j-1)-h(i,j))*0.001/gsize(i,j,5)
+                    tmp_sfx = so8rt_loc(5)-(h(i,j-1)-h(i,j))*0.001/gsize_k(5)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I
                         JYY0 = J-1
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,6)-(h(i-1,j-1)-h(i,j))*0.001/gsize(i,j,6)
+                    tmp_sfx = so8rt_loc(6)-(h(i-1,j-1)-h(i,j))*0.001/gsize_k(6)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I-1
                         JYY0 = J-1
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,7)-(h(i-1,j)-h(i,j))*0.001/gsize(i,j,7)
+                    tmp_sfx = so8rt_loc(7)-(h(i-1,j)-h(i,j))*0.001/gsize_k(7)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I-1
                         JYY0 = J
                         sfx = tmp_sfx
                     end if
 
-                    tmp_sfx = so8RT(i,j,8)-(h(i-1,j+1)-h(i,j))*0.001/gsize(i,j,8)
+                    tmp_sfx = so8rt_loc(8)-(h(i-1,j+1)-h(i,j))*0.001/gsize_k(8)
                     if(tmp_sfx .gt. 0. .and. sfx .lt. tmp_sfx) then
                         IXX0 = I-1
                         JYY0 = J+1

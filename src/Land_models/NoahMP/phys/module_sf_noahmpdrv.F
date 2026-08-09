@@ -522,15 +522,20 @@ CONTAINS
     !
     ! !!! DEBUG ONLY -- SET BACK TO 1 FOR ANY REAL RUN !!!
     ! Skip-to-chunk guard for compute-sanitizer runs. memcheck instruments
-    ! every device memory access (10-100x slowdown), so grinding through all
-    ! ~1.13M columns that are already known-good before reaching the fault at
-    ! 1130001:1140000 is impractical. When this is > 1, chunks lying entirely
-    ! below it skip their GPU launch entirely, cutting sanitizer work ~99%.
+    ! every device memory access (10-100x slowdown), so running all ~12.2M
+    ! columns under it is impractical inside the 1-hour gpudev walltime cap.
+    ! When this is > 1, chunks lying entirely below it skip their GPU launch.
+    !
+    ! Currently set to fast-forward PAST the NoahMP physics (which is already
+    ! clean -- compute-sanitizer reported zero access violations across all
+    ! 12,248,155 columns) so that the CUDA_ERROR_ILLEGAL_ADDRESS now being
+    ! chased inside ROUTE_SUBSURFACE1_ACC is reached almost immediately.
     !
     ! Columns below this threshold never have NoahmpMain called, so their
     ! physics results are INVALID and the downstream scatter loop propagates
-    ! that garbage into the (I,J) output arrays. Harmless here only because
-    ! the run faults before producing output.
+    ! that garbage into the (I,J) output arrays -- and on into routing. That
+    ! is acceptable for an address hunt (indices stay in range regardless)
+    ! but the numbers from such a run are meaningless.
     INTEGER, PARAMETER                  :: NOAHMP_ACC_DEBUG_FIRST_COL = 1
     INTEGER                             :: noahmp_batch_chunk_start
     INTEGER                             :: noahmp_batch_chunk_end

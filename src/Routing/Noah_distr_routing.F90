@@ -1879,7 +1879,8 @@ subroutine OverlandRouting_drv(did)
             rt_domain(did)%ixrt, &
             rt_domain(did)%jxrt, &
             rt_domain(did)%q_sfcflx_x, &
-            rt_domain(did)%q_sfcflx_y &
+            rt_domain(did)%q_sfcflx_y, &
+            rt_domain(did)%ELRT &
             )
         ! ADCHANGE: If overland routing is called, INFXSUBRT is moved to SFCHEADSUBRT, so
         !           zeroing out just in case

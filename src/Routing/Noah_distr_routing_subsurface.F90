@@ -160,6 +160,11 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     REAL :: SUBDT                !-- subsurface routing timestep
     INTEGER :: KRT                  !-- routing counter
     LOGICAL :: acc_single_rank      !-- use the single-rank OpenACC path
+    !-- dist(:,:,1:9) collapsed to 9 scalars for the ACC path (see the check
+    !-- below). Saved because dist is fixed grid geometry: verify once, reuse.
+    LOGICAL, SAVE :: dist_checked = .false.  !-- uniformity check already run?
+    LOGICAL, SAVE :: dist_uniform = .false.  !-- dist identical at every interior cell?
+    REAL,    SAVE :: dist_k(9)               !-- the per-direction distances (m), and cell area in (9)
     REAL, DIMENSION(subrt_static%IXRT,subrt_static%JXRT,subrt_static%nsoil) :: SMCTMP  !--temp store of SMC
     REAL, DIMENSION(subrt_static%IXRT,subrt_static%JXRT) :: ZWATTABLRTTMP ! temp store of ZWAT
     REAL, DIMENSION(subrt_static%IXRT,subrt_static%JXRT) :: INFXSUBRTTMP ! temp store of infilx
@@ -275,12 +280,57 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     acc_single_rank = .true.
 #endif
 
+    ! ---------------------------------------------------------------------
+    ! dist(XX,YY,9) is 9 full-domain planes -- ~9.5 GB at CONUS resolution,
+    ! and the device was measured at 96.5% of a 40 GB A100 with it resident.
+    ! On a map-projected grid it is also entirely redundant: get_dxdy_mp
+    ! (module_HYDRO_utils.F90) fills every interior cell from just dx and dy,
+    !     [dy, v1, dx, v1, dy, v1, dx, v1, dx*dy],  v1 = sqrt(dx^2+dy^2)
+    ! so the ACC path passes those 9 scalars instead of the array.
+    !
+    ! get_dist_ll (lat/lon grids) does NOT produce a uniform dist, so this is
+    ! verified once at runtime rather than assumed. If the grid turns out to
+    ! be non-uniform the ACC path is simply disabled and the original host
+    ! path below runs -- correctness is preserved either way.
+    !
+    ! dist is grid geometry, fixed at init, so the check only needs doing once.
+    ! Only interior cells are examined because that is all the ACC kernels
+    ! touch (i = 2..XX-1, j = 2..YY-1); edge cells keep the -1 sentinel that
+    ! get_dxdy_mp leaves behind.
+    ! ---------------------------------------------------------------------
+    if (acc_single_rank .and. .not. dist_checked) then
+        dist_checked = .true.
+        dist_uniform = .true.
+        dist_k(:) = subrt_data%properties%distance_to_neighbor(2,2,:)
+    check_dist: do j = 2, subrt_static%JXRT-1
+            do i = 2, subrt_static%IXRT-1
+                do kk = 1, 9
+                    if (subrt_data%properties%distance_to_neighbor(i,j,kk) &
+                        .ne. dist_k(kk)) then
+                        dist_uniform = .false.
+                        exit check_dist
+                    endif
+                end do
+            end do
+        end do check_dist
+#ifdef HYDRO_D
+        if (dist_uniform) then
+            print *, "dist is uniform; ACC subsurface path uses scalars ", dist_k
+        else
+            print *, "dist is NOT uniform (lat/lon grid?); ACC subsurface path disabled"
+        endif
+        call flush(6)
+#endif
+    endif
+
+    acc_single_rank = acc_single_rank .and. dist_uniform
+
     if (acc_single_rank) then
     ! Single-rank OpenACC path: steepest-descent routing and the soil
     ! moisture update run inside one device data region.  Multi-rank keeps
     ! the original path below because the MPP halo exchanges are host-side.
     CALL SUBSFC_RTNG_ACC(subrt_static%IXRT, subrt_static%JXRT, subrt_static%nsoil, &
-                         subrt_data%properties%distance_to_neighbor, &
+                         dist_k, &
                          subrt_data%properties%zwattablrt, &
                          subrt_data%properties%lksatrt, &
                          subrt_data%properties%nexprt, &
@@ -516,7 +566,7 @@ END SUBROUTINE SUBSFC_RTNG
 !DJG   collected in an error flag on the device and raised on the host.
 !DJG ----------------------------------------------------------------
 
-SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
+SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist_k, z, latksat, nexp, soldep, &
         ELRT, CWATAVAIL, SATLYRCHK, SUBDT, sldpth, &
         smcrt, smcmaxrt, smcrefrt, infiltration_excess, &
         QSUBDRY, QSUBDRYT, qsub)
@@ -526,7 +576,11 @@ SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
     IMPLICIT NONE
 
     INTEGER, INTENT(IN) :: XX, YY, NSOIL
-    REAL, INTENT(IN), DIMENSION(XX,YY,9) :: dist ! distance to neighbor cells (m)
+    ! Per-direction neighbour distances (m), uniform across the grid, with the
+    ! cell area (m2) in element 9. Replaces the dist(XX,YY,9) array -- 9 full
+    ! planes, ~9.5 GB at CONUS resolution. The caller verifies uniformity and
+    ! falls back to the host path if the grid is not map-projected.
+    REAL, INTENT(IN), DIMENSION(9) :: dist_k
     REAL, INTENT(IN), DIMENSION(XX,YY) :: z ! depth to water table (m)
     REAL, INTENT(IN), DIMENSION(XX,YY) :: latksat ! lateral saturated hydraulic conductivity (m/s)
     REAL, INTENT(IN), DIMENSION(XX,YY) :: nexp ! latksat decay coefficient
@@ -580,15 +634,16 @@ SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
 
     errFlag = 0
 
-    ! ELRT (1 plane) replaces SO8RT (8) + SO8RT_D (3) here: a net 10-plane
-    ! reduction, ~10.6 GB at CONUS resolution, which is what brings this
-    ! region back under the 40 GB A100 limit.
-!$acc data copyin(dist, z, latksat, nexp, soldep, ELRT, &
+    ! Two reductions relative to the original region:
+    !   ELRT (1 plane)  replaces SO8RT (8) + SO8RT_D (3)   ~10.6 GB saved
+    !   dist_k (9 vals) replaces dist (9 planes)            ~9.5 GB saved
+    ! Measured peak was 96.5% of a 40 GB A100 with only the first applied.
+!$acc data copyin(dist_k, z, latksat, nexp, soldep, ELRT, &
 !$acc&            CWATAVAIL, SATLYRCHK, sldpth, smcmaxrt, smcrefrt, hh_pre) &
 !$acc&     copy(smcrt, infiltration_excess, QSUBDRY, qsub) &
 !$acc&     create(qsub_tmp, QSUBDRY_tmp)
 
-    CALL ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, XX, YY, &
+    CALL ROUTE_SUBSURFACE1_ACC(dist_k, z, latksat, nexp, soldep, XX, YY, &
         ELRT, CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
         hh_pre, qsub_tmp, QSUBDRY_tmp, errFlag)
 
@@ -607,7 +662,7 @@ SUBROUTINE SUBSFC_RTNG_ACC(XX, YY, NSOIL, dist, z, latksat, nexp, soldep, &
     DO J=1,YY
         DO I=1,XX
 
-            SUBFLO = qsub(i,j) / dist(i,j,9) * SUBDT !Convert qsub from m^3/s to m
+            SUBFLO = qsub(i,j) / dist_k(9) * SUBDT !Convert qsub from m^3/s to m
 
             WATAVAIL = 0.  !Initialize to 0. for every cell...
 
@@ -680,7 +735,7 @@ END SUBROUTINE SUBSFC_RTNG_ACC
 !DJG   be called inside the SUBSFC_RTNG_ACC data region.
 !DJG ----------------------------------------------------------------
 
-SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
+SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist_k, z, latksat, nexp, soldep, &
                                  XX, YY, ELRT, &
                                  CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub, &
                                  hh_pre, qsub_tmp, QSUBDRY_tmp, errFlag)
@@ -689,7 +744,11 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
 
    ! Passed variables
    integer, intent(in) :: XX,YY
-   real, intent(in), dimension(XX,YY,9)    :: dist ! distance to neighbor cells (m)
+   ! Per-direction neighbour distances (m), uniform across the grid, with the
+   ! cell area (m2) in element 9. Replaces dist(XX,YY,9) -- 9 full planes,
+   ! ~9.5 GB at CONUS resolution. See SUBSFC_RTNG for the runtime uniformity
+   ! check that gates this path (non-uniform grids use the host path instead).
+   real, intent(in), dimension(9)          :: dist_k
    real, intent(in), dimension(XX,YY)      :: z ! depth to water table (m)
    real, intent(in), dimension(XX,YY)      :: latksat
                                               ! lateral saturated hydraulic conductivity (m/s)
@@ -759,7 +818,7 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
          ! The terrain slope toward neighbor k -- formerly the stored
          ! SO8RT(i,j,k) -- is recomputed here from ELRT, exactly as
          ! module_RT.F90 builds it:
-         !     SO8RT(i,j,k) = (ELRT(i,j) - ELRT(neighbor_k)) / dist(i,j,k)
+         !     SO8RT(i,j,k) = (ELRT(i,j) - ELRT(neighbor_k)) / dist_k(k)
          ! The steepest-terrain seed -- formerly SO8RT_D(i,j,:) -- is the
          ! argmax of that over k. module_RT.F90 seeds the scan with k=1 and
          ! uses a strict ">", so the same order and comparison are used here
@@ -770,7 +829,7 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
          beta = -1.0
 !$acc loop seq
          do k = 1, 8
-            so8rt_k = ( ELRT(i,j) - ELRT(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist(i,j,k)
+            so8rt_k = ( ELRT(i,j) - ELRT(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist_k(k)
             if ( k .eq. 1 ) then
                vmax_terr = so8rt_k
             else if ( so8rt_k .gt. vmax_terr ) then
@@ -778,7 +837,7 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
                index_terr = k
             end if
 
-            dzdx = ( z(i,j) - z(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist(i,j,k)
+            dzdx = ( z(i,j) - z(i+NEIGH_DI(k), j+NEIGH_DJ(k)) ) / dist_k(k)
             neighSlp = so8rt_k - dzdx
             if ( beta < neighSlp ) then
                beta = neighSlp
@@ -797,7 +856,7 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
          IXX0 = i + NEIGH_DI(index)
          JYY0 = j + NEIGH_DJ(index)
 
-         if (dist(i,j,index) .le. 0) then
+         if (dist_k(index) .le. 0) then
             errFlag = max(errFlag, 1)
          else if (beta .gt. 0) then            !if-then for flux calc
             if (beta .lt. 1E-20 ) then
@@ -813,13 +872,13 @@ SUBROUTINE ROUTE_SUBSURFACE1_ACC(dist, z, latksat, nexp, soldep, &
             else
                ! Calculate flux from cell
                ! AD_NOTE: gamma and qqsub are negative when flow is out of cell
-               gamma = -1.0 * ( (dist(i,j,index) * ksat * soldep(i,j)) / nexp(i,j) ) * beta
+               gamma = -1.0 * ( (dist_k(index) * ksat * soldep(i,j)) / nexp(i,j) ) * beta
                qqsub = gamma * hh
 
-               ! Calculate total water to route (where dist(i,j,9) is cell area):
-               waterToRoute = ABS(qqsub) / dist(i,j,9) * SUBDT
+               ! Calculate total water to route (where dist_k(9) is cell area):
+               waterToRoute = ABS(qqsub) / dist_k(9) * SUBDT
                if ( (qqsub .le. 0.0) .and. (CWATAVAIL(i,j) .lt. waterToRoute) ) THEN
-                  qqsub = -1.0 * CWATAVAIL(i,j) * dist(i,j,9) / SUBDT
+                  qqsub = -1.0 * CWATAVAIL(i,j) * dist_k(9) / SUBDT
                endif
 
                ! Remove from cell qsub to track net fluxes over full i, j loop
