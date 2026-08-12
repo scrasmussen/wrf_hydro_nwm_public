@@ -248,12 +248,37 @@ elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "PGI.*") OR (CMAKE_Fortran_COMPILER_I
 
 elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "Cray*"))
         message("-- Using Cray")
-        set(CMAKE_Fortran_FLAGS "-eZ -ffree -ef -h alias=none -h fp1 -hbyteswapio")
+        # Floating-point mode. -h fp1 permits reassociation and lower-accuracy
+        # intrinsics; on the device that can substitute approximate exp/tanh/pow
+        # implementations the host does not use, and those approximations are
+        # biased rather than random. That matches the observed GPU-vs-CPU
+        # signature: FSNO differences are entirely one-signed (nccmp reports
+        # Sum == AbsSum), which a biased transcendental produces but a scattered
+        # indexing bug does not.
+        #
+        # CRAY_FP_MODE exists to test that: build with -DCRAY_FP_MODE=fp0 and
+        # rerun. If the LDASOUT snow differences largely collapse, the cause is
+        # fast-math and the real fix is a narrower control on the ACC units
+        # rather than fp0 everywhere (fp0 costs performance). If they persist,
+        # the cause is algorithmic -> audit the snow modules, starting with
+        # SnowCoverGroundNiu07Mod, which computes FSNO.
+        set(CRAY_FP_MODE "fp1" CACHE STRING "Cray floating-point mode: fp0 (strictest) .. fp4")
+        message("-- Cray floating-point mode: -h ${CRAY_FP_MODE}")
+        set(CMAKE_Fortran_FLAGS "-eZ -ffree -ef -h alias=none -h ${CRAY_FP_MODE} -hbyteswapio")
         set(CMAKE_Fortran_FLAGS_RELEASE "-O2 -g")
         set(CMAKE_Fortran_FLAGS_DEBUG   "-O2 -g -M867,878,156,664,362") # -traceback")
         if (OPENACC_GPU)
           set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -h acc -target-accel=nvidia80")
         endif()
+        # CMake has no built-in CMAKE_Fortran_LINK_GROUP_USING_RESCAN rule for
+        # the Cray compiler ID, so $<LINK_GROUP:RESCAN,...> falls back to
+        # emitting bare --start-group/--end-group on the ftn command line.
+        # Unlike gfortran/ifort, the Cray ftn driver validates its own
+        # argument list and rejects anything it doesn't recognize instead of
+        # forwarding it to the linker (ftn-2115), so these must be wrapped in
+        # -Wl, to reach ld.
+        set(CMAKE_Fortran_LINK_GROUP_USING_RESCAN "-Wl,--start-group" "-Wl,--end-group")
+        set(CMAKE_Fortran_LINK_GROUP_USING_RESCAN_SUPPORTED TRUE)
 else()
         message("CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
         message("Fortran compiler: " ${Fortran_COMPILER_NAME})

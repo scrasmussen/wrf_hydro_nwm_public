@@ -512,13 +512,11 @@ CONTAINS
     ! budget alongside the routing arrays hydro_acc_residency_init keeps
     ! device-resident. Retune if profiling shows headroom either way.
     !
-    ! TEMPORARILY REDUCED to 10000 to bisect a CUDA_ERROR_ILLEGAL_ADDRESS
-    ! fault: at 500000 the failure was localized to chunk 1000001:1500000
-    ! (I=[486,4268] J=[706,923]); 10000 narrows that 50x and tightens the
-    ! printed I/J ranges enough to identify the offending region. Restore to
-    ! 500000 once the faulting column(s) are identified — the small size
-    ! costs extra kernel launches for no memory benefit.
-    INTEGER, PARAMETER                  :: NOAHMP_ACC_BATCH_CHUNK = 10000
+    ! Was temporarily 10000 while bisecting a CUDA_ERROR_ILLEGAL_ADDRESS (that
+    ! turned out to be a double-applied slice offset, since fixed). Restored:
+    ! 10000 meant 1,225 kernel launches per timestep instead of ~25, for no
+    ! memory benefit.
+    INTEGER, PARAMETER                  :: NOAHMP_ACC_BATCH_CHUNK = 500000
     !
     ! !!! DEBUG ONLY -- SET BACK TO 1 FOR ANY REAL RUN !!!
     ! Skip-to-chunk guard for compute-sanitizer runs. memcheck instruments
@@ -748,6 +746,45 @@ CONTAINS
     NoahmpIO_sub%IOPT_BTR     = IOPT_BTR
     NoahmpIO_sub%IOPT_RUNSRF  = IOPT_RUN
     NoahmpIO_sub%IOPT_RUNSUB  = IOPT_RUN
+
+#ifdef NOAHMP_ACC_COLUMNS
+    ! ------------------------------------------------------------------
+    ! Guard: not every runoff scheme exists on the device.
+    !
+    ! SoilWaterMainMod wraps most of the OptRunoffSurface / OptRunoffSubsurface
+    ! calls in #ifndef NOAHMP_ACC_COLUMNS, because those modules are not in
+    ! NOAHMP_ACC_COLUMN_SOURCES and referencing them from device code would
+    ! leave unresolved symbols at nvlink. The consequence is that selecting an
+    ! unsupported option does not fail -- the GPU simply computes nothing for
+    ! that term and carries on. That is exactly how RUNOFF_OPTION=7 silently
+    ! produced no surface infiltration (InfilRateSfc never set), giving a
+    ! one-signed dry bias of ~213k values in SOILSAT_TOP that took a long time
+    ! to track down. Fail loudly instead.
+    !
+    ! Device-capable today (both halves must be, since IOPT_RUNSRF and
+    ! IOPT_RUNSUB are both set from IOPT_RUN above):
+    !   surface    3 (FreeDrain), 7 (XinAnJiang)
+    !   subsurface 3, 4, 6, 7, 8 (all via RunoffSubSurfaceDrainage)
+    ! -> only IOPT_RUN = 3 or 7 are safe.
+    !
+    ! To support another option, add its module to NOAHMP_ACC_COLUMN_SOURCES
+    ! in noahmp/CMakeLists.txt, move its call out of the #ifndef in
+    ! SoilWaterMainMod, convert any runtime x**y to pow() (CCE cannot link
+    ! that on device), and extend the list here.
+    if ( (IOPT_RUN /= 3) .and. (IOPT_RUN /= 7) ) then
+       write(*,*) "FATAL ERROR: RUNOFF_OPTION = ", IOPT_RUN, &
+                  " is not implemented on the OpenACC (NOAHMP_ACC_COLUMNS) path."
+       write(*,*) "  Supported on GPU: 3 (free drainage) and 7 (Xinanjiang)."
+       write(*,*) "  Other values would silently skip surface runoff and infiltration."
+       write(*,*) "  Either change RUNOFF_OPTION, or build without NOAHMP_ACC_COLUMNS."
+       CALL wrf_error_fatal("module_sf_noahmpdrv: RUNOFF_OPTION unsupported on the OpenACC path")
+    endif
+
+    ! Tile drainage is likewise host-only (TileDrainageSimple /
+    ! TileDrainageHooghoudt are not device sources). IOPT_TDRN is hardcoded to
+    ! 0 below, so this cannot currently trigger -- but if that is ever wired
+    ! to the namelist, it needs the same treatment.
+#endif
     NoahmpIO_sub%IOPT_SFC     = IOPT_SFC
     NoahmpIO_sub%IOPT_FRZ     = IOPT_FRZ
     NoahmpIO_sub%IOPT_INF     = IOPT_INF

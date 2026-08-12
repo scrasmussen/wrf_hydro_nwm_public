@@ -138,6 +138,15 @@ subroutine output_chrt_NWM(domainId)
    real, allocatable, dimension(:,:) :: varMetaReal
    integer, allocatable, dimension(:,:) :: varMetaInt
    integer(kind=int64), allocatable, dimension(:,:) :: varMetaInt8
+   ! Contiguous scratch for writing a single row of varMetaReal. varMetaReal
+   ! is (3,numPtsOut) and Fortran is column-major, so varMetaReal(n,:) is a
+   ! stride-3 section. Passing that straight to nf90_put_var relies on the
+   ! compiler materialising a packed temporary; when it does not, netCDF reads
+   ! numPtsOut *consecutive* reals from the row's start address and writes the
+   ! interleaved stream [lat1,lon1,elev1,lat2,...] into every one of latitude,
+   ! longitude and elevation. Copy through this buffer instead so the argument
+   ! is unambiguously contiguous.
+   real, allocatable, dimension(:) :: varMetaRealRow
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
@@ -654,6 +663,7 @@ subroutine output_chrt_NWM(domainId)
       allocate(varMetaReal(3,numPtsOut))
       allocate(varMetaInt(1,numPtsOut))
       allocate(varMetaInt8(1,numPtsOut))
+      allocate(varMetaRealRow(numPtsOut))
 
       varOutReal(1,:) = PACK(g_qlinkOut(:,1),g_outInd == 1)
       varOutReal(2,:) = PACK(g_nudgeOut,g_outInd == 1)
@@ -964,14 +974,20 @@ subroutine output_chrt_NWM(domainId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into feature_id output variable.')
 
 #ifndef NWM_META
+      ! NOTE: varMetaReal(n,:) is a stride-3 section; copy through the
+      ! contiguous varMetaRealRow buffer before handing it to netCDF. See the
+      ! declaration of varMetaRealRow for why passing the section directly
+      ! silently interleaves lat/lon/elevation.
       iret = nf90_inq_varid(ftn,'latitude',varId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to locate latitude in NetCDF file.')
-      iret = nf90_put_var(ftn,varId,varMetaReal(1,:))
+      varMetaRealRow = varMetaReal(1,:)
+      iret = nf90_put_var(ftn,varId,varMetaRealRow)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into latitude output variable.')
 
       iret = nf90_inq_varid(ftn,'longitude',varId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to locate longitude in NetCDF file.')
-      iret = nf90_put_var(ftn,varId,varMetaReal(2,:))
+      varMetaRealRow = varMetaReal(2,:)
+      iret = nf90_put_var(ftn,varId,varMetaRealRow)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into longitude output variable.')
 
       iret = nf90_inq_varid(ftn,'order',varId)
@@ -981,7 +997,8 @@ subroutine output_chrt_NWM(domainId)
 
       iret = nf90_inq_varid(ftn,'elevation',varId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to locate elevation in NetCDF file.')
-      iret = nf90_put_var(ftn,varId,varMetaReal(3,:))
+      varMetaRealRow = varMetaReal(3,:)
+      iret = nf90_put_var(ftn,varId,varMetaRealRow)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into elevation output variable.')
 #endif
 
@@ -1006,6 +1023,7 @@ subroutine output_chrt_NWM(domainId)
       deallocate(varOutReal)
       deallocate(varOutInt)
       deallocate(varMetaReal)
+      deallocate(varMetaRealRow)
       deallocate(varMetaInt)
       deallocate(varMetaInt8)
    endif
