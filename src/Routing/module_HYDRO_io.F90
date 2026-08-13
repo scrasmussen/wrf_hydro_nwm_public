@@ -10631,33 +10631,105 @@ end subroutine output_chrt2
       tmpOUTLAKEID  = tmpTO_NODE
       OUTLAKEID(1:NLINKSL)  = TO_NODE(1:NLINKSL)
 
- !! find the links that flow into lakes (e.g. TYPEL = 3), and update the TO_NODE, so that links flow into the lake reach
-        DO i = 1, NLAKES
-          DO k = 1, NLINKSL
-             do m = 1, gToNodeOut(k,1)
+ !! find the links that flow into lakes (e.g. TYPEL = 3), and update the
+ !! TO_NODE, so that links flow into the lake reach
+ !!
+ !! Was O(n^2), inverted to loop over links once and look the lake up by ID,
+ !! which is O(NLINKSL).
+ !!
+ !! Why the inversion is exact: for a fixed (k,m,j) only one lake index can
+ !! satisfy any branch, and the branches partition on sign(tmpLAKEIDA(j)):
+ !!   tmpLAKEIDA(j) <  0 -> branch 1 and 3 need tmpLAKEIDA(j)==LAKEIDM(i),
+ !!                          impossible for a negative value, so only branch 2
+ !!                          applies, at i = index of LAKEIDA(k).
+ !!   tmpLAKEIDA(j) >= 0 -> branch 2 needs tmpLAKEIDA(j)<0, so only branches
+ !!                          1/3 apply, at i = index of tmpLAKEIDA(j).
+ !! Each j belongs to exactly one (k,m), so no j is written twice and the
+ !! original i-ascending order cannot matter. LAKELINKID(i) is written only by
+ !! branch 1 and keeps last-k-wins semantics either way.
+ !!
+ !! The `tmpTYPEL(j) .ne. 1` guard in branch 3 only has an effect when two
+ !! lakes share a LAKEIDM, which a hash keyed on LAKEIDM cannot represent --
+ !! so uniqueness is verified first and the original loop is used if it fails.
+      block
+        type(hash_t) :: lake_hash
+        integer(kind=int64) :: lval
+        logical :: lfound, lakeids_unique
+        integer :: ii
+
+        lakeids_unique = .true.
+        if (NLAKES > 0) then
+           call lake_hash%set_all_idx(LAKEIDM(1:NLAKES), NLAKES)
+           do ii = 1, NLAKES
+              call lake_hash%get(LAKEIDM(ii), lval, lfound)
+              if ((.not. lfound) .or. (int(lval) /= ii)) then
+                 lakeids_unique = .false.
+                 exit
+              endif
+           end do
+        endif
+
+        if (lakeids_unique) then
+
+           DO k = 1, NLINKSL
+              do m = 1, gToNodeOut(k,1)
                  j = gToNodeOut(k,m+1)
-                 if( (tmpTO_NODE(j) .eq. LINKID(k) ) .and. &
-                     (LAKEIDA(k) .lt. 0 .and. tmpLAKEIDA(j) .eq. LAKEIDM(i))) then
-                     tmpTYPEL(j) = 1  !this is the link flowing out of the lake
-                     tmpOUTLAKEID(j) = tmpLAKEIDA(j) !tmpLINKID(j) ! Wei Check
-                     LAKELINKID(i) = ind(j)
-!                    write(61,*) tmpTO_NODE(j),tmpLAKEIDA(j),LAKEIDA(k),LAKELINKID(i)
-!                    call flush(61)
-                 elseif( (tmpTO_NODE(j) .eq. LINKID(k)) .and. &
-                     (tmpLAKEIDA(j) .lt. 0 .and. LAKEIDA(k) .gt. 0) .and. &
-                     (LAKEIDA(k) .eq. LAKEIDM(i)) ) then
-                     tmpTYPEL(j) = 3 !type_3 inflow link to lake
-                     tmpOUTLAKEID(j) = LAKEIDM(i) !Wei Check
-!                    write(62,*) tmpTO_NODE(j),tmpOUTLAKEID(j),LAKEIDM(i)
-!                    call flush(62)
-                 elseif (tmpLAKEIDA(j) .eq. LAKEIDM(i) .and. tmpTYPEL(j) .ne. 1) then
-                     tmpTYPEL(j) = 2 ! internal lake linkd
-                     !! print the following to get the list of links which are ignored bc they are internal to lakes.
-                     !print*,'Ndg: tmpLAKEIDA(j):', tmpLAKEIDA(j)
+                 if (tmpLAKEIDA(j) .lt. 0) then
+                    ! only branch 2 can fire
+                    if ( (tmpTO_NODE(j) .eq. LINKID(k)) .and. (LAKEIDA(k) .gt. 0) ) then
+                       call lake_hash%get(LAKEIDA(k), lval, lfound)
+                       if (lfound) then
+                          i = int(lval)
+                          tmpTYPEL(j)     = 3 !type_3 inflow link to lake
+                          tmpOUTLAKEID(j) = LAKEIDM(i)
+                       endif
+                    endif
+                 else
+                    ! only branches 1 and 3 can fire
+                    call lake_hash%get(tmpLAKEIDA(j), lval, lfound)
+                    if (lfound) then
+                       i = int(lval)
+                       if ( (tmpTO_NODE(j) .eq. LINKID(k)) .and. (LAKEIDA(k) .lt. 0) ) then
+                          tmpTYPEL(j)     = 1  !this is the link flowing out of the lake
+                          tmpOUTLAKEID(j) = tmpLAKEIDA(j)
+                          LAKELINKID(i)   = ind(j)
+                       elseif (tmpTYPEL(j) .ne. 1) then
+                          tmpTYPEL(j) = 2 ! internal lake link
+                       endif
+                    endif
                  endif
-            END DO
+              end do
+           END DO
+
+        else
+#ifdef HYDRO_D
+           write(6,*) "nhdLakeMap_mpp: duplicate LAKEIDM detected, using the original O(NLAKES*NLINKSL) loop"
+           call flush(6)
+#endif
+           DO i = 1, NLAKES
+             DO k = 1, NLINKSL
+                do m = 1, gToNodeOut(k,1)
+                    j = gToNodeOut(k,m+1)
+                    if( (tmpTO_NODE(j) .eq. LINKID(k) ) .and. &
+                        (LAKEIDA(k) .lt. 0 .and. tmpLAKEIDA(j) .eq. LAKEIDM(i))) then
+                        tmpTYPEL(j) = 1  !this is the link flowing out of the lake
+                        tmpOUTLAKEID(j) = tmpLAKEIDA(j) !tmpLINKID(j) ! Wei Check
+                        LAKELINKID(i) = ind(j)
+                    elseif( (tmpTO_NODE(j) .eq. LINKID(k)) .and. &
+                        (tmpLAKEIDA(j) .lt. 0 .and. LAKEIDA(k) .gt. 0) .and. &
+                        (LAKEIDA(k) .eq. LAKEIDM(i)) ) then
+                        tmpTYPEL(j) = 3 !type_3 inflow link to lake
+                        tmpOUTLAKEID(j) = LAKEIDM(i) !Wei Check
+                    elseif (tmpLAKEIDA(j) .eq. LAKEIDM(i) .and. tmpTYPEL(j) .ne. 1) then
+                        tmpTYPEL(j) = 2 ! internal lake linkd
+                    endif
+               END DO
+             END DO
           END DO
-       END DO
+        endif
+
+        if (NLAKES > 0) call lake_hash%clear()
+      end block
 
 #ifdef HYDRO_D
       call system_clock(timing_t1)
@@ -10967,24 +11039,78 @@ end subroutine output_chrt2
 
         tmpLAKELINKID = LAKELINKID
 !       LAKELINKID = 0
-        DO i = 1, NLAKES
-          DO k = 1, NLINKSL
-             do m = 1, gToNodeOut(k,1)
+ !! Was DO i = 1, NLAKES / DO k = 1, NLINKSL -- ~1.6e10 iterations, measured
+ !! at ~133 s. Only one lake index can match a given (k,m,j) (the one whose
+ !! LAKEIDM equals tmpLAKEIDA(j)), so loop over links once and look it up.
+ !! Inverting keeps k ascending for every lake, so the "first match wins,
+ !! second match poisons to -999" behaviour below is unchanged.
+ !! Falls back to the original loop if LAKEIDM is not unique, since a hash
+ !! keyed on LAKEIDM cannot represent duplicates.
+      block
+        type(hash_t) :: lake_hash
+        integer(kind=int64) :: lval
+        logical :: lfound, lakeids_unique
+        integer :: ii
+
+        lakeids_unique = .true.
+        if (NLAKES > 0) then
+           call lake_hash%set_all_idx(LAKEIDM(1:NLAKES), NLAKES)
+           do ii = 1, NLAKES
+              call lake_hash%get(LAKEIDM(ii), lval, lfound)
+              if ((.not. lfound) .or. (int(lval) /= ii)) then
+                 lakeids_unique = .false.
+                 exit
+              endif
+           end do
+        endif
+
+        if (lakeids_unique) then
+           DO k = 1, NLINKSL
+              if (LAKEIDA(k) .ge. 0) cycle
+              do m = 1, gToNodeOut(k,1)
                  j = gToNodeOut(k,m+1)
-                 if( (tmpTO_NODE(j) .eq. LINKID(k) ) .and. &
-                     (LAKEIDA(k) .lt. 0 .and. tmpLAKEIDA(j) .eq. LAKEIDM(i))) then
-                     if(LAKELINKID(i) .gt. 0) then
-                         LAKELINKID(i) = -999
+                 if (tmpTO_NODE(j) .ne. LINKID(k)) cycle
+                 if (tmpLAKEIDA(j) .lt. 0) cycle
+                 call lake_hash%get(tmpLAKEIDA(j), lval, lfound)
+                 if (.not. lfound) cycle
+                 i = int(lval)
+                 if(LAKELINKID(i) .gt. 0) then
+                     LAKELINKID(i) = -999
 #ifdef HYDRO_D
-                         write(6,*) "remove the lake  LAKEIDM(i) ", i, LAKEIDM(i)
-                         call flush(6)
+                     write(6,*) "remove the lake  LAKEIDM(i) ", i, LAKEIDM(i)
+                     call flush(6)
 #endif
-                     endif
-                     if(LAKELINKID(i) .eq. 0) LAKELINKID(i) = ind(j)
                  endif
-            END DO
+                 if(LAKELINKID(i) .eq. 0) LAKELINKID(i) = ind(j)
+              end do
+           END DO
+        else
+#ifdef HYDRO_D
+           write(6,*) "nhdLakeMap_scan: duplicate LAKEIDM detected, using the original O(NLAKES*NLINKSL) loop"
+           call flush(6)
+#endif
+           DO i = 1, NLAKES
+             DO k = 1, NLINKSL
+                do m = 1, gToNodeOut(k,1)
+                    j = gToNodeOut(k,m+1)
+                    if( (tmpTO_NODE(j) .eq. LINKID(k) ) .and. &
+                        (LAKEIDA(k) .lt. 0 .and. tmpLAKEIDA(j) .eq. LAKEIDM(i))) then
+                        if(LAKELINKID(i) .gt. 0) then
+                            LAKELINKID(i) = -999
+#ifdef HYDRO_D
+                            write(6,*) "remove the lake  LAKEIDM(i) ", i, LAKEIDM(i)
+                            call flush(6)
+#endif
+                        endif
+                        if(LAKELINKID(i) .eq. 0) LAKELINKID(i) = ind(j)
+                    endif
+               END DO
+             END DO
           END DO
-       END DO
+        endif
+
+        if (NLAKES > 0) call lake_hash%clear()
+      end block
 !yw        call match1dLake(LAKELINKID, NLAKES, -999)
 
 !yw double check
@@ -10992,22 +11118,62 @@ end subroutine output_chrt2
       call ReachLS_decomp(gtoLakeId_g,gtoLakeId)
 
        lakemask = 0
-       DO k = 1, NLINKSL
-          if(LAKEIDA(k) .gt. 0) then
-             DO i = 1, NLAKES
-                if(gtoLakeId(k) .eq. LAKEIDM(i) )  then
-                    goto 992
-                endif
-             enddo
-             DO i = 1, NLAKES
-                if(LAKEIDA(k) .eq. LAKEIDM(i) )  then
-                     lakemask(i) = lakemask(i) + 1
-                      goto 992
-                endif
-             enddo
-992          continue
-          endif
-       enddo
+ !! Two more DO k / DO i = 1, NLAKES scans, same O(NLAKES*NLINKSL) cost.
+ !! Each is a "does this ID appear in LAKEIDM" membership test plus, for the
+ !! second, the index of the first match -- exactly what the hash provides.
+      block
+        type(hash_t) :: lake_hash
+        integer(kind=int64) :: lval
+        logical :: lfound, lakeids_unique
+        integer :: ii
+
+        lakeids_unique = .true.
+        if (NLAKES > 0) then
+           call lake_hash%set_all_idx(LAKEIDM(1:NLAKES), NLAKES)
+           do ii = 1, NLAKES
+              call lake_hash%get(LAKEIDM(ii), lval, lfound)
+              if ((.not. lfound) .or. (int(lval) /= ii)) then
+                 lakeids_unique = .false.
+                 exit
+              endif
+           end do
+        endif
+
+        if (lakeids_unique) then
+           DO k = 1, NLINKSL
+              if(LAKEIDA(k) .gt. 0) then
+                 ! first scan: if gtoLakeId(k) is a known lake, skip this link
+                 call lake_hash%get(gtoLakeId(k), lval, lfound)
+                 if (lfound) cycle
+                 ! second scan: credit the lake whose ID matches LAKEIDA(k)
+                 call lake_hash%get(LAKEIDA(k), lval, lfound)
+                 if (lfound) then
+                    i = int(lval)
+                    lakemask(i) = lakemask(i) + 1
+                 endif
+              endif
+           enddo
+        else
+           DO k = 1, NLINKSL
+              if(LAKEIDA(k) .gt. 0) then
+                 DO i = 1, NLAKES
+                    if(gtoLakeId(k) .eq. LAKEIDM(i) )  then
+                        goto 992
+                    endif
+                 enddo
+                 DO i = 1, NLAKES
+                    if(LAKEIDA(k) .eq. LAKEIDM(i) )  then
+                         lakemask(i) = lakemask(i) + 1
+                          goto 992
+                    endif
+                 enddo
+992              continue
+              endif
+           enddo
+        endif
+
+        if (NLAKES > 0) call lake_hash%clear()
+      end block
 
        if(allocated(gtoLakeId_g)) deallocate(gtoLakeId_g)
        if(allocated(gtoLakeId)) deallocate(gtoLakeId)
