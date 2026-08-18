@@ -5511,16 +5511,26 @@ subroutine postDiagMsg(diagFlag,diagMsg)
 end subroutine postDiagMsg
 
 subroutine nwmCheck(diagFlag,iret,msg)
+   use netcdf, only: nf90_strerror
    implicit none
 
    ! Subroutine arguments.
    integer, intent(in) :: diagFlag,iret
    character(len=*), intent(in) :: msg
+   character(len=32) :: iretStr
 
    ! Check status. If status of command is not 0, then post the error message
    ! if WRF_HYDRO_D was set to be 1.
    if (iret .ne. 0) then
-      call hydro_stop(trim(msg))
+      ! Report the netCDF/HDF5 status alongside the caller's message. Without
+      ! this, every failure routed through here reports only its own text --
+      ! e.g. "Unable to take RT_DOMAIN file out of definition mode" -- with no
+      ! indication of WHY, which is the difference between an actionable error
+      ! and a guess. (That exact message, with no code, is what a 4-rank run
+      ! produced while the same output succeeded at 1 and at 128 ranks.)
+      write(iretStr,'(I0)') iret
+      call hydro_stop(trim(msg)//' [netCDF iret='//trim(iretStr)// &
+                      ': '//trim(nf90_strerror(iret))//']')
    end if
 
 end subroutine nwmCheck

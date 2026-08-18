@@ -2072,6 +2072,17 @@ CONTAINS
    ENDDO JLOOP                                                          ! of J loop
 
 #ifdef NOAHMP_ACC_COLUMNS
+#ifdef HYDRO_D
+   ! Per-rank land-column count: the load-balance signal for multi-rank runs.
+   ! The 2-D decomposition splits CONUS by grid index, not by land fraction, so
+   ! coastal/ocean-heavy tiles get far fewer columns than interior ones and will
+   ! finish early while others still run. Compare this line across ranks before
+   ! reading anything into wall-time scaling -- a poor split looks exactly like
+   ! poor GPU speedup.
+   write(6,'(A,I0,A,I0)') "[ACC] noahmp_acc: rank land-column batch_n=", noahmp_batch_n, &
+        " of cap=", noahmp_batch_cap
+   call flush(6)
+#endif
    if (noahmp_batch_n > 0) then
       DO noahmp_batch_chunk_start = 1, noahmp_batch_n, NOAHMP_ACC_BATCH_CHUNK
          noahmp_batch_chunk_end = MIN(noahmp_batch_chunk_start + NOAHMP_ACC_BATCH_CHUNK - 1, noahmp_batch_n)

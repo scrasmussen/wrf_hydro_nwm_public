@@ -238,7 +238,8 @@ subroutine ov_rtng( &
 #ifdef MPP_LAND
     use module_mpp_land, only: left_id,down_id,right_id, &
         up_id,mpp_land_com_real, my_id, &
-        mpp_land_sync, numprocs
+        mpp_land_sync, numprocs, &
+        mpp_same_int1, mpp_land_bcast_real_1d
 #endif
     use overland_data
     IMPLICIT NONE
@@ -259,6 +260,12 @@ subroutine ov_rtng( &
     LOGICAL, SAVE :: gsize_uniform = .false.
     REAL,    SAVE :: gsize_k(9)
     INTEGER :: gi, gj, gk
+#ifdef MPP_LAND
+    ! Used to force every rank to the SAME uniformity verdict and the SAME
+    ! scalar values -- see the collective agreement below.
+    REAL    :: gsize_k_ref(9)
+    INTEGER :: gsize_uniform_i
+#endif
 
     !INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETRT
     !INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: LAKE_MSKRT
@@ -336,6 +343,35 @@ subroutine ov_rtng( &
                 end do
             end do
         end do check_gsize
+
+#ifdef MPP_LAND
+        ! COLLECTIVE AGREEMENT -- required now that the ACC path runs
+        ! multi-rank. Each rank scans only its own tile, so two failure modes
+        ! exist, and both are silent:
+        !
+        !   1. Ranks disagree on uniformity -> they select different overland
+        !      paths. Both paths issue the same five halo exchanges in the same
+        !      order, so this would not deadlock; it would just quietly mix
+        !      scalar-gsize and array-gsize numerics across the domain.
+        !   2. All ranks report "uniform" but with DIFFERENT values, because a
+        !      tile can be internally uniform while differing from its
+        !      neighbours (a lat/lon grid varies with latitude).
+        !
+        ! Broadcasting the reference values catches (2); mpp_same_int1 returns
+        ! -99 when ranks disagree, which catches (1). Any disagreement demotes
+        ! everyone to the host path, which is always correct.
+        gsize_k_ref(:) = gsize_k(:)
+        call mpp_land_bcast_real_1d(gsize_k_ref)
+        do gk = 1, 9
+            if (gsize_k(gk) .ne. gsize_k_ref(gk)) gsize_uniform = .false.
+        end do
+
+        gsize_uniform_i = 0
+        if (gsize_uniform) gsize_uniform_i = 1
+        call mpp_same_int1(gsize_uniform_i)
+        gsize_uniform = (gsize_uniform_i .eq. 1)
+#endif
+
 #ifdef HYDRO_D
         if (gsize_uniform) then
             print *, "gsize is uniform; ACC overland path uses scalars ", gsize_k
@@ -346,11 +382,11 @@ subroutine ov_rtng( &
 #endif
     endif
 
-#ifdef MPP_LAND
-    if (rt_option .eq. 1 .and. numprocs .eq. 1 .and. gsize_uniform) then
-#else
+    ! The numprocs==1 restriction is lifted: ROUTE_OVERLAND1_ACC now performs
+    ! the same five halo exchanges, in the same order, as ROUTE_OVERLAND1, and
+    ! restricts the outflow boundary condition and edge scrape to physical
+    ! domain edges.
     if (rt_option .eq. 1 .and. gsize_uniform) then
-#endif
         CALL OV_RTNG_ROUTE1_ACC(DTRT_TER, DT_FRAC, IXRT, JXRT, &
             ovrt_data%control%infiltration_excess, &
             ovrt_data%control%surface_water_head_routing, &
@@ -613,6 +649,14 @@ SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize_k, h, retent_dep, dist_rough, &
         XX, YY, QBDRY, QBDRYT, ELRT, q_sfcflx_x, q_sfcflx_y, &
         QBDRY_tmp, DH, DH_tmp, edge_adjust)
 
+#ifdef MPP_LAND
+    ! Neighbour ids identify PHYSICAL domain edges (-1 = no neighbour); the
+    ! *_ACC halo routines stage only the halo strips of a device-resident
+    ! array across MPI. See MPP/mpp_land.F90.
+    use module_mpp_land, only: left_id, down_id, right_id, up_id, &
+        mpp_land_com_real_acc, mpp_land_com_real8_acc
+#endif
+
     IMPLICIT NONE
 
     INTEGER, INTENT(IN) :: XX,YY
@@ -649,6 +693,25 @@ SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize_k, h, retent_dep, dist_rough, &
     REAL    :: so8rt_loc(8)
     REAL    :: vmax_terr
     INTEGER :: k
+
+    ! True where this rank has a neighbour, i.e. the tile edge is INTERIOR to
+    ! the global domain and must not be treated as an outflow boundary.
+    ! Read into plain scalars on the host so the device loops capture them as
+    ! firstprivate; module variables referenced directly inside a kernel would
+    ! need explicit data clauses.
+    LOGICAL :: has_left, has_right, has_down, has_up
+
+#ifdef MPP_LAND
+    has_left  = (left_id  .ge. 0)
+    has_right = (right_id .ge. 0)
+    has_down  = (down_id  .ge. 0)
+    has_up    = (up_id    .ge. 0)
+#else
+    has_left  = .false.
+    has_right = .false.
+    has_down  = .false.
+    has_up    = .false.
+#endif
 
 !$acc parallel loop collapse(2) private(i,j)
     do j=1,YY
@@ -792,7 +855,18 @@ SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize_k, h, retent_dep, dist_rough, &
 !$acc atomic update
                     DH_tmp(ixx0,jyy0) = DH_tmp(ixx0,jyy0) + tmp_adjust
 
-                    if ((ixx0.eq.XX).or.(ixx0.eq.1).or.(jyy0.eq.1) .or.(JYY0.eq.YY )) then
+                    ! Constant-flux boundary condition. ONLY a physical domain
+                    ! edge loses water. Using the bare "ixx0==XX .or. ..." test
+                    ! here (the non-MPP form) would treat every interior tile
+                    ! boundary as outflow, so each rank would silently leak
+                    ! water to nowhere at its halo -- wrong answers, no crash.
+                    ! This mirrors the MPP_LAND branch of ROUTE_OVERLAND1 and
+                    ! collapses to the original test at one rank, where no
+                    ! neighbours exist.
+                    if ( ((ixx0.eq.XX).and.(.not.has_right)) .or. &
+                         ((ixx0.eq.1) .and.(.not.has_left))  .or. &
+                         ((jyy0.eq.1) .and.(.not.has_down))  .or. &
+                         ((JYY0.eq.YY).and.(.not.has_up)) ) then
 !$acc atomic update
                         QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
                         qbdryt_delta = qbdryt_delta - qqsfc
@@ -804,27 +878,71 @@ SUBROUTINE ROUTE_OVERLAND1_ACC(dt, gsize_k, h, retent_dep, dist_rough, &
         end do
     end do
 
+    ! QBDRYT is a per-rank accumulator in the CPU path too (no MPI reduction
+    ! inside ROUTE_OVERLAND1), so leaving it rank-local matches exactly.
     QBDRYT = QBDRYT + qbdryt_delta
+
+#ifdef MPP_LAND
+    ! (1) SUM-mode exchange of the neighbour-directed accumulations.
+    ! The main loop routes water into cell (ixx0,jyy0), which for a cell on the
+    ! tile edge lies in the halo -- physically owned by the adjacent rank. Both
+    ! ranks hold a partial total, and flag=1 adds the two halves so each ends up
+    ! with the full amount. Double precision here mirrors the CPU path, whose
+    ! comment notes it is needed to avoid underflow.
+    call mpp_land_com_real8_acc(DH_tmp,    XX, YY, 1)
+    call mpp_land_com_real8_acc(QBDRY_tmp, XX, YY, 1)
+#endif
 
 !$acc parallel loop collapse(2) private(i,j)
     do j=1,YY
         do i=1,XX
             QBDRY(i,j) = QBDRY(i,j) + QBDRY_tmp(i,j)
             DH(i,j) = DH(i,j)+DH_tmp(i,j)
+        end do
+    end do
+
+#ifdef MPP_LAND
+    ! (2) REPLACE-mode exchange so each halo carries the neighbour's finished
+    ! DH/QBDRY.
+    !
+    ! ORDERING IS LOAD-BEARING: "H = H + DH" must come AFTER this exchange.
+    ! The single-rank kernel fused QBDRY+=QBDRY_tmp, DH+=DH_tmp and H+=DH into
+    ! one loop, which is valid only because the exchanges are no-ops at one
+    ! rank. Keeping them fused at N ranks would advance H using a DH the
+    ! neighbour has not yet contributed to -- a silent, mass-losing error.
+    call mpp_land_com_real8_acc(DH,    XX, YY, 99)
+    call mpp_land_com_real_acc (QBDRY, XX, YY, 99)
+#endif
+
+!$acc parallel loop collapse(2) private(i,j)
+    do j=1,YY
+        do i=1,XX
             H(i,j) = H(i,j) + DH(i,j)
         end do
     end do
 
+    ! Scrape the outermost edges -- physical domain edges only, same reasoning
+    ! as the boundary condition above. The CPU walks just the perimeter
+    ! (do j=1,YY,YY-1 / do i=1,XX,XX-1); testing every cell is equivalent
+    ! because interior cells fail the condition, and maps better to a GPU.
 !$acc parallel loop collapse(2) private(i,j)
     do i=1,XX
         do j=1,YY
-            if ((i.eq.XX).or.(i.eq.1).or.(j.eq.1).or.(j.eq.YY)) then
+            if ( ((i.eq.XX).and.(.not.has_right)) .or. &
+                 ((i.eq.1) .and.(.not.has_left))  .or. &
+                 ((j.eq.1) .and.(.not.has_down))  .or. &
+                 ((j.eq.YY).and.(.not.has_up)) ) then
                 if (h(i,j) .GT. retent_dep(i,j)) then
                     edge_adjust(i,j) = h(i,j) - retent_dep(i,j)
                 end if
             end if
         end do
     end do
+
+#ifdef MPP_LAND
+    ! (3) REPLACE-mode exchange of the edge correction before it is applied.
+    call mpp_land_com_real_acc(edge_adjust, XX, YY, 99)
+#endif
 
 !$acc parallel loop collapse(2) private(i,j)
     do j=1,YY

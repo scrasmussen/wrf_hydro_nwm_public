@@ -147,7 +147,99 @@ contains
 
       !     create 2d logical mapping of the CPU.
       call log_map2d()
+
+      !     bind this rank to its own accelerator before any OpenACC region runs.
+      call mpp_land_acc_device_init()
    end   subroutine MPP_LAND_INIT
+
+
+   ! ---------------------------------------------------------------------
+   ! Bind this MPI rank to its own accelerator device.
+   !
+   ! WHY THIS EXISTS: until this was added, nothing in the tree called any
+   ! OpenACC device-selection routine at all (no acc_set_device_num, no
+   ! acc_init, no `use openacc` anywhere).  Every rank therefore took the
+   ! runtime default, device 0.  That is harmless at one rank, but at N ranks
+   ! it stacks N copies of the working set onto a single card -- and a single
+   ! CONUS rank already peaks at ~37 GiB of a 40 GiB A100, so ranks 2..N fail
+   ! to allocate.  Multi-GPU cannot work without this.
+   !
+   ! The rank used for the mapping MUST be node-local, not the global rank.
+   ! A global rank breaks the moment the job spans more than one node: global
+   ! rank 4 would request device 4 on a node that only has devices 0-3.
+   ! MPI_Comm_split_type(MPI_COMM_TYPE_SHARED) gives the node-local rank
+   ! without assuming anything about how the launcher orders ranks.
+   !
+   ! DEVICE NUMBER BASE: OpenACC's base for acc_set_device_num has differed
+   ! between spec revisions (2.0 treated 0 as "implementation default"; later
+   ! revisions specify 0-based).  0-based is used here, matching CCE and the
+   ! current spec, and the result is logged.  VERIFY ON THE FIRST MULTI-RANK
+   ! RUN that nvidia-smi shows N distinct GPUs with non-zero memory -- if all
+   ! ranks land on one device, this base is the first thing to change.
+   ! ---------------------------------------------------------------------
+   subroutine mpp_land_acc_device_init()
+#ifdef _OPENACC
+      use openacc
+#endif
+      implicit none
+      logical, save :: already_done = .false.
+#ifdef _OPENACC
+      integer :: local_comm, local_rank, local_size, ndev, want_dev, got_dev, ierr
+      integer(acc_device_kind) :: devtype
+#endif
+
+      ! MPP_LAND_INIT is reachable from several couplers and is safe to call
+      ! more than once; the device binding must not be repeated once a CUDA
+      ! context exists.
+      if (already_done) return
+      already_done = .true.
+
+#ifdef _OPENACC
+      ! Node-local communicator -> node-local rank.
+      call MPI_Comm_split_type(HYDRO_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
+                               MPI_INFO_NULL, local_comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+         ! Not fatal: fall back to the global rank, which is correct on a
+         ! single node and merely suboptimal beyond it.
+         write(6,'(A,I0,A)') "WARNING: mpp_land_acc_device_init: rank ", my_id, &
+              ": MPI_Comm_split_type failed; using global rank for GPU binding"
+         local_rank = my_id
+         local_size = numprocs
+      else
+         call MPI_Comm_rank(local_comm, local_rank, ierr)
+         call MPI_Comm_size(local_comm, local_size, ierr)
+         call MPI_Comm_free(local_comm, ierr)
+      endif
+
+      devtype = acc_device_nvidia
+      ndev    = acc_get_num_devices(devtype)
+
+      if (ndev <= 0) then
+         write(6,'(A,I0,A)') "WARNING: mpp_land_acc_device_init: rank ", my_id, &
+              " sees 0 NVIDIA devices; continuing without explicit GPU binding"
+         call flush(6)
+         return
+      endif
+
+      want_dev = mod(local_rank, ndev)
+      call acc_set_device_num(want_dev, devtype)
+      ! Initialise now so a bad binding fails here, with this log line next to
+      ! it, rather than surfacing later as an opaque CRAY_ACC_ERROR in a kernel.
+      call acc_init(devtype)
+      got_dev = acc_get_device_num(devtype)
+
+      if (local_size > ndev) then
+         write(6,'(A,I0,A,I0,A,I0,A)') "WARNING: mpp_land_acc_device_init: rank ", my_id, &
+              ": ", local_size, " ranks share ", ndev, " GPUs on this node (oversubscribed)"
+      endif
+
+      write(6,'(A,I0,A,I0,A,I0,A,I0,A,I0)') &
+           "[ACC] device binding: global_rank=", my_id, " local_rank=", local_rank, &
+           " requested_device=", want_dev, " active_device=", got_dev, &
+           " devices_on_node=", ndev
+      call flush(6)
+#endif
+   end subroutine mpp_land_acc_device_init
 
 
    subroutine MPP_LAND_PAR_INI(over_lap,in_global_nx,in_global_ny,AGGFACTRT)
@@ -1278,6 +1370,232 @@ contains
       call MPP_LAND_UB_COM8(in_out_data,NX,NY,flag)
 
    end subroutine MPP_LAND_COM_REAL8
+
+
+   ! ------------------------------------------------------------------
+   ! Halo exchange for a DEVICE-RESIDENT array (OpenACC multi-GPU).
+   !
+   ! MPP_LAND_COM_REAL/REAL8 are host-side MPI and cannot see device
+   ! memory. The routing ACC kernels keep 1.05 GiB planes resident across
+   ! 360 overland sub-steps, so copying whole arrays back and forth per
+   ! exchange is out of the question -- at 5 exchanges x 360 sub-steps that
+   ! would be over a terabyte of PCIe traffic per simulated hour.
+   !
+   ! Only the halo actually participates. MPP_LAND_LR_COM touches columns
+   ! 1, 2, NX-1, NX (all j); MPP_LAND_UB_COM touches rows 1, 2, NY-1, NY
+   ! (all i) -- for BOTH flag=99 (replace) and flag=1 (sum). Nothing else in
+   ! the array is read or written. So staging just those four strips is
+   ! exact, not an approximation.
+   !
+   ! The full columns/rows must be staged (not just their interiors):
+   ! UB runs after LR and re-sends the corner values LR just wrote into
+   ! columns 1 and NX, which is how data propagates diagonally.
+   !
+   ! Cost per call at a 9217x7681 tile: ~0.5 MB, versus ~283 MB for the
+   ! whole plane.
+   !
+   ! With OPENACC_GPU=OFF the !$acc directives vanish and this degrades to a
+   ! plain call, which is still correct because the array is then host-only.
+   ! ------------------------------------------------------------------
+   ! WHY THE COLUMNS ARE PACKED AND THE ROWS ARE NOT.
+   !
+   ! The first version of these routines staged all four halo strips with a
+   ! single `!$acc update host(a(1:2,:), a(NX-1:NX,:), a(:,1:2), a(:,NY-1:NY))`.
+   ! Measured cost on the 4-GPU CONUS run: overland routing took 436.5 s where
+   ! the kernels alone account for ~9.8 s -- 427 s of pure staging, making the
+   ! multi-GPU overland path 44x slower than perfect scaling.
+   !
+   ! The reason is the array layout. Fortran is column-major, so:
+   !   a(:,1:2)     -> two whole columns, CONTIGUOUS. One fast block copy.
+   !   a(1:2,:)     -> 2 elements, then a gap of NX-2, repeated NY times.
+   !                   At NY=7681 that is a 7,681-segment DMA chain, measured
+   !                   at 59.3 ms per transfer (7.7 us per segment).
+   !
+   ! So the left/right strips are packed into a contiguous (4,NY) buffer by a
+   ! device kernel and moved in one ~123 KB copy; the up/bottom strips are
+   ! already contiguous and are updated directly. Only LR needed fixing.
+   !
+   ! ORDERING: LR must complete (and be unpacked back into the device array)
+   ! before the UB stage, because UB re-sends the corner values LR wrote into
+   ! columns 1 and NX -- that is how data propagates diagonally. This mirrors
+   ! MPP_LAND_COM_REAL, which calls LR then UB for the same reason.
+   subroutine MPP_LAND_COM_REAL_ACC(in_out_data,NX,NY,flag)
+      integer, intent(in) :: NX,NY
+      integer, intent(in) :: flag
+      real :: in_out_data(nx,ny)
+      real :: colbuf(4,NY)     ! packed columns 1, 2, NX-1, NX
+      integer :: j
+
+!$acc data create(colbuf)
+
+      ! ---- pack the four LR columns on the device ----
+!$acc parallel loop present(in_out_data)
+      do j = 1, NY
+         colbuf(1,j) = in_out_data(1,j)
+         colbuf(2,j) = in_out_data(2,j)
+         colbuf(3,j) = in_out_data(NX-1,j)
+         colbuf(4,j) = in_out_data(NX,j)
+      end do
+!$acc update host(colbuf)
+
+      call MPP_LAND_LR_COM_PACKED(colbuf,NY,flag)
+
+!$acc update device(colbuf)
+!$acc parallel loop present(in_out_data)
+      do j = 1, NY
+         in_out_data(1,j)    = colbuf(1,j)
+         in_out_data(2,j)    = colbuf(2,j)
+         in_out_data(NX-1,j) = colbuf(3,j)
+         in_out_data(NX,j)   = colbuf(4,j)
+      end do
+
+!$acc end data
+
+      ! ---- up/bottom: whole rows, already contiguous ----
+!$acc update host(in_out_data(:,1:2), in_out_data(:,NY-1:NY))
+      call MPP_LAND_UB_COM(in_out_data,NX,NY,flag)
+!$acc update device(in_out_data(:,1:2), in_out_data(:,NY-1:NY))
+
+   end subroutine MPP_LAND_COM_REAL_ACC
+
+
+   subroutine MPP_LAND_COM_REAL8_ACC(in_out_data,NX,NY,flag)
+      integer, intent(in) :: NX,NY
+      integer, intent(in) :: flag
+      real*8 :: in_out_data(nx,ny)
+      real*8 :: colbuf(4,NY)
+      integer :: j
+
+!$acc data create(colbuf)
+
+!$acc parallel loop present(in_out_data)
+      do j = 1, NY
+         colbuf(1,j) = in_out_data(1,j)
+         colbuf(2,j) = in_out_data(2,j)
+         colbuf(3,j) = in_out_data(NX-1,j)
+         colbuf(4,j) = in_out_data(NX,j)
+      end do
+!$acc update host(colbuf)
+
+      call MPP_LAND_LR_COM8_PACKED(colbuf,NY,flag)
+
+!$acc update device(colbuf)
+!$acc parallel loop present(in_out_data)
+      do j = 1, NY
+         in_out_data(1,j)    = colbuf(1,j)
+         in_out_data(2,j)    = colbuf(2,j)
+         in_out_data(NX-1,j) = colbuf(3,j)
+         in_out_data(NX,j)   = colbuf(4,j)
+      end do
+
+!$acc end data
+
+!$acc update host(in_out_data(:,1:2), in_out_data(:,NY-1:NY))
+      call MPP_LAND_UB_COM8(in_out_data,NX,NY,flag)
+!$acc update device(in_out_data(:,1:2), in_out_data(:,NY-1:NY))
+
+   end subroutine MPP_LAND_COM_REAL8_ACC
+
+
+   ! Left/right halo exchange on the PACKED column buffer.
+   !
+   ! Identical message pattern, tags and ordering to MPP_LAND_LR_COM -- only the
+   ! indexing changes, because the four columns it slices out of the full array
+   ! are already gathered here:
+   !     full a(1,:)    <->  cb(1,:)      full a(NX-1,:) <->  cb(3,:)
+   !     full a(2,:)    <->  cb(2,:)      full a(NX,:)   <->  cb(4,:)
+   subroutine MPP_LAND_LR_COM_PACKED(cb,NY,flag)
+      integer, intent(in) :: NY, flag
+      real :: cb(4,NY)
+      real :: data_r(2,NY)
+      integer :: size, tag, ierr
+
+      if(flag .eq. 99) then     ! replace the boundary
+         if(right_id .ge. 0) then       ! send to right first
+            tag = 11 ; size = ny
+            call MPI_Send(cb(3,:),size,MPI_REAL,right_id,tag,HYDRO_COMM_WORLD,ierr)
+         end if
+         if(left_id .ge. 0) then        ! receive from left
+            tag = 11 ; size = ny
+            call MPI_Recv(cb(1,:),size,MPI_REAL,left_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+         endif
+         if(left_id .ge. 0) then        ! send to left second
+            tag = 21 ; size = ny
+            call MPI_Send(cb(2,:),size,MPI_REAL,left_id,tag,HYDRO_COMM_WORLD,ierr)
+         endif
+         if(right_id .ge. 0) then       ! receive from right
+            tag = 21 ; size = ny
+            call MPI_Recv(cb(4,:),size,MPI_REAL,right_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+         endif
+      else                      ! sum the boundary
+         if(right_id .ge. 0) then
+            tag = 11 ; size = 2*ny
+            call MPI_Send(cb(3:4,:),size,MPI_REAL,right_id,tag,HYDRO_COMM_WORLD,ierr)
+         end if
+         if(left_id .ge. 0) then
+            tag = 11 ; size = 2*ny
+            call MPI_Recv(data_r,size,MPI_REAL,left_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+            cb(1,:) = cb(1,:) + data_r(1,:)
+            cb(2,:) = cb(2,:) + data_r(2,:)
+         endif
+         if(left_id .ge. 0) then
+            tag = 21 ; size = 2*ny
+            call MPI_Send(cb(1:2,:),size,MPI_REAL,left_id,tag,HYDRO_COMM_WORLD,ierr)
+         endif
+         if(right_id .ge. 0) then
+            tag = 21 ; size = 2*ny
+            call MPI_Recv(cb(3:4,:),size,MPI_REAL,right_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+         endif
+      endif
+
+   end subroutine MPP_LAND_LR_COM_PACKED
+
+
+   subroutine MPP_LAND_LR_COM8_PACKED(cb,NY,flag)
+      integer, intent(in) :: NY, flag
+      real*8 :: cb(4,NY)
+      real*8 :: data_r(2,NY)
+      integer :: size, tag, ierr
+
+      if(flag .eq. 99) then
+         if(right_id .ge. 0) then
+            tag = 11 ; size = ny
+            call MPI_Send(cb(3,:),size,MPI_DOUBLE_PRECISION,right_id,tag,HYDRO_COMM_WORLD,ierr)
+         end if
+         if(left_id .ge. 0) then
+            tag = 11 ; size = ny
+            call MPI_Recv(cb(1,:),size,MPI_DOUBLE_PRECISION,left_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+         endif
+         if(left_id .ge. 0) then
+            tag = 21 ; size = ny
+            call MPI_Send(cb(2,:),size,MPI_DOUBLE_PRECISION,left_id,tag,HYDRO_COMM_WORLD,ierr)
+         endif
+         if(right_id .ge. 0) then
+            tag = 21 ; size = ny
+            call MPI_Recv(cb(4,:),size,MPI_DOUBLE_PRECISION,right_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+         endif
+      else
+         if(right_id .ge. 0) then
+            tag = 11 ; size = 2*ny
+            call MPI_Send(cb(3:4,:),size,MPI_DOUBLE_PRECISION,right_id,tag,HYDRO_COMM_WORLD,ierr)
+         end if
+         if(left_id .ge. 0) then
+            tag = 11 ; size = 2*ny
+            call MPI_Recv(data_r,size,MPI_DOUBLE_PRECISION,left_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+            cb(1,:) = cb(1,:) + data_r(1,:)
+            cb(2,:) = cb(2,:) + data_r(2,:)
+         endif
+         if(left_id .ge. 0) then
+            tag = 21 ; size = 2*ny
+            call MPI_Send(cb(1:2,:),size,MPI_DOUBLE_PRECISION,left_id,tag,HYDRO_COMM_WORLD,ierr)
+         endif
+         if(right_id .ge. 0) then
+            tag = 21 ; size = 2*ny
+            call MPI_Recv(cb(3:4,:),size,MPI_DOUBLE_PRECISION,right_id,tag,HYDRO_COMM_WORLD,mpp_status,ierr)
+         endif
+      endif
+
+   end subroutine MPP_LAND_LR_COM8_PACKED
 
    subroutine MPP_LAND_COM_INTEGER(data,NX,NY,flag)
 !   ### Communicate message on left right and up bottom directions.
