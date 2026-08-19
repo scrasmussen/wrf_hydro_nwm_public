@@ -3482,7 +3482,13 @@ SUBROUTINE noahmp_acc_run_chunk(n, batch)
     integer :: k
 
 !$acc data copy(batch(1:n))
-!$acc parallel loop gang present(batch(1:n))
+    ! OCCUPANCY PROBE: `gang` alone maps loop iterations to gangs only, leaving
+    ! the vector lanes inside each gang idle -- so most of each SM sits unused.
+    ! Adding `vector` distributes iterations across gangs AND lanes.
+    !
+    ! Correctness is unaffected: columns are independent (no shared state, no
+    ! reductions), which is the same property that already makes `gang` valid.
+!$acc parallel loop gang vector present(batch(1:n))
     do k = 1, n
        call NoahmpMain(batch(k))
     end do
