@@ -1,4 +1,5 @@
 [submodule "src/Land_models/NoahMP/noahmp"]
 	path = src/Land_models/NoahMP/noahmp
-	branch = gpu-rebase-wrf-hydro-integration
+	# branch = gpu-rebase-wrf-hydro-integration
+	branch = gpu-mpi-rebase-wrf-hydro-integration
 	url = https://github.com/scrasmussen/noahmp.git
