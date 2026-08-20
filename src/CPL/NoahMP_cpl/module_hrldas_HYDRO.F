@@ -151,7 +151,12 @@ CONTAINS
            RT_DOMAIN(did)%soldrain = soldrain
         end if
 
-           if(nlst(did)%GWBASESWCRT == 3) gw2d(did)%qsgw = qsgw
+        if(nlst(did)%GWBASESWCRT == 3) then
+           call hydro_stop("GWBASESWCRT=3 (2-D groundwater) is not implemented "// &
+                "on the NoahMP path: qsgw is never supplied.")
+           ! commented out to silence qsgw unitialized warning
+           ! gw2d(did)%qsgw = qsgw
+        end if
 
 #ifdef MPP_LAND
         if(my_id .eq. IO_id) then
