@@ -182,7 +182,7 @@ def buildnml(case, caseroot, compname):
                 with open(case_nml, 'w') as f:
                     f.write(content)
 
-                print(f"   - updated START_YEAR/MONTH/DAY in {case_nml} to {case.get_value("RUN_STARTDATE")}")
+                print(f"   - updated START_YEAR/MONTH/DAY in {case_nml} to {start_year}-{start_month}-{start_day}")
 
         # The case copy is user-visible and persistent. Keep only a link in
         # the run directory so both locations always refer to the same file.

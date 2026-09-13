@@ -79,12 +79,18 @@ CAP_OBJS      += wrfhydro_nuopc_gluecode.o
 CAP_OBJS      += wrfhydro_nuopc_fields.o
 CAP_OBJS      += wrfhydro_nuopc_flags.o
 CAP_OBJS      += wrfhydro_esmf_extensions.o
+# ESMF_TYPEKIND_FIELD/COORD are type(esmf_typekind_flag) named constants, which
+# ifx emits as module data rather than inlining, so this object has to be in the
+# archive or the link fails with
+#   undefined reference to `wrfhydro_nuopc_macros_mp_esmf_typekind_field_'
+CAP_OBJS      += wrfhydro_nuopc_macros.o
 
 CAP_MODS      := rof_comp_nuopc.mod
 CAP_MODS      += wrfhydro_nuopc_gluecode.mod
 CAP_MODS      += wrfhydro_nuopc_fields.mod
 CAP_MODS      += wrfhydro_nuopc_flags.mod
 CAP_MODS      += wrfhydro_esmf_extensions.mod
+CAP_MODS      += wrfhydro_nuopc_macros.mod
 
 CAP_FILES     := $(CAP_OBJS) $(CAP_LIB)
 # CAP_FILES     := $(CAP_OBJS) $(CAP_MODS) $(CAP_LIB) $(CAP_VERS) $(CAP_MK)
@@ -140,8 +146,10 @@ librof.a: $(MODEL_LIB) $(CAP_OBJS)
 	cp $(MODEL_LIB) $@
 	ar rcs $@ $(CAP_OBJS)
 
+FC = mpif90
+
 fflags= \
-  -I/glade/u/apps/derecho/25.10/spack/opt/spack/esmf/8.9.1/cray-mpich/8.1.32/gcc/14.3.0/zri7/include \
+  $(ESMF_F90COMPILEPATHS) \
   -I../../../mod \
   -I./ \
   -I$(NCAR_INC_NETCDF) \
