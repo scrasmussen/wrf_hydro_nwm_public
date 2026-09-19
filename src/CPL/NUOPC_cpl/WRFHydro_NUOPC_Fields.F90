@@ -65,7 +65,7 @@ module wrfhydro_nuopc_fields
   logical, parameter :: EXPORT_SH20 = .true.
   ! logical, parameter :: EXPORT_SH20 = .false.
 
-
+  ! ESMF_REGRIDMETHOD_CONSERVE instead of ESMF_REGRIDMETHOD_BILINEAR
   type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content","smc", &
                  "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &

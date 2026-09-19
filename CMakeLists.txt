@@ -19,9 +19,24 @@ find_package(MPI REQUIRED)
 add_compile_options(${MPI_Fortran_COMPILE_FLAGS})
 include_directories(${MPI_Fortran_INCLUDE_PATH})
 link_directories(${MPI_Fortran_LIBRARIES})
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+# WRF-Hydro is added as a component of the parent ESMX build.  ESMX creates
+# the final application executable after processing its components, so keep
+# this setting in the cache to make it visible when that target is created.
+# This preserves external dependency directories (for example PnetCDF) in the
+# installed executable's RUNPATH.
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL
+    "Append external linker search paths to installed target RUNPATHs" FORCE)
 set(CMAKE_SKIP_BUILD_RPATH  FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
+# When the ESMX superbuild uses shared libraries, ESMX 8.9 does not install
+# ESMX_Data.  Install it alongside the other component libraries.  A static
+# ESMX build links this target into the application and needs no runtime file.
+if(DEFINED ESMX_BUILD_FILE AND CMAKE_INSTALL_LIBDIR AND BUILD_SHARED_LIBS)
+        install(FILES
+                "${CMAKE_BINARY_DIR}/ESMX_Data/${CMAKE_SHARED_LIBRARY_PREFIX}ESMX_Data${CMAKE_SHARED_LIBRARY_SUFFIX}"
+                DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
 
 # enable ctests
 enable_testing()
@@ -120,7 +135,7 @@ if (WRF_HYDRO_NUOPC STREQUAL "")
 endif()
 
 # add preprocessor defines using env variables
-
+message("WRF-Hydro CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message("=============================================================")
 message("-- Start of WRF-Hydro Env VARIABLES" )
 
@@ -202,6 +217,7 @@ message("WRF_HYDRO_CREATE_EXE_SYMLINK = " ${WRF_HYDRO_CREATE_EXE_SYMLINK} )
 message("=============================================================")
 
 #set compile flags based on compiler id
+
 if (MPAS_Hydro)
   message("MPAS-Hydro CMAKE_Fortran_FLAGS = ${CMAKE_Fortran_FLAGS}")
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
@@ -211,32 +227,39 @@ elseif (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
         if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
                 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch")
         endif()
-        set(CMAKE_Fortran_FLAGS_RELEASE "-O2")
-        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -fbacktrace")
+        set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O2")
+        set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -g -fbacktrace")
+        # ESMX adds GNU runtime checks to its Debug flags.  Keep the other
+        # inherited Debug options, but temporarily disable WRF-Hydro's
+        # bounds/allocation checks.
+        string(REPLACE "-fcheck=all" "" CMAKE_Fortran_FLAGS_DEBUG
+          "${CMAKE_Fortran_FLAGS_DEBUG}")
+
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "Intel.*")
         # set compile flags for ifort
         message( "-- Using ifort")
         set(CMAKE_Fortran_FLAGS "-fpp -w -ftz -align all -fno-alias -fp-model precise -FR -convert big_endian")
-        set(CMAKE_Fortran_FLAGS_RELEASE "-O2 -march=core-avx2")
-        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -traceback")
+        set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O2 -march=core-avx2")
+        set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -g -traceback")
 elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "PGI.*") OR (CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC.*"))
         message("-- Using NVHPC / PGI")
         set(CMAKE_Fortran_FLAGS "-Mpreprocess -Mfree -byteswapio -Kieee ")
-        set(CMAKE_Fortran_FLAGS_RELEASE "-O2")
-        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -traceback")
+        set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O2")
+        set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -g -traceback")
 elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "Cray*"))
         message("-- Using Cray")
         set(CMAKE_Fortran_FLAGS "-eZ -ffree -ef -h alias=none -h fp1 -hbyteswapio")
-        set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -G2")
-        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -G0") # -traceback")
+        set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3 -G2")
+        set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -G0") # -traceback
 else()
         message("CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
         message("Fortran compiler: " ${Fortran_COMPILER_NAME})
         message("No optimized Fortran compiler flags are known, we just try -O2...")
         set(CMAKE_Fortran_FLAGS "-cpp")
-        set(CMAKE_Fortran_FLAGS_RELEASE "-O2")
-        set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
+        set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O2")
+        set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -O0 -g")
 endif()
+
 message("-- CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
 
 #set output directories for libraries binaries and fortran .mod files

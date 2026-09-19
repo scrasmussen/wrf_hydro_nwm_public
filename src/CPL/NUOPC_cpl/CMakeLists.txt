@@ -1,7 +1,11 @@
 ### Library Prerequisites
-if (NOT TARGET esmf)
+if (TARGET ESMF::ESMF)
+  set(wrfhydro_esmf_target ESMF::ESMF)
+else()
+  # Standalone WRF-Hydro builds do not provide the parent ESMF target.
   find_package(ESMF MODULE REQUIRED)
-endif (NOT TARGET esmf)
+  set(wrfhydro_esmf_target esmf)
+endif()
 
 ### Library Files
 list(APPEND wrfhydro_nuopc_files
@@ -65,7 +69,7 @@ add_library(wrfhydro_nuopc_obj
   OBJECT
   ${wrfhydro_nuopc_files})
 target_include_directories(wrfhydro_nuopc_obj PRIVATE ${CMAKE_INSTALL_PREFIX})
-target_link_libraries(wrfhydro_nuopc_obj PUBLIC esmf)
+target_link_libraries(wrfhydro_nuopc_obj PUBLIC ${wrfhydro_esmf_target})
 add_dependencies(wrfhydro_nuopc_obj ${wrfhydro_nuopc_deps})
 
 set(WRFHYDRO_NUOPC_MOD_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -102,7 +106,7 @@ add_library(${hydro_nuopc_library}
   )
 target_link_libraries(${hydro_nuopc_library}
   PUBLIC
-  esmf
+  ${wrfhydro_esmf_target}
   ${NETCDF_LIBRARIES}
   )
 

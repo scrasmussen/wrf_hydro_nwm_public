@@ -239,7 +239,7 @@ module WRFHydro_NUOPC
        wrfhydro_get_timestep, wrfhydro_set_timestep, wrfhydro_get_hgrid, &
        wrfhydro_get_restart, wrfhydro_grid_create_from_fulldom, &
        wrfhydro_write_full_resolution_file, regrid_import_mesh_to_grid, &
-       regrid_export_grid_to_mesh, &
+       regrid_export_grid_to_mesh, ensure_regrid_scrip_files, &
        full_resolution_file
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
        field_create, field_realize, field_advertise, check_lsm_forcings, &
@@ -852,6 +852,9 @@ module WRFHydro_NUOPC
     call check(rc, __LINE__, file)
     call ESMF_VMGet(vm, petCount=np, localPet=rank, mpiCommunicator=comm, &
          rc=rc)
+    call check(rc, __LINE__, file)
+
+    call ensure_regrid_scrip_files(vm, rc)
     call check(rc, __LINE__, file)
 
     ! print *, rank, ": nx=", nx, "ny=",ny

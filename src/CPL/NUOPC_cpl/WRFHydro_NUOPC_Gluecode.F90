@@ -65,6 +65,7 @@ module wrfhydro_nuopc_gluecode
 
   public :: wrfhydro_write_full_resolution_file
   public :: wrfhydro_grid_create_from_fulldom
+  public :: ensure_regrid_scrip_files
   public :: regrid_import_mesh_to_grid
   public :: regrid_export_grid_to_mesh
 
@@ -2613,6 +2614,55 @@ contains
   end function get_mpas_dist_grid
 
 
+  subroutine ensure_regrid_scrip_files(vm, rc)
+    type(ESMF_VM), intent(inout) :: vm
+    integer, intent(out) :: rc
+    character(len=:), allocatable :: mpas_grid_file, mpas_scrip_file
+    character(len=:), allocatable :: fulldom_file, fulldom_scrip_file
+    integer :: rank
+    logical :: exists
+
+    rc = ESMF_SUCCESS
+    call ESMF_VMGet(vm, localPet=rank, rc=rc)
+    call check(rc, __LINE__, file)
+
+    ! These are serial NetCDF writers.  Let one PET create missing files and
+    ! synchronize before any PET asks ESMF_RegridWeightGen to open them.
+    if (rank == 0) then
+       mpas_grid_file = get_mpas_grid_filename()
+       mpas_scrip_file = mpas_to_scrip_filename(mpas_grid_file)
+       inquire(file=trim(mpas_scrip_file), exist=exists)
+       if (.not. exists) then
+          print *, 'Creating MPAS SCRIP file ', trim(mpas_scrip_file)
+          call mpas_to_scrip_mesh(mpas_grid_file, mpas_scrip_file)
+       end if
+
+       fulldom_file = read_hires_filename_from_namelist()
+       fulldom_scrip_file = fulldom_to_scrip_filename(fulldom_file)
+       inquire(file=trim(fulldom_scrip_file), exist=exists)
+       if (.not. exists) then
+          print *, 'Creating WRF-Hydro SCRIP file ', trim(fulldom_scrip_file)
+          call fulldom_to_scrip_grid(fulldom_file, fulldom_scrip_file)
+       end if
+    end if
+
+    call ESMF_VMBarrier(vm, rc=rc)
+    call check(rc, __LINE__, file)
+
+    ! Check from every PET after the barrier so a failed/incomplete creation
+    ! is reported before entering the collective regridding routines.
+    mpas_grid_file = get_mpas_grid_filename()
+    mpas_scrip_file = mpas_to_scrip_filename(mpas_grid_file)
+    inquire(file=trim(mpas_scrip_file), exist=exists)
+    if (.not. exists) error stop 'MPAS SCRIP file was not created'
+
+    fulldom_file = read_hires_filename_from_namelist()
+    fulldom_scrip_file = fulldom_to_scrip_filename(fulldom_file)
+    inquire(file=trim(fulldom_scrip_file), exist=exists)
+    if (.not. exists) error stop 'WRF-Hydro SCRIP file was not created'
+  end subroutine ensure_regrid_scrip_files
+
+
   function mpas_to_scrip_filename(mpas_grid_file) result(scrip_mesh_file)
     character(len=*), intent(in) :: mpas_grid_file
     character(len=:), allocatable :: scrip_mesh_file
@@ -2639,6 +2689,189 @@ contains
     end if
     scrip_file = fulldom_file(:i-1) // ".tmp.scrip.nc"
   end function fulldom_to_scrip_filename
+
+
+  ! Convert a logically rectangular WRF-Hydro Fulldom file to SCRIP.  The
+  ! input contains cell centers, so construct shared cell corners by averaging
+  ! the surrounding centers and linearly extrapolating the outer boundary.
+  subroutine fulldom_to_scrip_grid(fulldomFile, scripFile)
+    use netcdf
+    use iso_fortran_env, only : real64
+    implicit none
+
+    character(len=*), intent(in) :: fulldomFile, scripFile
+    integer :: stat, fin, fout, dimid, nx, ny, varid
+    integer :: dim_grid_size, dim_grid_corners, dim_grid_rank
+    integer :: var_grid_center_lat, var_grid_center_lon
+    integer :: var_grid_corner_lat, var_grid_corner_lon
+    integer :: var_grid_area, var_grid_imask, var_grid_dims
+    integer :: i, j, n, k, kp1
+    integer :: grid_dims(2)
+    integer, allocatable :: grid_imask(:)
+    real(real64), allocatable :: lat(:,:), lon(:,:)
+    real(real64), allocatable :: lat_pad(:,:), lon_pad(:,:)
+    real(real64), allocatable :: vertex_lat(:,:), vertex_lon(:,:)
+    real(real64), allocatable :: grid_center_lat(:), grid_center_lon(:)
+    real(real64), allocatable :: grid_corner_lat(:,:), grid_corner_lon(:,:)
+    real(real64), allocatable :: grid_area(:)
+    real(real64), parameter :: pi = acos(-1.0_real64)
+    real(real64), parameter :: degrees_to_radians = pi / 180.0_real64
+    real(real64) :: dlon
+
+    stat = nf90_open(trim(fulldomFile), nf90_nowrite, fin)
+    if (stat /= nf90_noerr) then
+       print *, 'Unable to open Fulldom file ', trim(fulldomFile), ': ', &
+            trim(nf90_strerror(stat))
+       error stop 'Unable to create WRF-Hydro SCRIP file'
+    end if
+
+    stat = nf90_inq_dimid(fin, 'x', dimid)
+    call check_nf(stat)
+    stat = nf90_inquire_dimension(fin, dimid, len=nx)
+    call check_nf(stat)
+    stat = nf90_inq_dimid(fin, 'y', dimid)
+    call check_nf(stat)
+    stat = nf90_inquire_dimension(fin, dimid, len=ny)
+    call check_nf(stat)
+
+    if (nx < 2 .or. ny < 2) error stop 'Fulldom grid must be at least 2 by 2'
+
+    allocate(lat(nx,ny), lon(nx,ny))
+    stat = nf90_inq_varid(fin, 'LATITUDE', varid)
+    call check_nf(stat)
+    stat = nf90_get_var(fin, varid, lat)
+    call check_nf(stat)
+    stat = nf90_inq_varid(fin, 'LONGITUDE', varid)
+    call check_nf(stat)
+    stat = nf90_get_var(fin, varid, lon)
+    call check_nf(stat)
+    stat = nf90_close(fin)
+    call check_nf(stat)
+
+    ! Pad the center arrays by one cell using linear extrapolation.  Averaging
+    ! each group of four padded centers then gives a common vertex for all
+    ! cells that meet at that point.
+    allocate(lat_pad(0:nx+1,0:ny+1), lon_pad(0:nx+1,0:ny+1))
+    lat_pad(1:nx,1:ny) = lat
+    lon_pad(1:nx,1:ny) = lon
+    lat_pad(0,1:ny) = 2.0_real64*lat(1,:) - lat(2,:)
+    lon_pad(0,1:ny) = 2.0_real64*lon(1,:) - lon(2,:)
+    lat_pad(nx+1,1:ny) = 2.0_real64*lat(nx,:) - lat(nx-1,:)
+    lon_pad(nx+1,1:ny) = 2.0_real64*lon(nx,:) - lon(nx-1,:)
+    lat_pad(:,0) = 2.0_real64*lat_pad(:,1) - lat_pad(:,2)
+    lon_pad(:,0) = 2.0_real64*lon_pad(:,1) - lon_pad(:,2)
+    lat_pad(:,ny+1) = 2.0_real64*lat_pad(:,ny) - lat_pad(:,ny-1)
+    lon_pad(:,ny+1) = 2.0_real64*lon_pad(:,ny) - lon_pad(:,ny-1)
+
+    allocate(vertex_lat(nx+1,ny+1), vertex_lon(nx+1,ny+1))
+    do j = 1, ny+1
+       do i = 1, nx+1
+          vertex_lat(i,j) = 0.25_real64 * sum(lat_pad(i-1:i,j-1:j))
+          vertex_lon(i,j) = 0.25_real64 * sum(lon_pad(i-1:i,j-1:j))
+       end do
+    end do
+
+    lat = lat * degrees_to_radians
+    lon = lon * degrees_to_radians
+    vertex_lat = vertex_lat * degrees_to_radians
+    vertex_lon = vertex_lon * degrees_to_radians
+
+    allocate(grid_center_lat(nx*ny), grid_center_lon(nx*ny))
+    allocate(grid_corner_lat(4,nx*ny), grid_corner_lon(4,nx*ny))
+    allocate(grid_area(nx*ny), grid_imask(nx*ny))
+
+    n = 0
+    do j = 1, ny
+       do i = 1, nx
+          n = n + 1
+          grid_center_lat(n) = lat(i,j)
+          grid_center_lon(n) = lon(i,j)
+          grid_corner_lat(:,n) = [vertex_lat(i,j), vertex_lat(i+1,j), &
+               vertex_lat(i+1,j+1), vertex_lat(i,j+1)]
+          grid_corner_lon(:,n) = [vertex_lon(i,j), vertex_lon(i+1,j), &
+               vertex_lon(i+1,j+1), vertex_lon(i,j+1)]
+
+          ! Spherical polygon area in steradians.  Normalize longitude
+          ! differences so this also works for grids crossing the dateline.
+          grid_area(n) = 0.0_real64
+          do k = 1, 4
+             kp1 = modulo(k, 4) + 1
+             dlon = modulo(grid_corner_lon(kp1,n) - grid_corner_lon(k,n) + &
+                  pi, 2.0_real64*pi) - pi
+             grid_area(n) = grid_area(n) + dlon * &
+                  (sin(grid_corner_lat(k,n)) + sin(grid_corner_lat(kp1,n)))
+          end do
+          grid_area(n) = 0.5_real64 * abs(grid_area(n))
+       end do
+    end do
+    grid_imask = 1
+    grid_dims = [nx, ny]
+
+    stat = nf90_create(trim(scripFile), ior(nf90_clobber, nf90_netcdf4), fout)
+    call check_nf(stat)
+    stat = nf90_def_dim(fout, 'grid_size', nx*ny, dim_grid_size)
+    call check_nf(stat)
+    stat = nf90_def_dim(fout, 'grid_corners', 4, dim_grid_corners)
+    call check_nf(stat)
+    stat = nf90_def_dim(fout, 'grid_rank', 2, dim_grid_rank)
+    call check_nf(stat)
+
+    stat = nf90_def_var(fout, 'grid_center_lat', nf90_double, &
+         [dim_grid_size], var_grid_center_lat)
+    call check_nf(stat)
+    stat = nf90_def_var(fout, 'grid_center_lon', nf90_double, &
+         [dim_grid_size], var_grid_center_lon)
+    call check_nf(stat)
+    stat = nf90_def_var(fout, 'grid_corner_lat', nf90_double, &
+         [dim_grid_corners,dim_grid_size], var_grid_corner_lat)
+    call check_nf(stat)
+    stat = nf90_def_var(fout, 'grid_corner_lon', nf90_double, &
+         [dim_grid_corners,dim_grid_size], var_grid_corner_lon)
+    call check_nf(stat)
+    stat = nf90_def_var(fout, 'grid_area', nf90_double, &
+         [dim_grid_size], var_grid_area)
+    call check_nf(stat)
+    stat = nf90_def_var(fout, 'grid_imask', nf90_int, &
+         [dim_grid_size], var_grid_imask)
+    call check_nf(stat)
+    stat = nf90_def_var(fout, 'grid_dims', nf90_int, &
+         [dim_grid_rank], var_grid_dims)
+    call check_nf(stat)
+
+    stat = nf90_put_att(fout, var_grid_center_lat, 'units', 'radians')
+    call check_nf(stat)
+    stat = nf90_put_att(fout, var_grid_center_lon, 'units', 'radians')
+    call check_nf(stat)
+    stat = nf90_put_att(fout, var_grid_corner_lat, 'units', 'radians')
+    call check_nf(stat)
+    stat = nf90_put_att(fout, var_grid_corner_lon, 'units', 'radians')
+    call check_nf(stat)
+    stat = nf90_put_att(fout, var_grid_area, 'units', 'radian^2')
+    call check_nf(stat)
+    stat = nf90_put_att(fout, var_grid_imask, 'units', 'unitless')
+    call check_nf(stat)
+    stat = nf90_enddef(fout)
+    call check_nf(stat)
+
+    stat = nf90_put_var(fout, var_grid_center_lat, grid_center_lat)
+    call check_nf(stat)
+    stat = nf90_put_var(fout, var_grid_center_lon, grid_center_lon)
+    call check_nf(stat)
+    stat = nf90_put_var(fout, var_grid_corner_lat, grid_corner_lat)
+    call check_nf(stat)
+    stat = nf90_put_var(fout, var_grid_corner_lon, grid_corner_lon)
+    call check_nf(stat)
+    stat = nf90_put_var(fout, var_grid_area, grid_area)
+    call check_nf(stat)
+    stat = nf90_put_var(fout, var_grid_imask, grid_imask)
+    call check_nf(stat)
+    stat = nf90_put_var(fout, var_grid_dims, grid_dims)
+    call check_nf(stat)
+    stat = nf90_close(fout)
+    call check_nf(stat)
+
+    print *, 'Created WRF-Hydro SCRIP file ', trim(scripFile)
+  end subroutine fulldom_to_scrip_grid
 
 
   ! Convert MPAS mesh to scrip format. Based on
