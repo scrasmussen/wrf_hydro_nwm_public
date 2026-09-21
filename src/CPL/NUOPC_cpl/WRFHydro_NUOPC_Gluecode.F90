@@ -654,11 +654,12 @@ contains
   end subroutine write_netcdf_full_resolution_file
 
   subroutine read_mesh_var_and_regrid_r(var_name, outvar, &
-       ncid, nCells, &
+       ncid, nCells, cell_ids, rank, gathered, &
        regrid_handle, srcPtr, dstPtr, f_src, f_dst)
     character(len=*), intent(in) :: var_name
     real, allocatable, intent(inout) :: outvar(:,:)
-    integer, intent(in) :: ncid, nCells
+    integer, intent(in) :: ncid, nCells, cell_ids(:), rank
+    real(ESMF_KIND_R8), intent(out) :: gathered(:,:)
     real(ESMF_KIND_R8), pointer, intent(inout) :: srcPtr(:), dstPtr(:,:)
     type(ESMF_Field) :: f_src, f_dst
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle
@@ -666,7 +667,7 @@ contains
     ! local
     real, allocatable :: var(:)
     integer :: rc, stat, varid
-    print *, "Regridding ", trim(var_name)
+    if (rank == 0) print *, "Regridding ", trim(var_name)
 
     ! read in NetCDF Vars
     stat = nf90_inq_varid(ncid, var_name, varid)
@@ -675,20 +676,8 @@ contains
     stat = nf90_get_var(ncid, varid, var)
     call check_nf(stat)
 
-    ! print *, "ncells =", ncells
-    ! print *, "var_r(1:10) =", var(1:10)
-
-    if (size(srcPtr) /= size(var)) then
-       rc = ESMF_RC_ARG_SIZE
-       stop 'var_r length does not match local mesh ELEMENT count.'
-    end if
-    ! if (size(dstPtr,1) /= size(outvar,1) .or. &
-    !     size(dstPtr,2) /= size(outvar,2)) then
-    !    rc = ESMF_RC_ARG_SIZE
-    !     stop 'outvar shape does not match local grid CENTER size.'
-    ! end if
-
-    srcPtr = real(var, kind=ESMF_KIND_R8)
+    ! The file is global; the source Field follows the local MPAS partition.
+    srcPtr = real(var(cell_ids), kind=ESMF_KIND_R8)
     dstPtr = 0.0_ESMF_KIND_R8
 
     call ESMF_FieldRegrid(srcField=f_src, dstField=f_dst, &
@@ -696,19 +685,20 @@ contains
          rc=rc)
     call check(rc, __LINE__, file)
 
-    outvar = dstPtr
-
-    print *, "  outvar_r(1:2,1:2) =", outvar(1:2,1:2)
-    print *, "  outvar_r shape =", shape(outvar)
+    ! Gather the structured destination grid in global (x,y) order.
+    call ESMF_FieldGather(f_dst, farray=gathered, rootPet=0, rc=rc)
+    call check(rc, __LINE__, file)
+    if (rank == 0) outvar = real(gathered)
   end subroutine read_mesh_var_and_regrid_r
 
 
   subroutine read_mesh_var_and_regrid_i(var_name, outvar, &
-       ncid, nCells, &
+       ncid, nCells, cell_ids, rank, gathered, &
        regrid_handle, srcPtr, dstPtr, f_src, f_dst)
     character(len=*), intent(in) :: var_name
     integer, allocatable, intent(inout) :: outvar(:,:)
-    integer, intent(in) :: ncid, nCells
+    integer, intent(in) :: ncid, nCells, cell_ids(:), rank
+    real(ESMF_KIND_R8), intent(out) :: gathered(:,:)
     real(ESMF_KIND_R8), pointer, intent(inout) :: srcPtr(:), dstPtr(:,:)
     type(ESMF_Field) :: f_src, f_dst
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle
@@ -716,7 +706,7 @@ contains
     ! local
     integer, allocatable :: var_i(:)
     integer :: rc, stat, varid
-    print *, "Regridding ", trim(var_name)
+    if (rank == 0) print *, "Regridding ", trim(var_name)
 
     ! read in NetCDF Vars
     stat = nf90_inq_varid(ncid, var_name, varid)
@@ -725,18 +715,7 @@ contains
     stat = nf90_get_var(ncid, varid, var_i)
     call check_nf(stat)
 
-    if (size(srcPtr) /= size(var_i)) then
-       rc = ESMF_RC_ARG_SIZE
-       print *, "size(srcPtr) =", size(srcPtr), "size(var_i)) =", size(var_i)
-       error stop 'var_i length does not match local mesh ELEMENT count.'
-    end if
-    ! if (size(dstPtr,1) /= size(outvar,1) .or. &
-    !     size(dstPtr,2) /= size(outvar,2)) then
-    !    rc = ESMF_RC_ARG_SIZE
-    !     stop 'outvar shape does not match local grid CENTER size.'
-    ! end if
-
-    srcPtr = real(var_i, kind=ESMF_KIND_R8)
+    srcPtr = real(var_i(cell_ids), kind=ESMF_KIND_R8)
     dstPtr = 0.0_ESMF_KIND_R8
 
     call ESMF_FieldRegrid(srcField=f_src, dstField=f_dst, &
@@ -744,32 +723,30 @@ contains
          rc=rc)
     call check(rc, __LINE__, file)
 
-    ! print*, trim(var_name), "dstPtr =", dstPtr
-    outvar = nint(dstPtr)
-
-    print *, "  outvar_i(1:2,1:2) =", outvar(1:2,1:2)
-    print *, "  outvar_i shape =", shape(outvar)
+    call ESMF_FieldGather(f_dst, farray=gathered, rootPet=0, rc=rc)
+    call check(rc, __LINE__, file)
+    if (rank == 0) outvar = nint(gathered)
   end subroutine read_mesh_var_and_regrid_i
 
   subroutine wrfhydro_write_full_resolution_file(wrfhydro_grid, wrfhydro_mesh, &
-       regrid_handle_con, regrid_handle_nn_stod, regrid_handle_nn_dtos)
+       regrid_handle_con, regrid_handle_nn_stod, regrid_handle_nn_dtos, vm)
     use netcdf
     type(ESMF_Grid), intent(in) :: wrfhydro_grid
     type(ESMF_Mesh), intent(in) :: wrfhydro_mesh
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_con
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_stod
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_dtos
-    ! type(ESMF_Mesh)            :: wrfhydro_mesh
+    type(ESMF_VM), intent(in) :: vm
     character(:), allocatable :: mpas_file
 
     ! NetCDF Variables
-    integer :: stat, ncid, dimid, nCells, varid
-    integer :: ncid_out
-    integer, allocatable :: var_i(:)
-    real, allocatable :: var_r(:)
+    integer :: stat, ncid, dimid, nCells
 
     ! ESMF Variables
     type(ESMF_Field) :: f_src, f_dst
+    type(ESMF_DistGrid) :: mesh_distgrid
+    integer, allocatable :: cell_ids(:)
+    real(ESMF_KIND_R8), allocatable :: gathered(:,:)
     real(ESMF_KIND_R8), pointer :: srcPtr(:) => null()
     real(ESMF_KIND_R8), pointer :: dstPtr(:,:) => null()
     integer :: rc
@@ -779,12 +756,11 @@ contains
     integer, dimension(:,:), allocatable :: soil_cat, lu_index, landmask
 
     ! locals
-    integer :: nx, ny
-    ! type(ESMF_RouteHandle) :: regrid_handle_tmp
+    integer :: nx, ny, rank, local_count, grid_lb(2), grid_ub(2)
 
-    print *, "=== entering wrfhydro_write_full_resolution_file ==="
-    ! initialize values
-    ! regrid_handle_tmp = regrid_handle
+    call ESMF_VMGet(vm, localPet=rank, rc=rc)
+    call check(rc, __LINE__, file)
+    if (rank == 0) print *, "=== entering wrfhydro_write_full_resolution_file ==="
 
     ! setup MPAS NetCDF variables
     mpas_file = "frontrange.static.nc"
@@ -809,7 +785,7 @@ contains
     call check(rc, __LINE__, file)
     f_dst = ESMF_FieldCreate(grid=wrfhydro_grid, &
          typekind=ESMF_TYPEKIND_R8, &
-         indexflag=ESMF_INDEX_DELOCAL, &
+         indexflag=ESMF_INDEX_GLOBAL, &
          name='var_dst', rc=rc)
     call check(rc, __LINE__, file)
 
@@ -818,30 +794,51 @@ contains
     call ESMF_FieldGet(f_dst, farrayPtr=dstPtr, rc=rc)
     call check(rc, __LINE__, file)
 
-    ! print *, "prencells =", ncells
-    ! print *, "prelat(1:2,1:2) =", lat(1:2,1:2)
-    ! print *, "prelon(1:2,1:2) =", lon(1:2,1:2)
-    ! print *, "prehgt(1:2,1:2) =", hgt(1:2,1:2)
-    ! print *, "presoil_cat(1:2,1:2) =", soil_cat(1:2,1:2)
-    ! print *, "preveg(1:2,1:2) =", veg(1:2,1:2)
-    ! print *, "prelu_index(1:2,1:2) =", lu_index(1:2,1:2)
-    ! print *, "prelandmask(1:2,1:2) =", landmask(1:2,1:2)
-    ! print *, "=================="
+    ! Use the Field's element distribution to preserve its local data order.
+    ! get_mpas_dist_grid creates one DE per PET with global MPAS cell IDs.
+    call ESMF_MeshGet(wrfhydro_mesh, elementDistgrid=mesh_distgrid, rc=rc)
+    call check(rc, __LINE__, file)
+    call ESMF_DistGridGet(mesh_distgrid, localDe=0, elementCount=local_count, rc=rc)
+    call check(rc, __LINE__, file)
+    if (local_count /= size(srcPtr)) &
+         error stop 'MPAS cell count does not match local source Field size'
+    allocate(cell_ids(local_count))
+    call ESMF_DistGridGet(mesh_distgrid, localDe=0, seqIndexList=cell_ids, rc=rc)
+    call check(rc, __LINE__, file)
+    if (any(cell_ids < 1) .or. any(cell_ids > nCells)) &
+         error stop 'MPAS cell IDs are outside the static file nCells dimension'
 
+    call ESMF_GridGet(wrfhydro_grid, tile=1, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         minIndex=grid_lb, maxIndex=grid_ub, rc=rc)
+    call check(rc, __LINE__, file)
+    nx = grid_ub(1) - grid_lb(1) + 1
+    ny = grid_ub(2) - grid_lb(2) + 1
+    if (rank == 0) then
+       allocate(gathered(nx, ny))
+    else
+       ! ESMF ignores the receive buffer on non-root PETs.
+       allocate(gathered(0, 0))
+    end if
 
     ! nearest neighbor regridding
     call read_mesh_var_and_regrid('isltyp', soil_cat, ncid, nCells, &
+         cell_ids, rank, gathered, &
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('ivgtyp', lu_index, ncid, nCells, &
+         cell_ids, rank, gathered, &
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('landmask', landmask, ncid, nCells, &
+         cell_ids, rank, gathered, &
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
-    ! bilinear regridding
+    ! conservative regridding
     call read_mesh_var_and_regrid('ter', hgt, ncid, nCells, &
+         cell_ids, rank, gathered, &
          regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('latCell', lat, ncid, nCells, &
+         cell_ids, rank, gathered, &
          regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('lonCell', lon, ncid, nCells, &
+         cell_ids, rank, gathered, &
          regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
 
     stat = nf90_close(ncid)
@@ -852,12 +849,15 @@ contains
     call check(rc, __LINE__, file)
 
 
-    nx = size(hgt, dim=1)
-    ny = size(hgt, dim=2)
-    call write_netcdf_full_resolution_file(nx, ny, hgt, soil_cat, lat, lon, &
-         lu_index, landmask)
+    if (rank == 0) then
+       call write_netcdf_full_resolution_file(nx, ny, hgt, soil_cat, lat, lon, &
+            lu_index, landmask)
+       print *, "=== exiting wrfhydro_write_full_resolution_file ==="
+    end if
 
-    print *, "=== exiting wrfhydro_write_full_resolution_file ==="
+    ! Do not let other PETs stop until the serial NetCDF writer has closed.
+    call ESMF_VMBarrier(vm, rc=rc)
+    call check(rc, __LINE__, file)
   end subroutine wrfhydro_write_full_resolution_file
 
   function wrfhydro_open_mesh(vm, rc) result(mesh)
@@ -1013,13 +1013,8 @@ contains
     if(ESMF_STDERRORCHECK(rc)) return
 
 
-    ! each step (after src has values):
-    print *, "Regrid field, applying weights"
-    call ESMF_LogWrite("Regrid field, applying weights", &
-         ESMF_LOGMSG_INFO, rc=rc)
-    ! Compute a regridding operation
-    call ESMF_FieldRegrid(import_field, new_field, route_handle, rc=rc)
-    if (ESMF_STDERRORCHECK(rc)) return
+    ! Only store the operator here.  The static-file reader fills the source
+    ! Field before applying it; these temporary Fields have no data yet.
 
 
 
@@ -1606,11 +1601,8 @@ contains
     type(ESMF_Grid) :: grid
     integer, intent(out) :: rc
     integer :: nx, ny
-    real :: lon0, lat0, dlon, dlat
-    real, allocatable :: lats(:), lons(:)
-    real :: lat_start, lat_end, lon_start, lon_end
     real(ESMF_KIND_R8), pointer :: lon(:,:), lat(:,:)
-    integer :: i,j
+    integer :: local_lb(2), local_ub(2)
 
     integer :: ncid, dim_xid, dim_yid
     integer :: var_lat_id, var_lon_id
@@ -1656,14 +1648,17 @@ contains
     call check_nf(stat)
     stat = nf90_get_var(ncid, var_lon_id, longitude)
     call check_nf(stat)
+    call check_nf(nf90_close(ncid))
 
     ! print *, "lat shape =", shape(latitude)
     ! print *, "lat(1:2,1:2) =", latitude(1:2,1:2)
 
+    ! Let ESMF distribute the grid across the current VM (one DE per PET).
+    ! Global indices let us select each PET's coordinates from Fulldom.
     grid = ESMF_GridCreate(&
-         regDecomp=[1, 1], &
          decompflag=[ESMF_DECOMP_BALANCED, ESMF_DECOMP_BALANCED], &
          maxIndex=[nx,ny], &
+         indexflag=ESMF_INDEX_GLOBAL, &
          rc=rc)
     call check(rc, __LINE__, file)
 
@@ -1673,14 +1668,15 @@ contains
 
     ! Get writable pointers to the coordinate arrays and fill a regular lat/lon
     call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
-         coordDim=1, farrayPtr=lon, rc=rc)
+         coordDim=1, farrayPtr=lon, &
+         exclusiveLBound=local_lb, exclusiveUBound=local_ub, rc=rc)
     call check(rc, __LINE__, file)
     call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
          coordDim=2, farrayPtr=lat, rc=rc)
     call check(rc, __LINE__, file)
 
-    lat(:,:) = latitude(:,:)
-    lon(:,:) = longitude(:,:)
+    lat(:,:) = latitude(local_lb(1):local_ub(1), local_lb(2):local_ub(2))
+    lon(:,:) = longitude(local_lb(1):local_ub(1), local_lb(2):local_ub(2))
   end function wrfhydro_grid_create_from_fulldom
 
 #undef METHOD
@@ -2533,7 +2529,8 @@ contains
     type(ESMF_VM), intent(inout) :: vm
     integer, intent(inout) :: rc
     type(ESMF_DistGrid) :: dist_grid
-    character(len=:), allocatable :: mpas_grid_file, iomsg
+    character(len=:), allocatable :: mpas_grid_file
+    character(len=512) :: iomsg
     character(len=:), allocatable :: config_block_decomp_file_prefix
     character(len=512) :: mpas_graph_file
     integer :: unit, iostat, irank, localCount, ierr, tmp
@@ -2541,8 +2538,7 @@ contains
     integer, allocatable :: gindex(:)
     rc = ESMF_SUCCESS
 
-    call ESMF_VMGetGlobal(vm, rc=rc)
-    call check(rc, __LINE__, file)
+    ! Preserve the caller's component VM and its PET numbering.
     call ESMF_VMGet(vm, localPet=rank, petCount=np, rc=rc)
     call check(rc, __LINE__, file)
 
@@ -2605,10 +2601,10 @@ contains
              gindex(idx) = inode ! seqIndex = global node id
           end if
        end do
+       close(unit)
     end if
-    close(unit)
 
-    print *, rank,":gindex=", gindex(1:10)
+    print *, rank,":gindex=", gindex(1:min(10, localCount))
     ! stop "here"
     dist_grid = ESMF_DistGridCreate(arbSeqIndexList=gindex, rc=rc)
   end function get_mpas_dist_grid
