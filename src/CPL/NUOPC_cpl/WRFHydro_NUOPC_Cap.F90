@@ -242,6 +242,7 @@ module WRFHydro_NUOPC
        regrid_export_grid_to_mesh, ensure_regrid_scrip_files, &
        full_resolution_file
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
+       initialize_cap_fld_list, &
        field_create, field_realize, field_advertise, check_lsm_forcings, &
        field_advertise_log, field_realize_log, read_impexp_config_flnm, &
        field_find_standardname, field_find_statename, state_fill_uniform, &
@@ -814,6 +815,7 @@ module WRFHydro_NUOPC
 
     type(ESMF_Grid)            :: wrfhydro_grid_p1
     logical :: geo_file_exists
+    integer :: create_fullres(1)
 
     rc = ESMF_SUCCESS
 
@@ -861,14 +863,22 @@ module WRFHydro_NUOPC
     ! print *, rank, ": np=", np
     ! print *, rank, ": did =", is%wrap%did
 
-    inquire(file=full_resolution_file, exist=geo_file_exists)
-    if (.not. geo_file_exists .and. np == 1) then
+    ! All PETs must take the same branch before entering collective regridding.
+    create_fullres = 0
+    if (rank == 0) then
+       inquire(file=full_resolution_file, exist=geo_file_exists)
+       if (.not. geo_file_exists) create_fullres = 1
+    end if
+    call ESMF_VMBroadcast(vm, create_fullres, count=1, rootPet=0, rc=rc)
+    call check(rc, __LINE__, file)
+    if (create_fullres(1) == 1) then
        print *, rank, "entering wrfhydro grid create, mesh regrid section"
        wrfhydro_mesh = wrfhydro_open_mesh(vm, rc)
        call check(rc, __LINE__, file)
 
        ! wrfhydro_grid_p1 = wrfhydro_GridCreate(is%wrap%did, rc=rc)
        wrfhydro_grid_p1 = wrfhydro_grid_create_from_fulldom(rc=rc)
+       call check(rc, __LINE__, file)
        call ESMF_GridValidate(wrfhydro_grid_p1, rc=rc)
        call check(rc, __LINE__, file)
 
@@ -911,14 +921,9 @@ module WRFHydro_NUOPC
        ! write to hydro.fullres.nc
        call wrfhydro_write_full_resolution_file(wrfhydro_grid_p1, &
             wrfhydro_mesh, regrid_handle_con, regrid_handle_nn_stod, &
-            regrid_handle_nn_dtos)
-       print*, "CREATED LOW-RES GRID"
+            regrid_handle_nn_dtos, vm)
+       if (rank == 0) print *, "Created ", full_resolution_file
        stop "Full Resolution File Created, Restart Hydro With Any NP"
-    else if (.not. geo_file_exists .and. np /= 1) then
-       print *, "Error: full resolution file ", full_resolution_file, &
-            " does not exists"
-       print *, "Rerun with np=1 and hydro will create the geo file"
-       stop "Full Resolution File Does Not Exist"
     else
        print *, trim(full_resolution_file), &
             " full resolution file exists, continuing"
@@ -955,6 +960,7 @@ module WRFHydro_NUOPC
       call check(rc, __LINE__, file)
     endif
 
+    call initialize_cap_fld_list()
     call field_dictionary_add(fieldList=cap_fld_list, rc=rc)
     call check(rc, __LINE__, file)
 

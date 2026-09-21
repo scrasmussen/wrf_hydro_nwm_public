@@ -10,7 +10,7 @@ contains
   subroutine check(rc, line, err_file, did)
     integer, intent(in) :: rc
     integer, intent(in) :: line
-    character(len=ESMF_MAXSTR), intent(in) :: err_file
+    character(len=*), intent(in) :: err_file
     integer, intent(in), optional :: did
     logical :: res
 

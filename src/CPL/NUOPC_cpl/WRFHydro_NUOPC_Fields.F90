@@ -65,94 +65,12 @@ module wrfhydro_nuopc_fields
   logical, parameter :: EXPORT_SH20 = .true.
   ! logical, parameter :: EXPORT_SH20 = .false.
 
-  ! ESMF_REGRIDMETHOD_CONSERVE instead of ESMF_REGRIDMETHOD_BILINEAR
-  type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
-    cap_fld_type("inst_total_soil_moisture_content","smc", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
-    cap_fld_type("inst_soil_moisture_content","slc", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
-    cap_fld_type("inst_soil_temperature","stc", &
-                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
-    cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
-    cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
-    cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
-    cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SH20, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_2","smc2", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_3","smc3", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_4","smc4", &
-                 ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_temperature_layer_1","stc1", &
-                 "K", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_F, 288.d0),                 &
-    cap_fld_type("soil_temperature_layer_2","stc2", &
-                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_F, 288.d0),             &
-    cap_fld_type("soil_temperature_layer_3","stc3", &
-                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_F, 288.d0),             &
-    cap_fld_type("soil_temperature_layer_4","stc4", &
-                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_F, 288.d0),             &
-    cap_fld_type("soil_porosity","smcmax1", &
-                 "1     ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_F, EXPORT_F, 0.45d0),                 &
-    cap_fld_type("vegetation_type","vegtyp", &
-                 ! "1     ", ESMF_REGRIDMETHOD_NEAREST_DTOS, &
-                 "1     ", ESMF_REGRIDMETHOD_NEAREST_STOD, &
-                 IMPORT_F, EXPORT_F, 16.0d0),                 & !FIX
-    cap_fld_type("surface_water_depth","sfchead", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_F, EXPORT_SF_HEAD, 0.00d0),             &
-    cap_fld_type("time_step_infiltration_excess","infxsrt", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_F, 0.00d0),             &
-    cap_fld_type("soil_column_drainage","soldrain", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_F, 0.00d0),             &
-    ! FOOBAR: double check this is ok
-    ! these two accumulated variables break during runtime
-    ! it could be they are pointing to the same variable
-    ! as infxsrt and soldrain on the MPAS side
-    cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_F, EXPORT_F, 0.00d0),             &
-    cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 ! IMPORT_F, EXPORT_SMC, 0.00d0)              &
-                 IMPORT_F, EXPORT_F, 0.00d0)              &
-    /)
+  ! Initialize metadata at runtime without constructing the ESMF members.
+  type(cap_fld_type), target :: cap_fld_list(22)
+  logical :: cap_fld_list_initialized = .false.
 
   public cap_fld_list
+  public initialize_cap_fld_list
   public field_dictionary_add
   public field_create
   public field_realize
@@ -186,6 +104,131 @@ module wrfhydro_nuopc_fields
 
   !-----------------------------------------------------------------------------
 contains
+  !-----------------------------------------------------------------------------
+
+  subroutine initialize_cap_fld_list()
+    ! Initialize once so later calls cannot overwrite configured metadata.
+    ! ESMF fields and route handles are created separately when first needed.
+    if (cap_fld_list_initialized) return
+
+    call set_field_metadata(cap_fld_list(1), &
+         "inst_total_soil_moisture_content", "smc", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3)
+    call set_field_metadata(cap_fld_list(2), &
+         "inst_soil_moisture_content", "slc", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3)
+    call set_field_metadata(cap_fld_list(3), &
+         "inst_soil_temperature", "stc", &
+         "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
+         TMP_IMPORT_T, EXPORT_F, 288.d0, 3)
+    call set_field_metadata(cap_fld_list(4), &
+         "liquid_fraction_of_soil_moisture_layer_1", "sh2ox1", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SH20, 0.20d0)
+    call set_field_metadata(cap_fld_list(5), &
+         "liquid_fraction_of_soil_moisture_layer_2", "sh2ox2", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SH20, 0.20d0)
+    call set_field_metadata(cap_fld_list(6), &
+         "liquid_fraction_of_soil_moisture_layer_3", "sh2ox3", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SH20, 0.20d0)
+    call set_field_metadata(cap_fld_list(7), &
+         "liquid_fraction_of_soil_moisture_layer_4", "sh2ox4", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SH20, 0.20d0)
+    call set_field_metadata(cap_fld_list(8), &
+         "soil_moisture_fraction_layer_1", "smc1", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SMC, 0.20d0)
+    call set_field_metadata(cap_fld_list(9), &
+         "soil_moisture_fraction_layer_2", "smc2", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SMC, 0.20d0)
+    call set_field_metadata(cap_fld_list(10), &
+         "soil_moisture_fraction_layer_3", "smc3", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SMC, 0.20d0)
+    call set_field_metadata(cap_fld_list(11), &
+         "soil_moisture_fraction_layer_4", "smc4", &
+         "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_SMC, 0.20d0)
+    call set_field_metadata(cap_fld_list(12), &
+         "soil_temperature_layer_1", "stc1", &
+         "K", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_F, 288.d0)
+    call set_field_metadata(cap_fld_list(13), &
+         "soil_temperature_layer_2", "stc2", &
+         "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_F, 288.d0)
+    call set_field_metadata(cap_fld_list(14), &
+         "soil_temperature_layer_3", "stc3", &
+         "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_F, 288.d0)
+    call set_field_metadata(cap_fld_list(15), &
+         "soil_temperature_layer_4", "stc4", &
+         "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_F, 288.d0)
+    call set_field_metadata(cap_fld_list(16), &
+         "soil_porosity", "smcmax1", &
+         "1     ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_F, EXPORT_F, 0.45d0)
+    call set_field_metadata(cap_fld_list(17), &
+         "vegetation_type", "vegtyp", &
+         "1     ", ESMF_REGRIDMETHOD_NEAREST_STOD, &
+         IMPORT_F, EXPORT_F, 16.0d0)
+    call set_field_metadata(cap_fld_list(18), &
+         "surface_water_depth", "sfchead", &
+         "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_F, EXPORT_SF_HEAD, 0.00d0)
+    call set_field_metadata(cap_fld_list(19), &
+         "time_step_infiltration_excess", "infxsrt", &
+         "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_F, 0.00d0)
+    call set_field_metadata(cap_fld_list(20), &
+         "soil_column_drainage", "soldrain", &
+         "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_T, EXPORT_F, 0.00d0)
+    ! These accumulated variables remain disabled: they may alias infxsrt
+    ! and soldrain on the MPAS side and have caused runtime failures.
+    call set_field_metadata(cap_fld_list(21), &
+         "surface_runoff_accumulated", "sfcrunoff", &
+         "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_F, EXPORT_F, 0.00d0)
+    call set_field_metadata(cap_fld_list(22), &
+         "subsurface_runoff_accumulated", "udrunoff", &
+         "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+         IMPORT_F, EXPORT_F, 0.00d0)
+
+    cap_fld_list_initialized = .true.
+
+  contains
+
+    subroutine set_field_metadata(fld, sd_name, st_name, units, &
+         regrid_method, ad_import, ad_export, vl_fillv, num_dims)
+      type(cap_fld_type), intent(inout) :: fld
+      character(len=*), intent(in) :: sd_name, st_name, units
+      type(ESMF_RegridMethod_Flag), intent(in) :: regrid_method
+      logical, intent(in) :: ad_import, ad_export
+      real(ESMF_KIND_R8), intent(in) :: vl_fillv
+      integer, intent(in), optional :: num_dims
+
+      ! Assign only metadata; do not copy or reset the runtime ESMF objects.
+      fld%sd_name = sd_name
+      fld%st_name = st_name
+      fld%units = units
+      fld%regrid_method = regrid_method
+      fld%ad_import = ad_import
+      fld%ad_export = ad_export
+      fld%vl_fillv = vl_fillv
+      fld%num_dims = 2
+      if (present(num_dims)) fld%num_dims = num_dims
+    end subroutine set_field_metadata
+
+  end subroutine initialize_cap_fld_list
+
   !-----------------------------------------------------------------------------
 
   subroutine field_dictionary_add(fieldList, rc)
