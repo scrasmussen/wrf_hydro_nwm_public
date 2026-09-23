@@ -855,7 +855,8 @@ subroutine disaggregateDomain_drv(did)
                             RT_DOMAIN(did)%IXRT, RT_DOMAIN(did)%JXRT, nlst(did)%AGGFACTRT, &
                             RT_DOMAIN(did)%SICE, RT_DOMAIN(did)%SMC, RT_DOMAIN(did)%SH2OX, &
                             RT_DOMAIN(did)%INFXSRT, rt_domain(did)%dist_lsm(:,:,9), &
-                            RT_DOMAIN(did)%SMCMAX1, RT_DOMAIN(did)%SMCREF1, &
+                            ! RT_DOMAIN(did)%SMCMAX1, RT_DOMAIN(did)%SMCREF1, &
+                            RT_DOMAIN(did)%SMCMAX3D, RT_DOMAIN(did)%SMCREF1, &
                             RT_DOMAIN(did)%SMCWLT1, RT_DOMAIN(did)%VEGTYP, RT_DOMAIN(did)%LKSAT, &
                             RT_DOMAIN(did)%NEXP, &
                             rt_domain(did)%overland%properties%distance_to_neighbor, &
@@ -896,7 +897,8 @@ end subroutine disaggregateDomain_drv
 ! Notes:
 !===================================================================================================
 subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
-                              SICE, SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, &
+                              ! SICE, SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, &
+                              SICE, SMC, SH2OX, INFXSRT, area_lsm, SMCMAX3D, SMCREF1, &
                               SMCWLT1, VEGTYP, LKSAT, NEXP, dist, INFXSWGT, &
                               LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
                               SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT,  &
@@ -925,7 +927,8 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    ! LSM grid parameters:
    real, intent(in),  dimension(IX,JX)           :: area_lsm ! cell area on the coarse grid (m2)
    integer, intent(in), dimension(IX,JX)         :: VEGTYP, soiltyp ! coarse grid veg and soil types
-   real, intent(in),  dimension(IX,JX)           :: SMCMAX1 ! coarse grid porosity
+   ! real, intent(in),  dimension(IX,JX)           :: SMCMAX1 ! coarse grid porosity
+   real, intent(in), dimension(IX,JX,NSOIL)      :: SMCMAX3D
    real, intent(in),  dimension(IX,JX)           :: SMCREF1 ! coarse grid field capacity
    real, intent(in),  dimension(IX,JX)           :: SMCWLT1 ! coarse grid wilting point
    real, intent(in),  dimension(IX,JX)           :: LKSAT ! coarse grid lateral ksat (m/s)
@@ -990,6 +993,12 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 
    ! Initialize variables
    SICE = SMC - SH2OX
+
+! write(6,*) 'CTSM_COARSE_CAPACITY_DIAG ', &
+     ! ' max_SMC_minus_porosity=', maxval(SMC - SMCMAX3D), &
+     ! ' count_SMC_gt_porosity=', count(SMC > SMCMAX3D + 1.0e-6)
+! call flush(6)
+
    SMCREFRT = 0.0
    ! ADCHANGE: Initialize ocean infxsubrt var to 0. Currently just a dump
    ! variable but could be used for future ocean model coupling
@@ -1037,6 +1046,43 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
          !DJG Weighting alg. alteration...
          LSMVOL = INFXSRT(I,J) * area_lsm(I,J) ! mm * m2
 
+#ifdef MPP_LAND
+         ! if (I == 17 .and. J == 8) then
+            ! write(6,*) 'SH2OWGT_COARSE_DIAG layer1 ', &
+                 ! ' min=', minval(SH2OWGT( &
+                    ! (I-1)*AGGFACTRT+1+merge(1,0,left_id.ge.0): &
+                     ! I*AGGFACTRT+merge(1,0,left_id.ge.0), &
+                    ! (J-1)*AGGFACTRT+1+merge(1,0,down_id.ge.0): &
+                     ! J*AGGFACTRT+merge(1,0,down_id.ge.0), 1)), &
+                 ! ' max=', maxval(SH2OWGT( &
+                    ! (I-1)*AGGFACTRT+1+merge(1,0,left_id.ge.0): &
+                     ! I*AGGFACTRT+merge(1,0,left_id.ge.0), &
+                    ! (J-1)*AGGFACTRT+1+merge(1,0,down_id.ge.0): &
+                     ! J*AGGFACTRT+merge(1,0,down_id.ge.0), 1)), &
+                 ! ' mean=', sum(SH2OWGT( &
+                    ! (I-1)*AGGFACTRT+1+merge(1,0,left_id.ge.0): &
+                     ! I*AGGFACTRT+merge(1,0,left_id.ge.0), &
+                    ! (J-1)*AGGFACTRT+1+merge(1,0,down_id.ge.0): &
+                     ! J*AGGFACTRT+merge(1,0,down_id.ge.0), 1)) / &
+                     ! real(AGGFACTRT*AGGFACTRT)
+            ! call flush(6)
+         ! endif
+#else
+         ! if (I == 17 .and. J == 8) then
+            ! write(6,*) 'SH2OWGT_COARSE_DIAG layer1 ', &
+                 ! ' min=', minval(SH2OWGT((I-1)*AGGFACTRT+1:I*AGGFACTRT, &
+                                         ! (J-1)*AGGFACTRT+1:J*AGGFACTRT,1)), &
+                 ! ' max=', maxval(SH2OWGT((I-1)*AGGFACTRT+1:I*AGGFACTRT, &
+                                         ! (J-1)*AGGFACTRT+1:J*AGGFACTRT,1)), &
+                 ! ' mean=', sum(SH2OWGT((I-1)*AGGFACTRT+1:I*AGGFACTRT, &
+                                      ! (J-1)*AGGFACTRT+1:J*AGGFACTRT,1)) / &
+                          ! real(AGGFACTRT*AGGFACTRT)
+            ! call flush(6)
+         ! endif
+#endif
+
+
+
          do AGGFACYRT=AGGFACTRT-1,0,-1 ! Start disagg fine grid j loop
             do AGGFACXRT=AGGFACTRT-1,0,-1 ! Start disagg fine grid i loop
 
@@ -1058,24 +1104,30 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                   ! Adjustments for soil ice
                   IF (SICE(I,J,KRT) .gt. 0) then
                      !DJG Adjust SMCMAX for SICE when subsfc routing...make 3d variable
-                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J) - SICE(I,J,KRT)
+                     ! SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J) - SICE(I,J,KRT)
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX3D(I,J,KRT) - SICE(I,J,KRT)
                      SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J) - SICE(I,J,KRT) !TODO: This can be negative! e.g., when almost saturated and fully frozen
-                     WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J)
+                     ! WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J)
+                     WATHOLDCAP = SMCMAX3D(I,J,KRT) - SMCWLT1(I,J)
                      IF (SICE(I,J,KRT) .le. WATHOLDCAP)    then
                         SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
                      else
-                        if (SICE(I,J,KRT) .lt. SMCMAX1(I,J)) then
+                        ! if (SICE(I,J,KRT) .lt. SMCMAX1(I,J)) then
+                        if (SICE(I,J,KRT) .lt. SMCMAX3D(I,J,KRT)) then
                            SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J) - &
                                                        (SICE(I,J,KRT) - WATHOLDCAP)
                         endif
-                        if (SICE(I,J,KRT) .ge. SMCMAX1(I,J)) then
+                        ! if (SICE(I,J,KRT) .ge. SMCMAX1(I,J)) then
+                        if (SICE(I,J,KRT) .ge. SMCMAX3D(I,J,KRT)) then
                            SMCWLTRT(IXXRT,JYYRT,KRT) = 0.
                         endif
                      endif
                   ELSE ! no ice
-                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J)
+                     ! SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J)
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX3D(I,J,KRT)
                      SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J)
-                     WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J) !TODO: Not used again so can delete
+                     ! WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J) !TODO: Not used again so can delete
+                     WATHOLDCAP = SMCMAX3D(I,J,KRT) - SMCWLT1(I,J) !TODO: Not used again so can delete
                      SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
                   ENDIF   ! endif adjust for soil ice
 
@@ -1108,6 +1160,26 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                         END IF
                      END DO
                      IF (SMCEXCS .GT. 0) THEN  !If not expired by sfc then add to Infil. Excess
+
+   ! if (SMCEXCS > 0.01) then
+      ! write(6,*) 'DISAG_SMCEXCS ', &
+           ! ' coarse_i=', I, &
+           ! ' coarse_j=', J, &
+           ! ' fine_i=', IXXRT, &
+           ! ' fine_j=', JYYRT, &
+           ! ' layer=', KRT, &
+           ! ' SH2OX=', SH2OX(I,J,KRT), &
+           ! ' SH2OWGT=', SH2OWGT(IXXRT,JYYRT,KRT), &
+           ! ' SICE=', SICE(I,J,KRT), &
+           ! ' SMCMAX3D=', SMCMAX3D(I,J,KRT), &
+           ! ' SMCMAXRT=', SMCMAXRT(IXXRT,JYYRT,KRT), &
+           ! ' SMCEXCS_mm=', SMCEXCS, &
+           ! ' INFX_before=', INFXSUBRT(IXXRT,JYYRT)
+      ! call flush(6)
+   ! endif
+
+
+
                         INFXSUBRT(IXXRT,JYYRT) = INFXSUBRT(IXXRT,JYYRT) + SMCEXCS
                         SMCEXCS = 0.
                      END IF

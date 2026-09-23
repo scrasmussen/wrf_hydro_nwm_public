@@ -745,6 +745,22 @@ contains
     !allocate(nlst(did)%ZSOIL8(NSOIL))
     !nlst(did)%ZSOIL8 = ZSOIL8
 
+	! Soil-layer configuration from hydro.namelist
+	if (NSOIL .gt. MAX_SOIL_LEVELS) then
+	   call hydro_stop('hydro.namelist ERROR: NSOIL exceeds MAX_SOIL_LEVELS.')
+	endif
+
+	nlst(did)%NSOIL = NSOIL
+
+	if (allocated(nlst(did)%ZSOIL8)) then
+	   deallocate(nlst(did)%ZSOIL8)
+	endif
+
+	if (NSOIL .gt. 0) then
+	   allocate(nlst(did)%ZSOIL8(NSOIL))
+	   nlst(did)%ZSOIL8(1:NSOIL) = ZSOIL8(1:NSOIL)
+	endif
+
     nlst(did)%RESTART_FILE = RESTART_FILE
     nlst(did)%hydrotbl_f = trim(hydrotbl_f)
     nlst(did)%SPLIT_OUTPUT_COUNT = SPLIT_OUTPUT_COUNT

@@ -158,12 +158,12 @@ contains
     nlst(did)%olddate(1:19)   = startTimeStr(1:19)
     nlst(did)%dt = dt
     cpl_outdate = startTimeStr(1:19)
-    nlst(did)%nsoil=4
-    allocate(nlst(did)%zsoil8(4),stat=stat)
-    if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg=METHOD//': Allocation of model soil depths memory failed.', &
-      file=FILENAME, rcToReturn=rc)) return ! bail out
-    nlst(did)%zsoil8(1:4)=(/-0.1,-0.4,-1.0,-2.0/)
+    ! nlst(did)%nsoil=4
+    ! allocate(nlst(did)%zsoil8(4),stat=stat)
+    ! if (ESMF_LogFoundAllocError(statusToCheck=stat, &
+      ! msg=METHOD//': Allocation of model soil depths memory failed.', &
+      ! file=FILENAME, rcToReturn=rc)) return ! bail out
+    ! nlst(did)%zsoil8(1:4)=(/-0.1,-0.4,-1.0,-2.0/)
     nlst(did)%geo_static_flnm = "geo_em.d01.nc"
     nlst(did)%geo_finegrid_flnm = "fulldom_hires_hydrofile.d01.nc"
     nlst(did)%sys_cpl = 2
@@ -185,11 +185,32 @@ contains
     if(ESMF_STDERRORCHECK(rc)) return ! bail out
 #endif
 
-    if(nlst(did)%nsoil .gt. 4) then
-      call ESMF_LogSetError(ESMF_FAILURE, &
-        msg=METHOD//": Maximum soil levels supported is 4.", &
-        file=FILENAME,rcToReturn=rc)
-      return  ! bail out
+    ! if(nlst(did)%nsoil .gt. 4) then
+      ! call ESMF_LogSetError(ESMF_FAILURE, &
+        ! msg=METHOD//": Maximum soil levels supported is 4.", &
+        ! file=FILENAME,rcToReturn=rc)
+      ! return  ! bail out
+    ! endif
+
+    if (nlst(did)%nsoil .le. 0) then
+       call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=METHOD//": Invalid NSOIL read from hydro.namelist.", &
+          file=FILENAME, rcToReturn=rc)
+       return
+    endif
+
+    if (.not. allocated(nlst(did)%zsoil8)) then
+       call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=METHOD//": ZSOIL8 was not allocated from hydro.namelist.", &
+          file=FILENAME, rcToReturn=rc)
+       return
+    endif
+
+    if (size(nlst(did)%zsoil8) .ne. nlst(did)%nsoil) then
+       call ESMF_LogSetError(ESMF_FAILURE, &
+          msg=METHOD//": NSOIL and ZSOIL8 size are inconsistent.", &
+          file=FILENAME, rcToReturn=rc)
+       return
     endif
 
     call get_file_dimension(fileName=nlst(did)%geo_static_flnm,&
@@ -303,7 +324,7 @@ contains
     nlst(did)%startdate(1:19) = startTimeStr(1:19)
     nlst(did)%olddate(1:19)   = startTimeStr(1:19)
     nlst(did)%dt = dt
-    nlst(did)%nsoil=4
+    ! nlst(did)%nsoil=4
     cpl_outdate = startTimeStr(1:19)
 
     if(nlst(did)%dt .le. 0) then
@@ -518,10 +539,6 @@ contains
       enddo
     enddo
 
-    write(6,*) "INFILTRATION_DIAG PET=", my_id, &
-      " stage=", trim(stage), " max_abs=", max_abs, &
-      " value=", max_value, " local_i=", max_i, " local_j=", max_j
-    call flush(6)
   end subroutine report_coupled_infiltration
 
   !-----------------------------------------------------------------------------
@@ -815,7 +832,8 @@ contains
 
      do j = lbnd(2),ubnd(2)
      do i = lbnd(1),ubnd(1)
-       gridarea(i,j) = radianarea(i,j) * R * R
+       ! gridarea(i,j) = radianarea(i,j) * R * R
+       gridarea(i,j) = radianarea(i,j)
      enddo
      enddo
 

@@ -35,21 +35,33 @@ module wrfhydro_nuopc_fields
     logical                     :: rl_export = .FALSE. ! realize export
   end type cap_fld_type
 
-  type(cap_fld_type), target, dimension(21) :: cap_fld_list = (/          &
+  type(cap_fld_type), target, dimension(23) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
                  "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+    cap_fld_type("inst_soil_moisture_content_routing_change","slc_delta", &
+                 "m3 m-3",IMPORT_F ,EXPORT_T ,0.00d0),                      &
     cap_fld_type("inst_soil_temperature                   ","stc     ", &
                  "K     ",IMPORT_T ,EXPORT_F,288.d0),                      &
+    cap_fld_type("inst_soil_porosity                      ","smcmax3d", &
+                 "m3 m-3",IMPORT_T ,EXPORT_F,0.45d0),                      &
+    ! cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1  ", &
+                 ! "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+    ! cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2  ", &
+                 ! "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+    ! cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3  ", &
+                 ! "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+    ! cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4  ", &
+                 ! "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1  ", &
-                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+                 "m3 m-3",IMPORT_F ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_2","sh2ox2  ", &
-                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+                 "m3 m-3",IMPORT_F ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_3","sh2ox3  ", &
-                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+                 "m3 m-3",IMPORT_F ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_4","sh2ox4  ", &
-                 "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
+                 "m3 m-3",IMPORT_F ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_moisture_fraction_layer_1          ","smc1    ", &
                  "m3 m-3",IMPORT_T ,EXPORT_T ,0.20d0),                      &
     cap_fld_type("soil_moisture_fraction_layer_2          ","smc2    ", &
@@ -76,7 +88,10 @@ module wrfhydro_nuopc_fields
                  "m     ",IMPORT_F,EXPORT_T ,0.00d0),                     &
     ! cap_fld_type("Flrl_rofinfl_excess_sur                 ","infxsrt ", &
                  ! "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0),                 &
-    cap_fld_type("Flrl_rofexcess_sur                      ","infxsrt ", &
+    ! cap_fld_type("Flrl_rofexcess_sur                      ","infxsrt ", &
+                 ! "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0),                 &
+    ! qflx_surf(c) = qflx_sat_excess_surf(c) + qflx_infl_excess_surf(c) + qflx_h2osfc_surf(c)
+    cap_fld_type("Flrl_rofsur                              ","infxsrt ", &
                  "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0),                 &
     cap_fld_type("Flrl_rofsub                              ","soldrain", &
                  "kg m-2 s-1",IMPORT_T ,EXPORT_F,0.00d0)                   &
@@ -100,6 +115,7 @@ module wrfhydro_nuopc_fields
   public state_copy_frhyd
   public state_update_sfchead_export
   public state_update_volrmch_export
+  public state_update_slc_delta_export
   public check_channel_volume_finite
   public state_check_missing
   public state_prescribe_missing
@@ -659,12 +675,36 @@ module wrfhydro_nuopc_fields
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+        case ('slc_delta')
+          ! Routing-induced change in liquid soil moisture.
+          ! Use an ESMF-owned 3-D buffer; this will be filled explicitly
+          ! after WRF-Hydro routing as SH2OX_after - SH2OX_before.
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            typekind=ESMF_TYPEKIND_FIELD, gridToFieldMap=(/1,2/), &
+            ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+
+          call ESMF_FieldFill(field_create, dataFillScheme="const", &
+            const1=0.0_ESMF_KIND_R8, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+
         case ('stc')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%stc(:,:,:), gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+        case ('smcmax3d')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%smcmax3d(:,:,:), gridToFieldMap=(/1,2/), &
+            ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
+
         case ('sh2ox1')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,1), &
@@ -777,7 +817,8 @@ module wrfhydro_nuopc_fields
       end select
     elseif (memflg .eq. MEMORY_COPY) then
       select case (trim(fld_name))
-        case ('smc','slc','stc')
+        ! case ('smc','slc','stc')
+        case ('smc','slc','stc','slc_delta')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             typekind=ESMF_TYPEKIND_FIELD, gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
@@ -1051,6 +1092,44 @@ module wrfhydro_nuopc_fields
   end subroutine state_update_volrmch_export
 
   !-----------------------------------------------------------------------------
+  subroutine state_update_slc_delta_export(state, did, sh2ox_before, rc)
+
+    type(ESMF_State), intent(inout)      :: state
+    integer, intent(in)                  :: did
+    real(ESMF_KIND_FIELD), intent(in)    :: sh2ox_before(:,:,:)
+    integer, intent(out)                 :: rc
+
+    integer                              :: n
+    logical                              :: realized
+    type(ESMF_Field)                     :: field
+    real(ESMF_KIND_FIELD), pointer       :: farrayPtr3d(:,:,:)
+    character(len=29), parameter         :: method = &
+      "state_update_slc_delta_export"
+
+    rc = ESMF_SUCCESS
+    realized = .false.
+
+    do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
+      if (trim(cap_fld_list(n)%st_name) .eq. 'slc_delta') then
+        realized = cap_fld_list(n)%rl_export
+        exit
+      endif
+    enddo
+
+    ! The mediator may choose not to connect this optional field.
+    if (.not.realized) return
+
+    call ESMF_StateGet(state, itemName='slc_delta', field=field, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return
+
+    call ESMF_FieldGet(field, farrayPtr=farrayPtr3d, rc=rc)
+    if (ESMF_STDERRORCHECK(rc)) return
+
+    farrayPtr3d(:,:,:) = rt_domain(did)%sh2ox(:,:,:) - sh2ox_before(:,:,:)
+
+  end subroutine state_update_slc_delta_export
+
+  !-----------------------------------------------------------------------------
 
   subroutine state_fill_uniform(state, fillValue, rc)
     type(ESMF_State), intent(inout)        :: state
@@ -1264,6 +1343,12 @@ module wrfhydro_nuopc_fields
             file=FILENAME,rcToReturn=rc)
           return  ! bail out
         endif
+
+! write(6,*) 'WRF_IMPORT_ITEM n=', n, &
+           ! ' name=[', trim(ItemNameList(n)), ']', &
+           ! ' dimCount=', dimCount
+
+
         select case (ItemNameList(n))
           case ('smc')
             rt_domain(did)%smc = farrayPtr3d
@@ -1271,6 +1356,14 @@ module wrfhydro_nuopc_fields
             rt_domain(did)%sh2ox = farrayPtr3d
           case ('stc')
             rt_domain(did)%stc = farrayPtr3d
+          case ('smcmax3d')
+            rt_domain(did)%smcmax3d = farrayPtr3d
+
+! write(6,*) 'WRF_SMCMAX3D_IMPORT PET=', did, &
+           ! ' nsoil=', size(rt_domain(did)%smcmax3d,3), &
+           ! ' min=', minval(rt_domain(did)%smcmax3d), &
+           ! ' max=', maxval(rt_domain(did)%smcmax3d)
+
           case ('sh2ox1')
             rt_domain(did)%sh2ox(:,:,1) = farrayPtr2d
           case ('sh2ox2')
@@ -1478,6 +1571,8 @@ module wrfhydro_nuopc_fields
             missng = any(rt_domain(did)%sh2ox.eq.chkVal)
           case ('stc')
             missng = any(rt_domain(did)%stc.eq.chkVal)
+          case ('smcmax3d')
+            missng = any(rt_domain(did)%smcmax3d.eq.chkVal)
           case ('sh2ox1')
             missng = any(rt_domain(did)%sh2ox(:,:,1).eq.chkVal)
           case ('sh2ox2')
@@ -1581,6 +1676,9 @@ module wrfhydro_nuopc_fields
           case ('stc')
             where (rt_domain(did)%stc.eq.chkVal) &
               rt_domain(did)%stc = filVal
+          case ('smcmax3d')
+            where (rt_domain(did)%smcmax3d.eq.chkVal) &
+              rt_domain(did)%smcmax3d = filVal
           case ('sh2ox1')
             where (rt_domain(did)%sh2ox(:,:,1).eq.chkVal) &
               rt_domain(did)%sh2ox(:,:,1) = filVal

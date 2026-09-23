@@ -1847,6 +1847,13 @@ endif
             rt_domain(did)%SMCWLT1 = max(min(rt_domain(did)%SMCWLT1, rt_domain(did)%SMCREF1), 0.0)
         endif
 
+        ! Initialize layer-dependent porosity from the native 2-D WRF-Hydro
+        ! porosity. In coupled CTSM runs, the NUOPC import subsequently
+        ! overwrites SMCMAX3D with CTSM layer-dependent porosity.
+        rt_domain(did)%SMCMAX3D = spread( &
+             rt_domain(did)%SMCMAX1, dim=3, &
+             ncopies=size(rt_domain(did)%SMCMAX3D,3))
+
         rt_domain(did)%soiltyp = soltyp
 
         if(allocated(soltyp)) deallocate(soltyp)

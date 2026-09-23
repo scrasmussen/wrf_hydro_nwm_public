@@ -13,6 +13,7 @@ module rof_comp_nuopc
   use wrfhydro_nuopc_flags
   use wrfhydro_esmf_extensions
   use wrfhydro_nuopc_macros
+  use module_rt_data, only : rt_domain
 
   implicit none
 
@@ -1106,6 +1107,8 @@ subroutine CheckImport(gcomp, rc)
     character(len=9)            :: nStr
     character(len=16)           :: misgValTypeStr
 
+    real, allocatable :: sh2ox_before(:,:,:)
+
     rc = ESMF_SUCCESS
 
     ! Query component for name, verbosity, and diagnostic values
@@ -1189,9 +1192,20 @@ subroutine CheckImport(gcomp, rc)
       call check_channel_volume_finite(is%wrap%did, &
         "before wrfhydro_nuopc_run", rc)
       if (ESMF_STDERRORCHECK(rc)) return ! bail out
+
+      if (.not. allocated(sh2ox_before)) then
+       allocate(sh2ox_before( &
+            size(rt_domain(is%wrap%did)%sh2ox,1), &
+            size(rt_domain(is%wrap%did)%sh2ox,2), &
+            size(rt_domain(is%wrap%did)%sh2ox,3)))
+      end if
+
+      sh2ox_before(:,:,:) = rt_domain(is%wrap%did)%sh2ox(:,:,:)
+
       call wrfhydro_nuopc_run(is%wrap%did,is%wrap%lsm_forcings(1), &
         is%wrap%clock(1),is%wrap%NStateImp(1),is%wrap%NStateExp(1),rc)
       if(ESMF_STDERRORCHECK(rc)) return ! bail out
+
       call check_channel_volume_finite(is%wrap%did, &
         "after wrfhydro_nuopc_run", rc)
       if (ESMF_STDERRORCHECK(rc)) return ! bail out
@@ -1213,6 +1227,11 @@ subroutine CheckImport(gcomp, rc)
       call state_update_volrmch_export(is%wrap%NStateExp(1), &
         is%wrap%did, rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+
+      call state_update_slc_delta_export(is%wrap%NStateExp(1), &
+        is%wrap%did, sh2ox_before, rc=rc)
+      if (ESMF_STDERRORCHECK(rc)) return  ! bail out
+
     endif
 
     if (is%wrap%reset_import) then
