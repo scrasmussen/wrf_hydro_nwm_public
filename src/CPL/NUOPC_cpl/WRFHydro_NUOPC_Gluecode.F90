@@ -578,10 +578,11 @@ contains
 
 
   subroutine write_netcdf_full_resolution_file(dx, dy, hgt, soil_cat, lat, &
-       lon, lu_index, landmask)
+       lon, lu_index, landmask, n_land_cats, isurban, iswater, isice)
     integer, intent(in) :: dx, dy
     real, dimension(:,:), intent(in) :: hgt, lat, lon
     integer, dimension(:,:), intent(in) :: soil_cat, lu_index, landmask
+    integer, intent(in) :: n_land_cats, isurban, iswater, isice
 
     ! Constants
     character(len=*), parameter :: times_value = '0000-00-00_00:00:00'
@@ -597,7 +598,6 @@ contains
     ! Local parameters
     character(len=*), parameter :: timestr = "0000-00-00_00:00:00"
     integer, parameter :: soil_cat_n = 16
-    integer, parameter :: land_cat_n = 24
 
     if (io_rank) print *, "=== entering write_netcdf_full_resolution_file ==="
     ! Begin work
@@ -609,7 +609,7 @@ contains
     call check_nf(nf90_def_dim(ncid, 'west_east', dx, dim_we))
     call check_nf(nf90_def_dim(ncid, 'south_north', dy, dim_sn))
     call check_nf(nf90_def_dim(ncid, 'soil_cat', soil_cat_n, dim_soil_cat))
-    call check_nf(nf90_def_dim(ncid, 'land_cat', land_cat_n, dim_land_cat))
+    call check_nf(nf90_def_dim(ncid, 'land_cat', n_land_cats, dim_land_cat))
     call check_nf(nf90_def_dim(ncid, 'DateStrLen', DateStrLen, dim_dsl))
 
     ! Define Variables
@@ -624,10 +624,10 @@ contains
     call check_nf(nf90_def_var(ncid, 'LANDMASK', NF90_INT, [dim_we, dim_sn, dim_time], var_landmask))
 
     ! Attributes
-    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISWATER', 16))
+    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISWATER', iswater))
     call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISLAKE', -1))
-    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISICE', 24))
-    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISURBAN', 1))
+    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISICE', isice))
+    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISURBAN', isurban))
     call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISOILWATER', 14))
 
     ! call check_nf(nf90_put_att(ncid, var_hgt, 'description', 'topography height'))
@@ -757,6 +757,8 @@ contains
 
     ! locals
     integer :: nx, ny, rank, local_count, grid_lb(2), grid_ub(2)
+    integer :: varid, isurban, iswater, isice, n_land_cats
+    character(len=64) :: mminlu         ! TODO: len=64 comes from MPAS's ShortStrKIND, might be better to import that?
 
     call ESMF_VMGet(vm, localPet=rank, rc=rc)
     call check(rc, __LINE__, file)
@@ -774,6 +776,40 @@ contains
 
     stat = nf90_inquire_dimension(ncid, dimid, len=nCells)
     call check_nf(stat)
+
+    ! Land use classification and special category indices are set by
+    ! MPAS's Noah-MP based on config_landuse_data (e.g. USGS vs. MODIS);
+    ! read them from MPAS's static file's `mminlu` field instead of assuming USGS.
+    mminlu = ' '
+    stat = nf90_inq_varid(ncid, 'mminlu', varid)
+    call check_nf(stat)
+    stat = nf90_get_var(ncid, varid, mminlu)
+    call check_nf(stat)
+
+    stat = nf90_inq_varid(ncid, 'iswater_lu', varid)
+    call check_nf(stat)
+    stat = nf90_get_var(ncid, varid, iswater)
+    call check_nf(stat)
+
+    stat = nf90_inq_varid(ncid, 'isice_lu', varid)
+    call check_nf(stat)
+    stat = nf90_get_var(ncid, varid, isice)
+    call check_nf(stat)
+
+    ! TODO: these should be read somehow from a static file instead of hardcoding them
+    select case (trim(mminlu))
+    case ('USGS')
+      isurban = 1
+      n_land_cats = 24
+    case ('MODIFIED_IGBP_MODIS_NOAH')
+      isurban = 13
+      n_land_cats = 20
+    case default
+      ! Unrecognized land use classification scheme, stop with an error.
+      ! TODO: use ESMF/NUOPC error stop handling is probably better than this
+      error stop 'wrfhydro_write_full_resolution_file: unrecognized mminlu &
+           &land use classification scheme read from MPAS static file'
+    end select
 
     ! setup MPAS regridding
     !   regrid MPAS mesh to WRF-Hydro hi-res grid
@@ -851,7 +887,7 @@ contains
 
     if (rank == 0) then
        call write_netcdf_full_resolution_file(nx, ny, hgt, soil_cat, lat, lon, &
-            lu_index, landmask)
+            lu_index, landmask, n_land_cats, isurban, iswater, isice)
        print *, "=== exiting wrfhydro_write_full_resolution_file ==="
     end if
 
