@@ -64,12 +64,14 @@ module wrfhydro_nuopc_gluecode
   public :: wrfhydro_get_restart
 
   public :: wrfhydro_write_full_resolution_file
+  public :: full_resolution_file_is_current
   public :: wrfhydro_grid_create_from_fulldom
   public :: ensure_regrid_scrip_files
   public :: regrid_import_mesh_to_grid
   public :: regrid_export_grid_to_mesh
 
   character(len=*), parameter :: full_resolution_file = 'hydro.fullres.nc'
+  integer, parameter :: full_resolution_version = 2
   character(len=:), allocatable :: hires_file
   public :: full_resolution_file
   character(len=*), parameter :: vars_out_dir = "vars_out/"
@@ -577,6 +579,17 @@ contains
   end subroutine
 
 
+  logical function full_resolution_file_is_current() result(current)
+    integer :: ncid, version, stat
+
+    current = .false.
+    stat = nf90_open(full_resolution_file, NF90_NOWRITE, ncid)
+    if (stat /= NF90_NOERR) return
+    stat = nf90_get_att(ncid, NF90_GLOBAL, 'hydro_fullres_version', version)
+    if (stat == NF90_NOERR) current = version == full_resolution_version
+    call check_nf(nf90_close(ncid))
+  end function full_resolution_file_is_current
+
   subroutine write_netcdf_full_resolution_file(dx, dy, hgt, soil_cat, lat, &
        lon, lu_index, landmask, n_land_cats, isurban, iswater, isice)
     integer, intent(in) :: dx, dy
@@ -624,6 +637,11 @@ contains
     call check_nf(nf90_def_var(ncid, 'LANDMASK', NF90_INT, [dim_we, dim_sn, dim_time], var_landmask))
 
     ! Attributes
+    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'hydro_fullres_version', full_resolution_version))
+    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'hydro_grid_order', 'south_to_north'))
+    call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'coordinate_source', 'Fulldom cell centers'))
+    call check_nf(nf90_put_att(ncid, var_lat, 'units', 'degrees_north'))
+    call check_nf(nf90_put_att(ncid, var_lon, 'units', 'degrees_east'))
     call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISWATER', iswater))
     call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISLAKE', -1))
     call check_nf(nf90_put_att(ncid, NF90_GLOBAL, 'ISICE', isice))
@@ -870,12 +888,27 @@ contains
     call read_mesh_var_and_regrid('ter', hgt, ncid, nCells, &
          cell_ids, rank, gathered, &
          regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
-    call read_mesh_var_and_regrid('latCell', lat, ncid, nCells, &
-         cell_ids, rank, gathered, &
-         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
-    call read_mesh_var_and_regrid('lonCell', lon, ncid, nCells, &
-         cell_ids, rank, gathered, &
-         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
+
+    ! Coordinates describe the destination cells, not interpolated MPAS
+    ! locations. Gather the same south-to-north grid used for these fields.
+    block
+      real(ESMF_KIND_R8), pointer :: grid_coord(:,:)
+      call ESMF_GridGetCoord(wrfhydro_grid, staggerloc=ESMF_STAGGERLOC_CENTER, &
+           coordDim=2, farrayPtr=grid_coord, rc=rc)
+      call check(rc, __LINE__, file)
+      dstPtr = grid_coord
+      call ESMF_FieldGather(f_dst, farray=gathered, rootPet=0, rc=rc)
+      call check(rc, __LINE__, file)
+      if (rank == 0) lat = real(gathered)
+
+      call ESMF_GridGetCoord(wrfhydro_grid, staggerloc=ESMF_STAGGERLOC_CENTER, &
+           coordDim=1, farrayPtr=grid_coord, rc=rc)
+      call check(rc, __LINE__, file)
+      dstPtr = grid_coord
+      call ESMF_FieldGather(f_dst, farray=gathered, rootPet=0, rc=rc)
+      call check(rc, __LINE__, file)
+      if (rank == 0) lon = real(gathered)
+    end block
 
     stat = nf90_close(ncid)
     call check_nf(stat)
@@ -1686,8 +1719,10 @@ contains
     call check_nf(stat)
     call check_nf(nf90_close(ncid))
 
-    ! print *, "lat shape =", shape(latitude)
-    ! print *, "lat(1:2,1:2) =", latitude(1:2,1:2)
+    ! Match Hydro's routing readers, which reverse Fulldom's file rows.
+    ! SCRIP generation uses this same order for the weight-matrix indices.
+    latitude = latitude(:,ny:1:-1)
+    longitude = longitude(:,ny:1:-1)
 
     ! Let ESMF distribute the grid across the current VM (one DE per PET).
     ! Global indices let us select each PET's coordinates from Fulldom.
@@ -1695,6 +1730,8 @@ contains
          decompflag=[ESMF_DECOMP_BALANCED, ESMF_DECOMP_BALANCED], &
          maxIndex=[nx,ny], &
          indexflag=ESMF_INDEX_GLOBAL, &
+         coordSys=ESMF_COORDSYS_SPH_DEG, &
+         coordTypeKind=ESMF_TYPEKIND_R8, &
          rc=rc)
     call check(rc, __LINE__, file)
 
@@ -2719,7 +2756,8 @@ contains
             " does not have .nc suffix"
        error stop "Error: fulldom_file in incorrect format"
     end if
-    scrip_file = fulldom_file(:i-1) // ".tmp.scrip.nc"
+    ! Do not reuse older SCRIP files whose indices run north-to-south.
+    scrip_file = fulldom_file(:i-1) // ".south_north.scrip.nc"
   end function fulldom_to_scrip_filename
 
 
@@ -2779,6 +2817,11 @@ contains
     call check_nf(stat)
     stat = nf90_close(fin)
     call check_nf(stat)
+
+    ! Hydro reverses Fulldom rows on input. Use that internal order for
+    ! both the SCRIP cell IDs and the bootstrap/runtime ESMF fields.
+    lat = lat(:,ny:1:-1)
+    lon = lon(:,ny:1:-1)
 
     ! Pad the center arrays by one cell using linear extrapolation.  Averaging
     ! each group of four padded centers then gives a common vertex for all

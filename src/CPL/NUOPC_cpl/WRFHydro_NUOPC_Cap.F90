@@ -240,7 +240,7 @@ module WRFHydro_NUOPC
        wrfhydro_get_restart, wrfhydro_grid_create_from_fulldom, &
        wrfhydro_write_full_resolution_file, regrid_import_mesh_to_grid, &
        regrid_export_grid_to_mesh, ensure_regrid_scrip_files, &
-       full_resolution_file
+       full_resolution_file, full_resolution_file_is_current
   use WRFHYDRO_NUOPC_Fields, only: cap_fld_list, field_dictionary_add, &
        initialize_cap_fld_list, &
        field_create, field_realize, field_advertise, check_lsm_forcings, &
@@ -867,10 +867,20 @@ module WRFHydro_NUOPC
     create_fullres = 0
     if (rank == 0) then
        inquire(file=full_resolution_file, exist=geo_file_exists)
-       if (.not. geo_file_exists) create_fullres = 1
+       if (.not. geo_file_exists) then
+          create_fullres = 1
+       else if (.not. full_resolution_file_is_current()) then
+          create_fullres = -1
+       end if
     end if
     call ESMF_VMBroadcast(vm, create_fullres, count=1, rootPet=0, rc=rc)
     call check(rc, __LINE__, file)
+    if (create_fullres(1) == -1) then
+       if (rank == 0) print *, 'Legacy hydro.fullres.nc: move it aside and rerun ', &
+            'to generate south-to-north fields with Fulldom coordinates in degrees. ', &
+            'Also regenerate hydro2dtbl.nc if it was derived from the legacy file.'
+       error stop 'Incompatible hydro.fullres.nc coordinate convention'
+    end if
     if (create_fullres(1) == 1) then
        print *, rank, "entering wrfhydro grid create, mesh regrid section"
        wrfhydro_mesh = wrfhydro_open_mesh(vm, rc)
