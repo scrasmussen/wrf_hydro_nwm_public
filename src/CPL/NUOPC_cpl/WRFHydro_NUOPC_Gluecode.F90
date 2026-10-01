@@ -72,7 +72,11 @@ module wrfhydro_nuopc_gluecode
 
   character(len=*), parameter :: full_resolution_file = 'hydro.fullres.nc'
   integer, parameter :: full_resolution_version = 2
-  character(len=:), allocatable :: hires_file
+  character(len=:), allocatable :: hires_file_saved
+  character(len=:), allocatable :: hires_scrip_file_saved
+  character(len=:), allocatable :: mpas_grid_file_saved
+  character(len=:), allocatable :: scrip_mesh_file_saved
+
   public :: full_resolution_file
   character(len=*), parameter :: vars_out_dir = "vars_out/"
   character(len=*), parameter :: vars_in_dir = "vars_in/"
@@ -125,7 +129,9 @@ module wrfhydro_nuopc_gluecode
 
   logical :: wrfhydro_open_mesh_initialized = .false.
   type(ESMF_Mesh) :: saved_wrfhydro_mesh
-  logical :: io_rank = .false.
+  logical, allocatable :: reuse_regrid_weights_saved
+  logical :: reuse_import_regrid_weights_init = .true.
+  logical :: reuse_export_regrid_weights_init = .true.
 
   interface read_mesh_var_and_regrid
      module procedure read_mesh_var_and_regrid_i
@@ -137,6 +143,14 @@ module wrfhydro_nuopc_gluecode
   ! Model Glue Code
   !-----------------------------------------------------------------------------
 contains
+
+  logical function io_rank()
+    if (io_id == my_id) then
+       io_rank = .true.
+    else
+       io_rank = .false.
+    end if
+  end function io_rank
 
 #undef METHOD
 #define METHOD "wrfhydro_nuopc_ini"
@@ -203,7 +217,7 @@ contains
     ! nlst(did)%geo_static_flnm = "fixed/frontrange.init.fixed.nc"
     ! geo_static_flnm is read in init_namelist_rt_field call
 
-    nlst(did)%geo_finegrid_flnm = read_hires_filename_from_namelist()
+    nlst(did)%geo_finegrid_flnm = get_hires_file()
     nlst(did)%sys_cpl = 2
     nlst(did)%sys_cpl = 5 ! added to couple to MPAS
     print *, "---FIX THIS TO NAMELIST OPTION OR SOMETHING ELSE---"
@@ -612,7 +626,7 @@ contains
     character(len=*), parameter :: timestr = "0000-00-00_00:00:00"
     integer, parameter :: soil_cat_n = 16
 
-    if (io_rank) print *, "=== entering write_netcdf_full_resolution_file ==="
+    if (io_rank()) print *, "=== entering write_netcdf_full_resolution_file ==="
     ! Begin work
     ! Create/clobber file
     call check_nf(nf90_create(full_resolution_file, NF90_CLOBBER, ncid))
@@ -698,8 +712,10 @@ contains
     srcPtr = real(var(cell_ids), kind=ESMF_KIND_R8)
     dstPtr = 0.0_ESMF_KIND_R8
 
-    call ESMF_FieldRegrid(srcField=f_src, dstField=f_dst, &
+    call ESMF_FieldRegrid(srcField=f_src, &
+         dstField=f_dst, &
          routehandle=regrid_handle, &
+         termorderflag=ESMF_TERMORDER_SRCSEQ, &
          rc=rc)
     call check(rc, __LINE__, file)
 
@@ -736,8 +752,10 @@ contains
     srcPtr = real(var_i(cell_ids), kind=ESMF_KIND_R8)
     dstPtr = 0.0_ESMF_KIND_R8
 
-    call ESMF_FieldRegrid(srcField=f_src, dstField=f_dst, &
+    call ESMF_FieldRegrid(srcField=f_src, &
+         dstField=f_dst, &
          routehandle=regrid_handle, &
+         termorderflag=ESMF_TERMORDER_SRCSEQ, &
          rc=rc)
     call check(rc, __LINE__, file)
 
@@ -949,7 +967,7 @@ contains
 
 
     mpas_grid_file = get_mpas_grid_filename()
-    scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
+    scrip_mesh_file = get_mpas_scrip_filename(mpas_grid_file)
 
     print *, "mpas_grid_file=", mpas_grid_file
     print *, "scrip_mesh_file=", scrip_mesh_file
@@ -985,8 +1003,11 @@ contains
 
     type(ESMF_Field) :: import_field, new_field
     character(:), allocatable :: file
+    character(len=:), allocatable :: hires_file, hires_scrip_file
+    character(len=:), allocatable :: mpas_grid_file, scrip_mesh_file
+    character(:), allocatable :: weight_file
 
-    character(:), allocatable :: mpas_grid_file, scrip_mesh_file, hires_scrip_file
+    integer :: srcTermProcessing
 
     ! testing variables
     logical :: realizeImport, connected
@@ -997,6 +1018,7 @@ contains
     ! error stop "WRFHYDRO_REGRID_MESH IS ENTERED?"
     file = __FILE__
     rc = ESMF_SUCCESS
+
     print *, "enter: wrfhydro_regrid_mesh"
     call ESMF_LogWrite("WRFH: enter wrfhydro_regrid_mesh", &
          ESMF_LOGMSG_INFO, rc=rc)
@@ -1040,22 +1062,23 @@ contains
     call ESMF_LogWrite("Initialized route_handle", &
          ESMF_LOGMSG_INFO, rc=rc)
 
-    ! stop "SHOULD THIS BE REACHED?"
-    ! generate regrid weights file and read in to handle
-    if (.not. allocated(hires_file)) &
-         error stop "hires_file variable not defined"
-    call create_dir_if_needed(weights_dir)
 
+    ! generate regrid weights file and read in to handle
+    hires_file = get_hires_file()
+    hires_scrip_file = get_hires_scrip_file(hires_file)
     mpas_grid_file = get_mpas_grid_filename()
-    scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
-    hires_scrip_file = fulldom_to_scrip_filename(hires_file)
+    scrip_mesh_file = get_mpas_scrip_filename(mpas_grid_file)
     print *, "mpas_grid_file =", trim(mpas_grid_file)
     print *, "scrip_grid_file =", trim(scrip_mesh_file)
     print *, "hires_scrip_file =", trim(hires_scrip_file)
+
+    call create_dir_if_needed(weights_dir)
+    weight_file = weights_dir//'setup_'//st_name//'.nc'
+
     call ESMF_RegridWeightGen(&
          srcFile=scrip_mesh_file, &
          dstFile=hires_scrip_file, &
-         weightFile=weights_dir//'setup_'//st_name//'.nc', &
+         weightFile=weight_file, &
          regridmethod=regrid_method, &
          srcFileType=ESMF_FILEFORMAT_SCRIP, &
          dstFileType=ESMF_FILEFORMAT_SCRIP, &
@@ -1064,10 +1087,14 @@ contains
          normType=ESMF_NORMTYPE_FRACAREA, &
          rc=rc)
     call check(rc, __LINE__, file)
+    srcTermProcessing = 0
     ! Precompute Field sparse matrix multiplication with local factors
-    call ESMF_FieldSMMStore(srcField=import_field, dstField=new_field, &
-         filename=weights_dir//'setup_'//st_name//'.nc', &
-         routehandle=route_handle, rc=rc)
+    call ESMF_FieldSMMStore(srcField=import_field, &
+         dstField=new_field, &
+         filename=weight_file, &
+         routehandle=route_handle, &
+         srcTermProcessing=srcTermProcessing, &
+         rc=rc)
     call check(rc, __LINE__, file)
 
     ! generate regrid weights in to handle
@@ -1114,8 +1141,49 @@ contains
     call ESMF_LogWrite("WRFH: exit wrfhydro_regrid_mesh", &
          ESMF_LOGMSG_INFO, rc=rc)
     print *, "WRFH: exit wrfhydro_regrid_mesh"
-    ! error stop "where is this being called?"
   end function wrfhydro_regrid_mesh
+
+
+  logical function get_reuse_regrid_weights() &
+       result(reuse_regrid_weights)
+    implicit none
+    if (.not. allocated(reuse_regrid_weights_saved)) then
+       reuse_regrid_weights_saved = get_reuse_regrid_weights_from_namelist()
+    end if
+    reuse_regrid_weights = reuse_regrid_weights_saved
+  end function get_reuse_regrid_weights
+
+  logical function get_reuse_regrid_weights_from_namelist() &
+       result(reuse_regrid_weights)
+    implicit none
+    ! Opt in for comparisons using an identical set of weights. All required
+    ! files must already exist in weights/; FieldSMMStore reports missing files.
+    character(len=1) :: value
+    character(len=*), parameter :: fname = 'hydro.namelist'
+    character(len=512) :: iomsg_str
+    integer :: status, ios, unit
+
+    namelist /MPAS_Hydro_nlist/ reuse_regrid_weights
+
+    ! Default if the file or entry is missing
+    reuse_regrid_weights = .true.
+
+    ! open and read namelist
+    open(newunit=unit, file=trim(fname), status='old', action='read', &
+         iostat=ios, iomsg=iomsg_str)
+    if (ios /= 0) then
+       write(*,'(a)') 'WARNING: could not open '//trim(fname)//': '//trim(iomsg_str)
+       return
+    end if
+    read(unit, nml=MPAS_Hydro_nlist, iostat=ios, iomsg=iomsg_str)
+    if (ios > 0) then
+       write(*,'(a)') 'ERROR reading &MPAS_Hydro_nlist in '//trim(fname)//': '//trim(iomsg_str)
+       stop "ERROR reading &MPAS_Hydro_nlist in hydro.namelist"
+    else if (ios < 0) then
+       write(*,'(a)') 'NOTE: &MPAS_Hydro_nlist not found in '//trim(fname)//', using default'
+    end if
+    close(unit)
+  end function get_reuse_regrid_weights_from_namelist
 
   subroutine regrid_import_mesh_to_grid(grid, mesh, state, &
        did, memflg)
@@ -1126,9 +1194,13 @@ contains
     type(memory_flag), intent(in) :: memflg
     type(ESMF_Field) :: meshField !, gridField
     integer :: n, rc, itemCount
+    integer :: srcTermProcessing
     character(len=64), allocatable :: itemNameList(:)
     logical :: imported
-    character(:), allocatable :: mpas_grid_file, scrip_mesh_file, hires_scrip_file
+    character(:), allocatable :: hires_file, hires_scrip_file
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
+    character(:), allocatable :: weight_file
+    logical :: reuse_regrid_weights, weight_file_exists, create_regrid_weight
 
     ! debugging
     integer :: unit, i
@@ -1137,7 +1209,7 @@ contains
     character(len=3) :: rank_s
 
     if (print_import_statelog_once) then
-       if (io_rank) print *, 'WRFH: enter regrid_import_mesh_to_grid'
+       if (io_rank()) print *, 'WRFH: enter regrid_import_mesh_to_grid'
        call ESMF_LogWrite('WRFH: enter regrid_import_mesh_to_grid', ESMF_LOGMSG_INFO)
        call ESMF_LogWrite('--- WRFH: IMPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
        call ESMF_StateLog(state, rc=rc)
@@ -1159,6 +1231,13 @@ contains
        end do
     end if
 
+    ! get filenames
+    hires_file = get_hires_file()
+    hires_scrip_file = get_hires_scrip_file(hires_file)
+    mpas_grid_file = get_mpas_grid_filename()
+    scrip_mesh_file = get_mpas_scrip_filename(mpas_grid_file)
+    reuse_regrid_weights = get_reuse_regrid_weights()
+
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_import) then
           imported = NUOPC_IsConnected(state, &
@@ -1179,12 +1258,12 @@ contains
           call ESMF_GridValidate(grid, rc=rc)
           call check(rc, __LINE__, file)
 
-
           ! new way to handle gridField
           if (cap_fld_list(n)%import_field_init .eqv. .false.) then
              cap_fld_list(n)%import_field = field_create(cap_fld_list(n)%st_name, grid, did, &
                   memflg, rc)
              cap_fld_list(n)%import_field_init = .true.
+             call check(rc, __LINE__, file)
           end if
 
           ! CREAT LOCAL COPY, NOT CONNECTED TO WRF-H MODEL MEMORY
@@ -1192,10 +1271,7 @@ contains
           !      typekind=ESMF_TYPEKIND_R8, &
           !      indexflag=ESMF_INDEX_DELOCAL, &
           !      name=cap_fld_list(n)%st_name, rc=rc)
-          call check(rc, __LINE__, file)
-
-
-          call check(rc, __LINE__, file)
+          ! call check(rc, __LINE__, file)
 
           ! --- Debugging: write import mesh before regrid
           ! if (debug) then
@@ -1218,30 +1294,48 @@ contains
              ! call ESMF_FieldRegridStore(srcField=meshField, &
              call check(rc, __LINE__, file)
 
-             if (.not. allocated(hires_file)) &
-                  hires_file = read_hires_filename_from_namelist()
-             hires_scrip_file = fulldom_to_scrip_filename(hires_file)
-             mpas_grid_file = get_mpas_grid_filename()
-             scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
-
              call create_dir_if_needed(weights_dir)
              ! center, dims and imask
-             call ESMF_RegridWeightGen(&
-                  srcFile=scrip_mesh_file, &
-                  dstFile=hires_scrip_file, &
-                  weightFile=weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc', &
-                  regridmethod=cap_fld_list(n)%regrid_method, &
-                  srcFileType=ESMF_FILEFORMAT_SCRIP, &
-                  dstFileType=ESMF_FILEFORMAT_SCRIP, &
-                  srcRegionalFlag=.true., &
-                  dstRegionalFlag=.true., &
-                  normType=ESMF_NORMTYPE_FRACAREA, &
-                  rc=rc)
-             call check(rc, __LINE__, file)
+             weight_file = &
+                  weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc'
+             inquire(file=weight_file, exist=weight_file_exists)
+
+             create_regrid_weight = .false.
+             ! if weights file doesn't exist create it
+             ! if reuse_regrid_weights is false, create weights
+             if (weight_file_exists .eqv. .false.) then
+                create_regrid_weight = .true.
+                if (reuse_regrid_weights .and. io_rank()) then
+                   print *, "Warning: reuse_regrid_weight set to .true. but&
+                        & weight file doesn't exist, creating " // weight_file
+                end if
+             else if (reuse_regrid_weights .eqv. .false.) then
+                create_regrid_weight = .true.
+             end if
+
+             if (create_regrid_weight) then
+                call ESMF_RegridWeightGen(&
+                     srcFile=scrip_mesh_file, &
+                     dstFile=hires_scrip_file, &
+                     weightFile=weight_file, &
+                     regridmethod=cap_fld_list(n)%regrid_method, &
+                     srcFileType=ESMF_FILEFORMAT_SCRIP, &
+                     dstFileType=ESMF_FILEFORMAT_SCRIP, &
+
+                     srcRegionalFlag=.true., &
+                     dstRegionalFlag=.true., &
+                     normType=ESMF_NORMTYPE_FRACAREA, &
+                     rc=rc)
+                call check(rc, __LINE__, file)
+             end if
              ! Precompute Field sparse matrix multiplication with local factors
-             call ESMF_FieldSMMStore(srcField=meshfield, dstField=cap_fld_list(n)%import_field, &
-                  filename=weights_dir//trim(cap_fld_list(n)%st_name)//'_import.nc', &
+             ! Disable source partial sums for reproducibility across PET counts.
+             srcTermProcessing = 0
+             call ESMF_FieldSMMStore(srcField=meshfield, &
+                  dstField=cap_fld_list(n)%import_field, &
+                  filename=weight_file, &
                   routehandle=cap_fld_list(n)%import_handle, &
+                  srcTermProcessing=srcTermProcessing, &
                   ! transposeRoutehandle=cap_fld_list(n)%export_handle, &
                   rc=rc)
              call check(rc, __LINE__, file)
@@ -1253,7 +1347,8 @@ contains
           if (debug) print*, "DEBUGGING: using var's handle to regrid field ", &
                trim(cap_fld_list(n)%st_name)
           call ESMF_FieldRegrid(meshField, cap_fld_list(n)%import_field, &
-               cap_fld_list(n)%import_handle, rc=rc)
+               cap_fld_list(n)%import_handle, &
+               termorderflag=ESMF_TERMORDER_SRCSEQ, rc=rc)
           call check(rc, __LINE__, file)
 
           ! --- Debugging: write import mesh after regrid
@@ -1283,7 +1378,6 @@ contains
 
   subroutine regrid_export_grid_to_mesh(grid, mesh, state, &
        saved_import_state, did, memflg)
-    use MPI
     type(ESMF_Grid), intent(in) :: grid
     type(ESMF_Mesh), intent(in) :: mesh
     type(ESMF_State),intent(in) :: state
@@ -1293,6 +1387,7 @@ contains
     type(ESMF_Field) :: meshField!, gridField
     type(ESMF_Field) :: importMeshField
     integer :: n, rc, itemCount
+    integer :: srcTermProcessing
     character(len=64), allocatable :: itemNameList(:)
     logical :: exported
 
@@ -1303,7 +1398,10 @@ contains
     real(ESMF_KIND_FIELD), pointer :: farrayPtr2d(:,:)
 
 
-    character(:), allocatable :: mpas_grid_file, scrip_mesh_file, hires_scrip_file
+    character(:), allocatable :: hires_file, hires_scrip_file
+    character(:), allocatable :: mpas_grid_file, scrip_mesh_file
+    character(:), allocatable :: weight_file
+    logical :: reuse_regrid_weights, weight_file_exists, create_regrid_weight
 
     ! debugging
     integer :: unit
@@ -1314,13 +1412,11 @@ contains
 
     real(ESMF_KIND_R8), pointer :: import_mesh(:)
     real(ESMF_KIND_R8), pointer :: export_mesh(:)
-
-
     integer :: ierr
 
     if (print_export_statelog_once) then
-       if (io_rank) print *, 'WRFH: enter regrid_export_grid_to_mesh'
-       if (io_rank) call ESMF_LogWrite('--- WRFH: EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
+       if (io_rank()) print *, 'WRFH: enter regrid_export_grid_to_mesh'
+       if (io_rank()) call ESMF_LogWrite('--- WRFH: EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
        if (debug) call ESMF_LogWrite('___ EXPORT STATE DEBUG: ', ESMF_LOGMSG_INFO)
        if (debug) call ESMF_StatePrint(state, rc=rc)
        print_export_statelog_once = .false.
@@ -1333,6 +1429,13 @@ contains
     call ESMF_StateGet(state,itemNameList=itemNameList, rc=rc)
     call check(rc, __LINE__, file)
     if (debug) print *, "============ Export itemnamelist: ", itemNameList
+
+    ! get filenames
+    hires_file = get_hires_file()
+    hires_scrip_file = get_hires_scrip_file(hires_file)
+    mpas_grid_file = get_mpas_grid_filename()
+    scrip_mesh_file = get_mpas_scrip_filename(mpas_grid_file)
+    reuse_regrid_weights = get_reuse_regrid_weights()
 
     do n=lbound(cap_fld_list,1),ubound(cap_fld_list,1)
        if (cap_fld_list(n)%ad_export) then
@@ -1434,33 +1537,45 @@ contains
              ! ESMF_REGION_SELECT:
              ! only zero out those elements in the destination Field that
              ! will be updated by the sparse matrix multiplication
-             if (.not. allocated(hires_file)) &
-                  error stop "hires_file variable not defined"
-             hires_scrip_file = fulldom_to_scrip_filename(hires_file)
 
-             ! hires_scrip_file needs grid corner, grid
-             ! center, dims and imask
+             weight_file = &
+                  weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc'
+             inquire(file=weight_file, exist=weight_file_exists)
 
-             mpas_grid_file = get_mpas_grid_filename()
-             scrip_mesh_file = mpas_to_scrip_filename(mpas_grid_file)
+             create_regrid_weight = .false.
+             if (weight_file_exists .eqv. .false.) then
+                create_regrid_weight = .true.
+                if (reuse_regrid_weights .and. io_rank()) then
+                   print *, "Warning: reuse_regrid_weight set to .true. but&
+                        & weight file doesn't exist, creating " // weight_file
+                end if
+             else if (reuse_regrid_weights .eqv. .false.) then
+                create_regrid_weight = .true.
+             end if
 
-             call ESMF_RegridWeightGen(&
-                  srcFile=hires_scrip_file, & ! grid
-                  dstFile=scrip_mesh_file, &            ! to mesh
-                  weightFile=weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc', &
-                  regridmethod=cap_fld_list(n)%regrid_method, &
-                  unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
-                  srcFileType=ESMF_FILEFORMAT_SCRIP, &
-                  dstFileType=ESMF_FILEFORMAT_SCRIP, &
-                  srcRegionalFlag=.true., &
-                  dstRegionalFlag=.true., &
-                  normType=ESMF_NORMTYPE_FRACAREA, &
-                  rc=rc)
-             call check(rc, __LINE__, file)
+             if (create_regrid_weight) then
+                call ESMF_RegridWeightGen(&
+                     srcFile=hires_scrip_file, & ! grid
+                     dstFile=scrip_mesh_file, &  ! to mesh
+                     weightFile=weight_file, &
+                     regridmethod=cap_fld_list(n)%regrid_method, &
+                     unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
+                     srcFileType=ESMF_FILEFORMAT_SCRIP, &
+                     dstFileType=ESMF_FILEFORMAT_SCRIP, &
+                     srcRegionalFlag=.true., &
+                     dstRegionalFlag=.true., &
+                     normType=ESMF_NORMTYPE_FRACAREA, &
+                     rc=rc)
+                call check(rc, __LINE__, file)
+             end if
              ! Precompute Field sparse matrix multiplication with local factors
-             call ESMF_FieldSMMStore(srcField=cap_fld_list(n)%export_field, dstField=meshfield, &
-                  filename=weights_dir//trim(cap_fld_list(n)%st_name)//'_export.nc', &
+             ! Disable source partial sums for reproducibility across PET counts.
+             srcTermProcessing = 0
+             call ESMF_FieldSMMStore(srcField=cap_fld_list(n)%export_field, &
+                  dstField=meshfield, &
+                  filename=weight_file, &
                   routehandle=cap_fld_list(n)%export_handle, &
+                  srcTermProcessing=srcTermProcessing, &
                   rc=rc)
              call check(rc, __LINE__, file)
 
@@ -1471,6 +1586,7 @@ contains
                trim(cap_fld_list(n)%st_name)
           call ESMF_FieldRegrid(cap_fld_list(n)%export_field, meshField, &
                cap_fld_list(n)%export_handle, &
+               termorderflag=ESMF_TERMORDER_SRCSEQ, &
                zeroregion=ESMF_REGION_SELECT, rc=rc)
           call check(rc, __LINE__, file)
 
@@ -1576,6 +1692,27 @@ contains
   end subroutine dump_state
 
 
+  function get_hires_file() result(hires_file)
+    implicit none
+    character(len=:), allocatable :: hires_file
+    if (.not. allocated(hires_file_saved)) then
+       hires_file_saved = read_hires_filename_from_namelist()
+    end if
+    hires_file = hires_file_saved
+  end function get_hires_file
+
+  function get_hires_scrip_file(hires_file) result(hires_scrip_file)
+    implicit none
+    character(len=*), intent(in) :: hires_file
+    character(len=:), allocatable :: hires_scrip_file
+    if (.not. allocated(hires_scrip_file_saved)) then
+       hires_scrip_file_saved = fulldom_to_scrip_filename(hires_file)
+    end if
+    hires_scrip_file = hires_scrip_file_saved
+  end function get_hires_scrip_file
+
+
+
   function read_hires_filename_from_namelist() result(geo_finegrid_flnm)
     implicit none
     ! integer :: sys_cpl
@@ -1677,9 +1814,10 @@ contains
     integer :: var_lat_id, var_lon_id
     integer :: stat
     real, allocatable :: latitude(:,:), longitude(:,:)
+    character(:), allocatable :: hires_file
 
     ! read from hydro.namelist
-    hires_file = read_hires_filename_from_namelist()
+    hires_file = get_hires_file()
 
     ! get lat/lon and nx/ny from hires_file
     print *, "WRFH: Opening high-resolution file ", hires_file
@@ -2575,6 +2713,7 @@ contains
     if (stat /= 0) stop 'Could not open namelist.atmosphere'
     read(unit, decomposition, iostat=stat)
     if (stat /= 0) stop 'Error reading namelist.atmosphere'
+    close(unit)
     decomp_filename = config_block_decomp_file_prefix
   end function get_config_block_decomp_file_prefix
 
@@ -2584,17 +2723,20 @@ contains
          config_block_decomp_file_prefix
     integer :: i
 
-    config_block_decomp_file_prefix = get_config_block_decomp_file_prefix()
-
-    i = index(trim(config_block_decomp_file_prefix), 'graph.info.part', &
-         back=.true.)
-    if (i == 0) then
-       print *, "config_block_decomp_file_prefix =", &
-            config_block_decomp_file_prefix
-       error stop &
-            "Error: graph.info.part not in config_block_decomp_file_prefix"
+    if (.not. allocated(mpas_grid_file_saved)) then
+       config_block_decomp_file_prefix = get_config_block_decomp_file_prefix()
+       i = index(trim(config_block_decomp_file_prefix), 'graph.info.part', &
+            back=.true.)
+       if (i == 0) then
+          print *, "config_block_decomp_file_prefix =", &
+               config_block_decomp_file_prefix
+          error stop &
+               "Error: graph.info.part not in config_block_decomp_file_prefix"
+       end if
+       mpas_grid_file_saved = &
+            config_block_decomp_file_prefix(:i-1) // "grid.nc"
     end if
-    mpas_grid_file = config_block_decomp_file_prefix(:i-1) // "grid.nc"
+    mpas_grid_file = mpas_grid_file_saved
   end function get_mpas_grid_filename
 
   function get_mpas_dist_grid(vm, rc) &
@@ -2699,14 +2841,14 @@ contains
     ! synchronize before any PET asks ESMF_RegridWeightGen to open them.
     if (rank == 0) then
        mpas_grid_file = get_mpas_grid_filename()
-       mpas_scrip_file = mpas_to_scrip_filename(mpas_grid_file)
+       mpas_scrip_file = get_mpas_scrip_filename(mpas_grid_file)
        inquire(file=trim(mpas_scrip_file), exist=exists)
        if (.not. exists) then
           print *, 'Creating MPAS SCRIP file ', trim(mpas_scrip_file)
           call mpas_to_scrip_mesh(mpas_grid_file, mpas_scrip_file)
        end if
 
-       fulldom_file = read_hires_filename_from_namelist()
+       fulldom_file = get_hires_file()
        fulldom_scrip_file = fulldom_to_scrip_filename(fulldom_file)
        inquire(file=trim(fulldom_scrip_file), exist=exists)
        if (.not. exists) then
@@ -2721,29 +2863,32 @@ contains
     ! Check from every PET after the barrier so a failed/incomplete creation
     ! is reported before entering the collective regridding routines.
     mpas_grid_file = get_mpas_grid_filename()
-    mpas_scrip_file = mpas_to_scrip_filename(mpas_grid_file)
+    mpas_scrip_file = get_mpas_scrip_filename(mpas_grid_file)
     inquire(file=trim(mpas_scrip_file), exist=exists)
     if (.not. exists) error stop 'MPAS SCRIP file was not created'
 
-    fulldom_file = read_hires_filename_from_namelist()
+    fulldom_file = get_hires_file()
     fulldom_scrip_file = fulldom_to_scrip_filename(fulldom_file)
     inquire(file=trim(fulldom_scrip_file), exist=exists)
     if (.not. exists) error stop 'WRF-Hydro SCRIP file was not created'
   end subroutine ensure_regrid_scrip_files
 
 
-  function mpas_to_scrip_filename(mpas_grid_file) result(scrip_mesh_file)
+  function get_mpas_scrip_filename(mpas_grid_file) result(scrip_mesh_file)
     character(len=*), intent(in) :: mpas_grid_file
     character(len=:), allocatable :: scrip_mesh_file
     integer :: i
-    i = index(trim(mpas_grid_file), '.grid.nc', back=.true.)
-    if (i == 0) then
-       print *, "Error: mpas_grid_file ", trim(mpas_grid_file), &
-            " does not have .grid.nc suffix"
-       error stop "Error: mpas_grid_file in incorrect format"
+    if (.not. allocated(scrip_mesh_file_saved)) then
+       i = index(trim(mpas_grid_file), '.grid.nc', back=.true.)
+       if (i == 0) then
+          print *, "Error: mpas_grid_file ", trim(mpas_grid_file), &
+               " does not have .grid.nc suffix"
+          error stop "Error: mpas_grid_file in incorrect format"
+       end if
+       scrip_mesh_file_saved = mpas_grid_file(:i-1) // ".tmp.scrip.nc"
     end if
-    scrip_mesh_file = mpas_grid_file(:i-1) // ".tmp.scrip.nc"
-  end function mpas_to_scrip_filename
+    scrip_mesh_file = scrip_mesh_file_saved
+  end function get_mpas_scrip_filename
 
 
   function fulldom_to_scrip_filename(fulldom_file) result(scrip_file)
