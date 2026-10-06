@@ -64,6 +64,7 @@ contains
         character(len=19) str_tmp
 #endif
         rst_out = -99
+        rt_domain(did)%restart_written = .false.
 #ifdef MPP_LAND
         if(IO_id .eq. my_id) then
 #endif
@@ -123,6 +124,8 @@ contains
 #ifdef WRF_HYDRO_NUDGING
             call output_nudging_last_obs
 #endif
+            ! rst_out is broadcast above, so every rank sees the same event.
+            rt_domain(did)%restart_written = .true.
         endif
 
 

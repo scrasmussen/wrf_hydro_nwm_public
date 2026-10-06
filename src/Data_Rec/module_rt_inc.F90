@@ -262,6 +262,8 @@ module module_rt_inc
 !  his_out_counts: used for channel routing output and  special for restart.
 !  his_out_counts = previous run + out_counts
     integer :: out_counts, rst_counts, his_out_counts
+    ! Shared checkpoint event for coupling state; not stored in restart files.
+    logical :: restart_written = .false.
 
     REAL,    allocatable, DIMENSION(:,:)   :: lat_lsm, lon_lsm
     REAL,    allocatable, DIMENSION(:,:,:) :: dist_lsm

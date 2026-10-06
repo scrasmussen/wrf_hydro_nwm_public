@@ -316,6 +316,28 @@ module WRFHydro_NUOPC
   contains
   !-----------------------------------------------------------------------------
 
+  pure function filename_time_string(timeString) result(filenameTime)
+    character(len=*), intent(in) :: timeString
+    character(len=len(timeString)) :: filenameTime
+    integer :: i
+
+    ! ROMIO treats a colon in an MPI I/O filename as a filesystem prefix.
+    ! Use the same colon-free timestamp for checkpoint writes and reads.
+    filenameTime = timeString
+    do i = 1, len(filenameTime)
+      if (filenameTime(i:i) == ':') filenameTime(i:i) = '.'
+    enddo
+  end function filename_time_string
+
+  pure function mpas_hydro_restart_prefix(timeString) result(filePrefix)
+    character(len=*), intent(in) :: timeString
+    character(len=27) :: filePrefix
+
+    ! Accept ESMF (T) or Hydro (_) date separators; avoid ROMIO's colon syntax.
+    filePrefix = "MPAS_HYDRO_RST."//timeString(1:4)//timeString(6:7)// &
+      timeString(9:10)//timeString(12:13)//timeString(15:16)
+  end function mpas_hydro_restart_prefix
+
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -1318,7 +1340,7 @@ module WRFHydro_NUOPC
     elseif (is%wrap%init_import .eq. FILLV_FILE) then
       call state_fill_file(is%wrap%NStateImp(1), &
         filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
-          "_imp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
+          "_imp_D"//trim(nStr)//"_"//trim(filename_time_string(currTimeStr)), rc=rc)
       if (ESMF_STDERRORCHECK(rc)) return
       call NUOPC_SetTimestamp(is%wrap%NStateImp(1), time=currTime, rc=rc)
       call check(rc, __LINE__, file)
@@ -1373,8 +1395,7 @@ module WRFHydro_NUOPC
     elseif (is%wrap%init_export .eq. FILLV_FILE) then
        call printa("initialize export state FILLV_FILE")
        call state_fill_file(is%wrap%NStateExp(1), &
-            filePrefix=trim(is%wrap%dirInput)//"/restart_"//trim(cname)// &
-            "_exp_D"//trim(nStr)//"_"//trim(currTimeStr), rc=rc)
+            filePrefix=trim(is%wrap%dirInput)//"/"//mpas_hydro_restart_prefix(currTimeStr), rc=rc)
        if (ESMF_STDERRORCHECK(rc)) return
        call NUOPC_SetTimestamp(is%wrap%NStateExp(1), time=currTime, rc=rc)
        call check(rc, __LINE__, file)
@@ -1653,11 +1674,12 @@ subroutine CheckImport(gcomp, rc)
     character(len=10)           :: sStr
     type(ESMF_Clock)            :: modelClock
     type(ESMF_State)            :: importState, exportState
-    type(ESMF_Time)             :: currTime, advEndTime
+    type(ESMF_Time)             :: currTime, advEndTime, hydroTime
     character(len=32)           :: currTimeStr, advEndTimeStr
     type(ESMF_TimeInterval)     :: timeStep
     character(len=9)            :: nStr
     character(len=16)           :: misgValTypeStr
+    logical                    :: checkpointPending
 
     type(ESMF_Grid)            :: wrfhydro_grid_l
 
@@ -1708,6 +1730,7 @@ subroutine CheckImport(gcomp, rc)
     call check(rc, __LINE__, file)
 
     ! query the clock for its current time and timestep
+    checkpointPending = .false.
     call ESMF_ClockGet(modelClock, &
       currTime=currTime, timeStep=timeStep, rc=rc)
     call check(rc, __LINE__, file)
@@ -1814,6 +1837,17 @@ subroutine CheckImport(gcomp, rc)
       if(ESMF_STDERRORCHECK(rc)) return ! bail out
       call ESMF_ClockAdvance(is%wrap%clock(1),rc=rc)
         call check(rc, __LINE__, file)
+      if (is%wrap%writeRestart .and. rt_domain(is%wrap%did)%restart_written) then
+        call ESMF_ClockGet(is%wrap%clock(1), currTime=hydroTime, rc=rc)
+        call check(rc, __LINE__, file)
+        if (hydroTime /= advEndTime) then
+          call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
+            msg="Hydro restart from rst_dt must coincide with a coupling boundary", &
+            line=__LINE__, file=__FILE__, rcToReturn=rc)
+          return
+        endif
+        checkpointPending = .true.
+      endif
       is%wrap%stepTimer(1) = &
            is%wrap%stepTimer(1) - timestep
     end do
@@ -1861,6 +1895,16 @@ subroutine CheckImport(gcomp, rc)
     endif
 
     ! Write export files
+    ! Save the mesh return fields after routing, at the same coupling boundary
+    ! as the model checkpoint. They cannot be reconstructed from the routing
+    ! grid alone: soil exports retain MPAS values outside the routing domain.
+    ! Follow HYDRO_rst_out's rst_dt schedule, including monthly checkpoints.
+    if (checkpointPending) then
+      call NUOPC_Write(is%wrap%NStateExp(1), &
+        fileNamePrefix=trim(is%wrap%dirOutput)//"/"//mpas_hydro_restart_prefix(advEndTimeStr)//"_", &
+        overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
+      call check(rc, __LINE__, file)
+    endif
     if (btest(diagnostic,16)) then
        call NUOPC_Write(is%wrap%NStateExp(1), &
             fileNamePrefix=trim(is%wrap%dirOutput)//"/diag_"//trim(cname)//"_"// &
@@ -1989,14 +2033,8 @@ subroutine CheckImport(gcomp, rc)
 
     write (nStr,"(I0)") is%wrap%did
 
-    ! Write export file
-    if (is%wrap%writeRestart) then
-       call NUOPC_Write(is%wrap%NStateExp(1), &
-            fileNamePrefix=trim(is%wrap%dirOutput)//"/restart_"//trim(cname)// &
-            "_exp_D"//trim(nStr)//"_"//trim(currTimeStr)//"_", &
-            overwrite=.true., status=ESMF_FILESTATUS_REPLACE, timeslice=1, rc=rc)
-       call check(rc, __LINE__, file)
-    endif
+    ! Export checkpoints are written only with native Hydro checkpoints in
+    ! ModelAdvance, so finalization cannot create an off-schedule checkpoint.
 
     call wrfhydro_nuopc_fin(is%wrap%did,rc)
     call check(rc, __LINE__, file)
